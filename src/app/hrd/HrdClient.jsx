@@ -82,13 +82,13 @@ export default function HrdClient({ sites, board, scenarios }) {
           <div style={{ width: '100%', height: 260 }}>
             <ResponsiveContainer>
               <BarChart data={byMonth}>
-                <CartesianGrid stroke="#eef0f3" vertical={false} />
+                <CartesianGrid stroke="#e3e6eb" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={(v) => (v / 1e6).toFixed(0) + ' jt'} tick={{ fontSize: 11 }} width={56} />
                 <Tooltip formatter={(v) => idr(v)} />
                 <Legend />
-                <Bar dataKey="scenario" name="Biaya skenario" fill="#F97316" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="saving" name="Penghematan" fill="#16A34A" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="scenario" name="Biaya skenario" fill="#d08a4a" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="saving" name="Penghematan" fill="#086840" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

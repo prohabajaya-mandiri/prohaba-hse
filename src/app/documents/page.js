@@ -3,6 +3,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listDocuments } from '@/lib/services/documents';
 import DocumentsClient from './DocumentsClient';
 
+export const metadata = { title: 'Dokumen HSE' };
+
 export default async function DocumentsPage({ searchParams }) {
   const user = await requirePage('/documents');
   const q = await query(searchParams);

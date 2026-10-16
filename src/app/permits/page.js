@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listPermits } from '@/lib/services/permits';
 import PermitsClient from './PermitsClient';
 
+export const metadata = { title: 'Permit & SKS' };
+
 export default async function PermitsPage({ searchParams }) {
   const user = await requirePage('/permits');
   const q = await query(searchParams);

@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listLeaves, listPolicies, rosterBoard } from '@/lib/services/roster';
 import RosterClient from './RosterClient';
 
+export const metadata = { title: 'Roster & Cuti' };
+
 export default async function RosterPage({ searchParams }) {
   const user = await requirePage('/roster');
   const q = await query(searchParams);

@@ -6,6 +6,8 @@ import { listPlacements } from '@/lib/services/placements';
 import { scopedPersonnel } from '@/lib/services/common';
 import PlacementsClient from './PlacementsClient';
 
+export const metadata = { title: 'Penempatan & Mutasi' };
+
 export default async function PlacementsPage({ searchParams }) {
   const user = await requirePage('/placements');
   const q = await query(searchParams);

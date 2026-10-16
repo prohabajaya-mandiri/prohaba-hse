@@ -4,6 +4,8 @@ import { requirePage } from '@/lib/page';
 import { getReport } from '@/lib/services/reports';
 import ReportDetail from './ReportDetail';
 
+export const metadata = { title: 'Detail Laporan' };
+
 export default async function ReportPage({ params }) {
   const user = await requirePage('/reports');
   const { id } = await params;

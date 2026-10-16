@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listActivities, listDaily, listIndicators, recap } from '@/lib/services/performance';
 import PerformanceClient from './PerformanceClient';
 
+export const metadata = { title: 'HSE Performance' };
+
 export default async function PerformancePage({ searchParams }) {
   const user = await requirePage('/performance');
   const q = await query(searchParams);

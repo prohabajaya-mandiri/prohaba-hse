@@ -3,6 +3,8 @@ import { requirePage } from '@/lib/page';
 import { ROLE_LABELS } from '@/lib/access';
 import AccountClient from './AccountClient';
 
+export const metadata = { title: 'Akun Saya' };
+
 export default async function AccountPage() {
   const user = await requirePage('/account');
   return (

@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { competencyGaps, listCertificates, listCompetencies, listSessions } from '@/lib/services/training';
 import TrainingClient from './TrainingClient';
 
+export const metadata = { title: 'Training & Kompetensi' };
+
 export default async function TrainingPage({ searchParams }) {
   const user = await requirePage('/training');
   const q = await query(searchParams);

@@ -71,15 +71,15 @@ export default function PerformanceClient({ tab, sites, data, activities, daily,
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer>
                 <ComposedChart data={data.trend} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid stroke="#eef0f3" vertical={false} />
+                  <CartesianGrid stroke="#e3e6eb" vertical={false} />
                   <XAxis dataKey="period" tick={{ fontSize: 11 }} />
                   <YAxis yAxisId="mh" tick={{ fontSize: 11 }} width={60} />
                   <YAxis yAxisId="n" orientation="right" tick={{ fontSize: 11 }} width={36} allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  <Bar yAxisId="n" dataKey="activities" name="Aktivitas" fill="#2760A8" radius={[4, 4, 0, 0]} />
-                  <Bar yAxisId="n" dataKey="incidents" name="Kejadian" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                  <Line yAxisId="mh" type="monotone" dataKey="manhours" name="Manhours" stroke="#F97316" strokeWidth={2} dot={false} />
+                  <Bar yAxisId="n" dataKey="activities" name="Aktivitas" fill="#086840" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="n" dataKey="incidents" name="Kejadian" fill="#c2453d" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="mh" type="monotone" dataKey="manhours" name="Manhours" stroke="#d08a4a" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

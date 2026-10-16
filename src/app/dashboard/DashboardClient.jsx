@@ -8,8 +8,9 @@ import { formatDate } from '@/lib/dates';
 import { fmtNum, labelOf } from '@/lib/labels';
 import { CATEGORIES, WORK_STATUSES } from '@/lib/domain/personnel';
 
-const STATUS_COLORS = { ACTIVE: '#16A34A', CUTI: '#3B82F6', SAKIT: '#F97316', MCU: '#1E4A8A', RESIGN: '#9CA3AF', DIRUMAHKAN: '#EAB308', MUTASI: '#7AAAD9' };
-const FIT_COLORS = { FIT: '#16A34A', FOLLOW_UP: '#EAB308', UNFIT: '#DC2626', PROSES: '#3B82F6', BELUM_MCU: '#9CA3AF', FU_TERLAMBAT: '#EA580C', MCU_KEDALUWARSA: '#991B1B' };
+// Warna grafik diredam: hijau K3 sebagai warna utama, aksen lembut seperlunya.
+const STATUS_COLORS = { ACTIVE: '#086840', CUTI: '#5b8fc7', SAKIT: '#d08a4a', MCU: '#7fb3a0', RESIGN: '#b3b9c2', DIRUMAHKAN: '#d4b45a', MUTASI: '#8aa5c9' };
+const FIT_COLORS = { FIT: '#086840', FOLLOW_UP: '#d4a73a', UNFIT: '#c2453d', PROSES: '#5b8fc7', BELUM_MCU: '#b3b9c2', FU_TERLAMBAT: '#d08a4a', MCU_KEDALUWARSA: '#8f2a24' };
 
 export default function DashboardClient({ sites, data }) {
   const statusData = WORK_STATUSES.map((s) => ({ name: labelOf(s), value: data.totals.statuses[s] ?? 0, key: s })).filter((x) => x.value);
@@ -66,7 +67,7 @@ export default function DashboardClient({ sites, data }) {
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={fitData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
-                  {fitData.map((d) => <Cell key={d.key} fill={FIT_COLORS[d.key] ?? '#9CA3AF'} />)}
+                  {fitData.map((d) => <Cell key={d.key} fill={FIT_COLORS[d.key] ?? '#b3b9c2'} />)}
                 </Pie>
                 <Tooltip />
                 <Legend />
@@ -81,14 +82,14 @@ export default function DashboardClient({ sites, data }) {
           <div style={{ width: '100%', height: 280 }}>
             <ResponsiveContainer>
               <BarChart data={siteChart}>
-                <CartesianGrid stroke="#eef0f3" vertical={false} />
+                <CartesianGrid stroke="#e3e6eb" vertical={false} />
                 <XAxis dataKey="site" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} width={40} allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="Staff" stackId="a" fill="#1E4A8A" />
-                <Bar dataKey="Manpower" stackId="a" fill="#F97316" />
-                <Bar dataKey="Harian Kantor" stackId="a" fill="#7AAAD9" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Staff" stackId="a" fill="#086840" />
+                <Bar dataKey="Manpower" stackId="a" fill="#5fa883" />
+                <Bar dataKey="Harian Kantor" stackId="a" fill="#b7d3c3" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

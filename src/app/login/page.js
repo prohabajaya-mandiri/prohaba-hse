@@ -1,6 +1,6 @@
 import LoginClient from './LoginClient';
 
-export const metadata = { title: 'Login - E-HSE Prohaba Jaya Mandiri' };
+export const metadata = { title: 'Masuk' };
 
 export default function LoginPage() {
   return <LoginClient />;

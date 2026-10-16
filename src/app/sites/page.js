@@ -4,6 +4,8 @@ import { listSites } from '@/lib/services/sites';
 import { canManageMaster } from '@/lib/access';
 import SitesClient from './SitesClient';
 
+export const metadata = { title: 'Site & Proyek' };
+
 export default async function SitesPage() {
   const user = await requirePage('/sites');
   const sites = await listSites(user);

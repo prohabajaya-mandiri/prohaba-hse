@@ -3,6 +3,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { hrBoard, listScenarios } from '@/lib/services/hrd';
 import HrdClient from './HrdClient';
 
+export const metadata = { title: 'Monitoring HRD' };
+
 export default async function HrdPage({ searchParams }) {
   const user = await requirePage('/hrd');
   const q = await query(searchParams);

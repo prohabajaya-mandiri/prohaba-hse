@@ -3,6 +3,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listAudit } from '@/lib/services/settings-admin';
 import AuditClient from './AuditClient';
 
+export const metadata = { title: 'Audit Log' };
+
 export default async function AuditPage({ searchParams }) {
   const user = await requirePage('/audit-log');
   const q = await query(searchParams);

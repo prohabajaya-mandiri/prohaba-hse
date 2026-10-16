@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listPersonnel } from '@/lib/services/personnel';
 import PersonnelClient from './PersonnelClient';
 
+export const metadata = { title: 'Database Personel' };
+
 export default async function PersonnelPage({ searchParams }) {
   const user = await requirePage('/personnel');
   const q = await query(searchParams);

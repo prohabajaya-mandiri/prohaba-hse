@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listMobilizations } from '@/lib/services/mobilization';
 import MobilizationClient from './MobilizationClient';
 
+export const metadata = { title: 'Mobilisasi' };
+
 export default async function MobilizationPage({ searchParams }) {
   const user = await requirePage('/mobilization');
   const q = await query(searchParams);

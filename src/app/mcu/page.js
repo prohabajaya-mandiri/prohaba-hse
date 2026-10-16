@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listMcu } from '@/lib/services/mcu';
 import McuClient from './McuClient';
 
+export const metadata = { title: 'Medical Check Up' };
+
 export default async function McuPage({ searchParams }) {
   const user = await requirePage('/mcu');
   const q = await query(searchParams);

@@ -3,6 +3,8 @@ import { requirePage } from '@/lib/page';
 import { listSettings } from '@/lib/services/settings-admin';
 import SettingsClient from './SettingsClient';
 
+export const metadata = { title: 'Parameter' };
+
 export default async function SettingsPage() {
   const user = await requirePage('/settings');
   const settings = await listSettings();

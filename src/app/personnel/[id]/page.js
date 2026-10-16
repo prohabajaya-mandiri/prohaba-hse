@@ -5,6 +5,8 @@ import { getPersonnel } from '@/lib/services/personnel';
 import { redirect } from 'next/navigation';
 import PersonnelDetail from './PersonnelDetail';
 
+export const metadata = { title: 'Detail Personel' };
+
 export default async function PersonnelDetailPage({ params }) {
   const user = await requirePage('/personnel');
   const { id } = await params;

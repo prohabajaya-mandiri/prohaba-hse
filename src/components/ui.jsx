@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Paperclip, Search } from 'lucide-react';
@@ -24,10 +25,10 @@ export function Modal({ open, onClose, title, subtitle, size = '', children, foo
             <div className="modal-header">
               <div>
                 <div className="modal-title">{title}</div>
-                {subtitle && <div className="muted" style={{ marginTop: 2 }}>{subtitle}</div>}
+                {subtitle && <div className="modal-subtitle">{subtitle}</div>}
               </div>
-              <button type="button" onClick={onClose} className="btn-ghost" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gray-400)' }} aria-label="Tutup">
-                <X size={22} />
+              <button type="button" onClick={onClose} className="icon-btn modal-close" aria-label="Tutup">
+                <X size={20} />
               </button>
             </div>
             <div className="modal-body">{children}</div>
@@ -49,7 +50,7 @@ export function DataTable({ columns, rows, empty = 'Belum ada data.', onRowClick
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={columns.length} style={{ textAlign: 'center', padding: 36, color: 'var(--gray-500)', display: 'table-cell' }}>{empty}</td></tr>
+            <tr><td colSpan={columns.length} className="cell-empty" style={{ display: 'table-cell' }}>{empty}</td></tr>
           ) : rows.map((row, i) => (
             <tr key={rowKey(row, i)} className={onRowClick ? 'clickable' : ''} onClick={onRowClick ? () => onRowClick(row) : undefined}>
               {columns.map((c) => (
@@ -79,7 +80,7 @@ export function Kpi({ label, value, tone = 'navy', icon: Icon, hint, href }) {
       {hint && <div className="kpi-trend flat">{hint}</div>}
     </div>
   );
-  return href ? <a href={href} style={{ textDecoration: 'none' }}>{body}</a> : body;
+  return href ? <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>{body}</Link> : body;
 }
 
 export function Card({ title, actions, children, padding = 20 }) {
@@ -198,8 +199,8 @@ export function FilterBar({ filters, children }) {
         f.type === 'search' ? (
           <form key="q" className="form-group" style={{ position: 'relative', minWidth: 220 }} onSubmit={(e) => { e.preventDefault(); apply('q', q.trim()); }}>
             <label className="form-label">{f.label ?? 'Cari'}</label>
-            <Search size={16} style={{ position: 'absolute', left: 12, bottom: 12, color: 'var(--gray-400)' }} />
-            <input className="form-input" style={{ paddingLeft: 34 }} value={q} placeholder={f.placeholder ?? 'Ketik lalu Enter'} onChange={(e) => setQ(e.target.value)} />
+            <Search size={17} style={{ position: 'absolute', left: 12, bottom: 12.5, color: 'var(--gray-400)', pointerEvents: 'none' }} />
+            <input className="form-input" style={{ paddingLeft: 38 }} value={q} placeholder={f.placeholder ?? 'Ketik lalu Enter'} onChange={(e) => setQ(e.target.value)} />
           </form>
         ) : (
           <div key={f.name} className="form-group">
@@ -308,10 +309,10 @@ export function PersonnelPicker({ value, onChange, params = {}, required }) {
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
         onChange={(e) => { setTerm(e.target.value); setOpen(true); }} />
       {open && items.length > 0 && (
-        <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: '100%', background: 'white', border: '1px solid var(--gray-200)', borderRadius: 10, boxShadow: 'var(--shadow-lg)', maxHeight: 240, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 'calc(100% + 4px)', background: 'white', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', maxHeight: 260, overflowY: 'auto' }}>
           {items.map((p) => (
             <button type="button" key={p.id} onMouseDown={() => { setSelected(p); onChange(p.id, p); setTerm(''); setOpen(false); }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 'none', background: p.id === value ? 'var(--navy-50)' : 'white', cursor: 'pointer', fontSize: 13 }}>
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: 'none', background: p.id === value ? 'var(--brand-50)' : 'white', cursor: 'pointer', fontSize: 14 }}>
               <strong>{p.name}</strong> <span className="muted">· {p.code} · {p.position} · {p.siteName ?? '-'}</span>
             </button>
           ))}
@@ -330,12 +331,19 @@ export function Pager({ page, total, limit = 50 }) {
     next.set('page', String(n));
     router.push(pathname + '?' + next);
   };
-  if (total <= limit) return <div className="muted" style={{ margin: '12px 0' }}>{total} data</div>;
+  if (!total) return null;
+  const pages = Math.ceil(total / limit);
+  const from = (page - 1) * limit + 1;
+  const to = Math.min(page * limit, total);
   return (
-    <nav aria-label="Halaman data" className="no-print" style={{ display: 'flex', gap: 12, margin: '14px 0', alignItems: 'center', flexWrap: 'wrap' }}>
-      <button className="btn btn-outline btn-sm" disabled={page <= 1} onClick={() => go(page - 1)}>← Sebelumnya</button>
-      <span className="muted">Halaman {page} dari {Math.ceil(total / limit)} · {total} data</span>
-      <button className="btn btn-outline btn-sm" disabled={page * limit >= total} onClick={() => go(page + 1)}>Berikutnya →</button>
+    <nav aria-label="Halaman data" className="pager no-print">
+      <span>Menampilkan {from.toLocaleString('id-ID')}–{to.toLocaleString('id-ID')} dari {total.toLocaleString('id-ID')} data{pages > 1 ? ` · halaman ${page} dari ${pages}` : ''}</span>
+      {pages > 1 && (
+        <span className="pager-nav">
+          <button className="btn btn-outline btn-sm" disabled={page <= 1} onClick={() => go(page - 1)}>← Sebelumnya</button>
+          <button className="btn btn-outline btn-sm" disabled={page >= pages} onClick={() => go(page + 1)}>Berikutnya →</button>
+        </span>
+      )}
     </nav>
   );
 }

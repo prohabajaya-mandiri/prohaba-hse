@@ -3,6 +3,8 @@ import { requirePage } from '@/lib/page';
 import { pendingApprovals } from '@/lib/services/inbox';
 import ApprovalsClient from './ApprovalsClient';
 
+export const metadata = { title: 'Persetujuan' };
+
 export default async function ApprovalsPage() {
   const user = await requirePage('/approvals');
   const data = await pendingApprovals(user);

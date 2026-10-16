@@ -4,6 +4,8 @@ import { listNotifications } from '@/lib/services/inbox';
 import { maybeRunReminders } from '@/lib/services/reminders';
 import NotificationsClient from './NotificationsClient';
 
+export const metadata = { title: 'Notifikasi' };
+
 export default async function NotificationsPage({ searchParams }) {
   const user = await requirePage('/notifications');
   const q = await query(searchParams);

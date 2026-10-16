@@ -3,6 +3,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { listReports } from '@/lib/services/reports';
 import ReportsClient from './ReportsClient';
 
+export const metadata = { title: 'Laporan HSE Site' };
+
 export default async function ReportsPage({ searchParams }) {
   const user = await requirePage('/reports');
   const q = await query(searchParams);

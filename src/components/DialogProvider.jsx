@@ -1,49 +1,37 @@
 'use client';
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, HelpCircle, FileText } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, HelpCircle, PencilLine, XCircle } from 'lucide-react';
 
 const DialogContext = createContext({});
 
 export const useDialog = () => useContext(DialogContext);
 
+let nextId = 0;
+
 export default function DialogProvider({ children }) {
   const [dialogs, setDialogs] = useState([]);
 
-  const addDialog = (dialog) => {
-    setDialogs((prev) => [...prev, { ...dialog, id: Date.now().toString() }]);
-  };
+  const addDialog = (dialog) => setDialogs((prev) => [...prev, { ...dialog, id: ++nextId }]);
+  const removeDialog = (id) => setDialogs((prev) => prev.filter((d) => d.id !== id));
 
-  const removeDialog = (id) => {
-    setDialogs((prev) => prev.filter((d) => d.id !== id));
-  };
+  const showAlert = useCallback((message, title = 'Informasi') => new Promise((resolve) => {
+    addDialog({ type: 'alert', title, message, resolve });
+  }), []);
 
-  const showAlert = useCallback((message, title = 'Informasi') => {
-    return new Promise((resolve) => {
-      addDialog({ type: 'alert', title, message, resolve });
-    });
-  }, []);
+  const showConfirm = useCallback((message, title = 'Konfirmasi') => new Promise((resolve) => {
+    addDialog({ type: 'confirm', title, message, resolve });
+  }), []);
 
-  const showConfirm = useCallback((message, title = 'Konfirmasi') => {
-    return new Promise((resolve) => {
-      addDialog({ type: 'confirm', title, message, resolve });
-    });
-  }, []);
-
-  const showPrompt = useCallback((message, title = 'Masukkan Data', defaultValue = '') => {
-    return new Promise((resolve) => {
-      addDialog({ type: 'prompt', title, message, resolve, promptValue: defaultValue });
-    });
-  }, []);
+  const showPrompt = useCallback((message, title = 'Masukkan Data', defaultValue = '') => new Promise((resolve) => {
+    addDialog({ type: 'prompt', title, message, resolve, promptValue: defaultValue });
+  }), []);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (dialogs.length === 0) return;
-      const topDialog = dialogs[dialogs.length - 1];
-      if (e.key === 'Escape') {
-        topDialog.resolve(topDialog.type === 'prompt' ? null : false);
-        removeDialog(topDialog.id);
-      }
+      if (dialogs.length === 0 || e.key !== 'Escape') return;
+      const top = dialogs[dialogs.length - 1];
+      top.resolve(top.type === 'prompt' ? null : false);
+      removeDialog(top.id);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -52,186 +40,89 @@ export default function DialogProvider({ children }) {
   return (
     <DialogContext.Provider value={{ showAlert, showConfirm, showPrompt }}>
       {children}
-      <AnimatePresence>
-        {dialogs.map((dialog, index) => {
-          const isTop = index === dialogs.length - 1;
-          return (
-            <DialogItem 
-              key={dialog.id} 
-              dialog={dialog} 
-              isTop={isTop} 
-              onClose={() => removeDialog(dialog.id)} 
-            />
-          );
-        })}
-      </AnimatePresence>
+      {dialogs.map((dialog, index) => (
+        <DialogItem
+          key={dialog.id}
+          dialog={dialog}
+          isTop={index === dialogs.length - 1}
+          onClose={() => removeDialog(dialog.id)}
+        />
+      ))}
     </DialogContext.Provider>
   );
 }
 
+// Nada ikon mengikuti judul yang dipakai halaman: "Sukses"/"Berhasil" hijau,
+// "Error"/"Gagal" merah, konfirmasi oranye, sisanya biru.
+function toneOf(dialog) {
+  if (dialog.type === 'confirm') return { Icon: HelpCircle, color: 'var(--accent-600)', bg: 'var(--accent-50)' };
+  if (dialog.type === 'prompt') return { Icon: PencilLine, color: 'var(--brand-600)', bg: 'var(--brand-50)' };
+  const t = String(dialog.title).toLowerCase();
+  if (/sukses|berhasil/.test(t)) return { Icon: CheckCircle2, color: 'var(--green-600)', bg: 'var(--green-50)' };
+  if (/error|gagal|peringatan/.test(t)) return { Icon: XCircle, color: 'var(--red-600)', bg: 'var(--red-50)' };
+  return { Icon: AlertCircle, color: 'var(--brand-600)', bg: 'var(--brand-50)' };
+}
+
 function DialogItem({ dialog, isTop, onClose }) {
   const [inputValue, setInputValue] = useState(dialog.promptValue || '');
+  const confirmRef = useRef(null);
+  const { Icon, color, bg } = toneOf(dialog);
+  const destructive = dialog.type === 'confirm' && /hapus|batalkan|arsip|keluar|tolak/i.test(`${dialog.title} ${dialog.message}`);
+
+  useEffect(() => {
+    if (dialog.type !== 'prompt') confirmRef.current?.focus();
+  }, [dialog.type]);
 
   const handleConfirm = () => {
-    if (dialog.type === 'prompt') dialog.resolve(inputValue);
-    else dialog.resolve(true);
+    dialog.resolve(dialog.type === 'prompt' ? inputValue : true);
     onClose();
   };
 
   const handleCancel = () => {
-    if (dialog.type === 'prompt') dialog.resolve(null);
-    else dialog.resolve(false);
+    dialog.resolve(dialog.type === 'prompt' ? null : false);
     onClose();
   };
 
-  const getIcon = () => {
-    if (dialog.type === 'alert') return <AlertCircle size={28} style={{ color: 'var(--blue-500)' }} />;
-    if (dialog.type === 'confirm') return <HelpCircle size={28} style={{ color: 'var(--orange-500)' }} />;
-    return <FileText size={28} style={{ color: 'var(--navy-600)' }} />;
-  };
-
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        pointerEvents: isTop ? 'auto' : 'none'
-      }}
-    >
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        onClick={handleCancel}
-        style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(4px)'
-        }}
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.2, type: 'spring', bounce: 0.3 }}
-        style={{
-          position: 'relative',
-          backgroundColor: '#fff',
-          width: '100%',
-          maxWidth: '420px',
-          borderRadius: '20px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          pointerEvents: 'auto'
-        }}
-      >
-        <div style={{ padding: '24px 24px 16px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '8px' }}>
-            <div style={{ padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '16px', flexShrink: 0 }}>
-              {getIcon()}
-            </div>
-            <div>
-              <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '4px', lineHeight: 1.2 }}>
-                {dialog.title}
-              </h3>
-              <p style={{ fontSize: '14px', color: 'var(--gray-600)', lineHeight: 1.5, margin: 0 }}>
-                {dialog.message}
-              </p>
-            </div>
+    <div className="modal-overlay" style={{ zIndex: 400, pointerEvents: isTop ? 'auto' : 'none', alignItems: 'center' }} onMouseDown={(e) => e.target === e.currentTarget && handleCancel()}>
+      <div className="modal modal-sm" role="alertdialog" aria-modal="true" aria-labelledby={`dlg-${dialog.id}`} style={{ borderRadius: 'var(--radius-xl)' }}>
+        <div style={{ padding: '22px 22px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-full)', background: bg, color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <Icon size={22} />
           </div>
-          
-          {dialog.type === 'prompt' && (
-            <div style={{ marginTop: '16px' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h3 id={`dlg-${dialog.id}`} style={{ fontSize: 17, marginBottom: 4 }}>{dialog.title}</h3>
+            <p style={{ fontSize: 14.5, color: 'var(--gray-600)', lineHeight: 1.6, whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
+              {dialog.message}
+            </p>
+            {dialog.type === 'prompt' && (
               <input
                 type="text"
                 autoFocus
+                className="form-input"
+                style={{ marginTop: 14 }}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleConfirm();
-                }}
-                placeholder="Ketik di sini..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  backgroundColor: 'var(--gray-50)',
-                  border: '1px solid var(--gray-200)',
-                  borderRadius: '12px',
-                  outline: 'none',
-                  fontSize: '15px',
-                  transition: 'all 0.2s'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--navy-500)';
-                  e.target.style.boxShadow = '0 0 0 2px var(--navy-100)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--gray-200)';
-                  e.target.style.boxShadow = 'none';
-                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
+                placeholder="Ketik di sini…"
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
-
-        <div style={{ padding: '16px 24px', backgroundColor: 'var(--gray-50)', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--gray-100)' }}>
+        <div className="modal-footer">
           {dialog.type !== 'alert' && (
-            <button
-              onClick={handleCancel}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '12px',
-                fontWeight: 600,
-                color: 'var(--gray-600)',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '14px',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--gray-200)'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-            >
-              Batal
-            </button>
+            <button type="button" className="btn btn-outline" onClick={handleCancel}>Batal</button>
           )}
           <button
-            autoFocus={dialog.type !== 'prompt'}
+            ref={confirmRef}
+            type="button"
+            className={`btn ${destructive ? 'btn-danger' : 'btn-primary'}`}
             onClick={handleConfirm}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '12px',
-              fontWeight: 600,
-              color: '#fff',
-              backgroundColor: dialog.type === 'confirm' ? 'var(--orange-500)' : 'var(--navy-600)',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '14px',
-              boxShadow: dialog.type === 'confirm' ? '0 4px 14px 0 rgba(249,115,22,0.39)' : '0 4px 14px 0 rgba(15,23,42,0.39)',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-1px)';
-              e.target.style.boxShadow = dialog.type === 'confirm' ? '0 6px 20px rgba(249,115,22,0.23)' : '0 6px 20px rgba(15,23,42,0.23)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = dialog.type === 'confirm' ? '0 4px 14px 0 rgba(249,115,22,0.39)' : '0 4px 14px 0 rgba(15,23,42,0.39)';
-            }}
           >
-            {dialog.type === 'alert' ? 'Mengerti' : dialog.type === 'prompt' ? 'Konfirmasi' : 'Ya, Lanjutkan'}
+            {dialog.type === 'alert' ? 'Mengerti' : dialog.type === 'prompt' ? 'Simpan' : 'Ya, lanjutkan'}
           </button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
-  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut,
+  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X,
 } from 'lucide-react';
 import { useDialog } from './DialogProvider';
 import { canAccess, ROLE_LABELS } from '@/lib/access';
@@ -61,27 +62,31 @@ const NAV_ITEMS = [
   },
 ];
 
+const initials = (name) => (name || 'U').trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+
 export default function Sidebar({ user, isOpen, setIsOpen }) {
   const pathname = usePathname();
   const { showConfirm } = useDialog();
   if (!user) return null;
   const role = user.role;
-  const initials = (user.operatorName || user.name || 'U').split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 
   const handleLogout = async () => {
-    if (await showConfirm('Apakah Anda yakin ingin keluar dari aplikasi?')) signOut({ callbackUrl: '/login' });
+    if (await showConfirm('Apakah Anda yakin ingin keluar dari aplikasi?', 'Keluar')) signOut({ callbackUrl: '/login' });
   };
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`} aria-label="Navigasi utama">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-inner">
-          <div className="sidebar-logo-icon">P</div>
-          <div className="sidebar-logo-text">
-            <div className="sidebar-logo-name">Prohaba Jaya Mandiri</div>
-            <div className="sidebar-logo-sub">E-HSE</div>
-          </div>
-        </div>
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, color: 'inherit' }}>
+          <Image src="/brand/prohaba-hse-logo.png" alt="Logo Prohaba Jaya Mandiri dan K3" width={88} height={41} priority />
+          <span className="sidebar-logo-text">
+            <span className="sidebar-logo-name" style={{ display: 'block' }}>E-HSE</span>
+            <span className="sidebar-logo-sub" style={{ display: 'block' }}>Prohaba Jaya Mandiri</span>
+          </span>
+        </Link>
+        <button type="button" className="sidebar-close" onClick={() => setIsOpen?.(false)} aria-label="Tutup navigasi">
+          <X size={20} />
+        </button>
       </div>
 
       <nav className="sidebar-nav">
@@ -92,11 +97,17 @@ export default function Sidebar({ user, isOpen, setIsOpen }) {
             <div key={section.section} className="nav-section">
               <div className="nav-section-label">{section.section}</div>
               {visible.map((item) => {
-                const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
+                const active = pathname === item.href || pathname.startsWith(item.href + '/');
                 const Icon = item.icon;
                 return (
-                  <Link key={item.href} href={item.href} className={`nav-item ${active || pathname === item.href ? 'active' : ''}`} onClick={() => setIsOpen?.(false)}>
-                    <Icon size={18} className="nav-icon" />
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`nav-item ${active ? 'active' : ''}`}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => setIsOpen?.(false)}
+                  >
+                    <Icon className="nav-icon" aria-hidden />
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -107,21 +118,17 @@ export default function Sidebar({ user, isOpen, setIsOpen }) {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="sidebar-user" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link href="/account" style={{ display: 'flex', gap: 12, alignItems: 'center', textDecoration: 'none', minWidth: 0 }}>
-            <div className="user-avatar">{initials}</div>
-            <div className="user-info" style={{ minWidth: 0 }}>
-              <div className="user-name truncate" style={{ fontSize: 13 }}>{user.operatorName || user.name}</div>
-              <div className="user-role truncate" style={{ fontSize: 11 }}>
+        <div className="sidebar-user">
+          <Link href="/account" className="sidebar-user-link" title="Akun & kata sandi">
+            <div className="user-avatar" aria-hidden>{initials(user.operatorName || user.name)}</div>
+            <div className="user-info">
+              <div className="user-name">{user.operatorName || user.name}</div>
+              <div className="user-role">
                 {ROLE_LABELS[role] || role}{user.operatorName ? ' · ' + user.name : ''}
               </div>
             </div>
           </Link>
-          <button
-            onClick={handleLogout}
-            style={{ background: 'transparent', border: 'none', color: 'var(--red-500)', cursor: 'pointer', padding: 4, display: 'flex', borderRadius: 4 }}
-            title="Keluar"
-          >
+          <button type="button" onClick={handleLogout} className="icon-btn danger" title="Keluar" aria-label="Keluar">
             <LogOut size={18} />
           </button>
         </div>

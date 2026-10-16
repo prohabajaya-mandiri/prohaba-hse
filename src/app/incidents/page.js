@@ -4,6 +4,8 @@ import { query, requirePage, scopedSites } from '@/lib/page';
 import { incidentSettings, listIncidents } from '@/lib/services/incidents';
 import IncidentsClient from './IncidentsClient';
 
+export const metadata = { title: 'Insiden' };
+
 export default async function IncidentsPage({ searchParams }) {
   const user = await requirePage('/incidents');
   const q = await query(searchParams);

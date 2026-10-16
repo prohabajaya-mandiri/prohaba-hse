@@ -5,6 +5,8 @@ import { dashboard } from '@/lib/services/dashboard';
 import { maybeRunReminders } from '@/lib/services/reminders';
 import DashboardClient from './DashboardClient';
 
+export const metadata = { title: 'Dashboard' };
+
 export default async function DashboardPage({ searchParams }) {
   const user = await requirePage('/dashboard');
   const q = await query(searchParams);
