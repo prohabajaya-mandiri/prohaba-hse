@@ -298,6 +298,55 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   font-weight: 600;
 }
 
+/* Modul dengan sub-menu: induk hanya diberi warna teks, sub-menu yang aktif
+   yang mendapat latar, agar posisi pengguna terbaca satu tingkat saja. */
+.nav-row { position: relative; display: flex; align-items: center; }
+.nav-row .nav-item { flex: 1; min-width: 0; }
+.nav-item.has-sub { padding-right: 48px; }
+.nav-item.has-sub.active { background: transparent; }
+.nav-item.has-sub.active:hover { background: var(--gray-50); }
+.nav-toggle {
+  position: absolute;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  color: var(--gray-400);
+}
+.nav-toggle:hover { background: var(--gray-100); color: var(--gray-700); }
+.nav-toggle svg { width: 17px; height: 17px; transition: transform var(--transition-fast); }
+.nav-group.open .nav-toggle svg { transform: rotate(180deg); }
+
+.nav-sub {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  margin: 2px 0 6px;
+}
+/* Garis panduan tipis yang menghubungkan sub-menu dengan induknya. */
+.nav-sub::before {
+  content: "";
+  position: absolute;
+  left: 29px;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--gray-200);
+}
+.nav-subitem {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 7px 16px 7px 51px;
+  font-size: 14px;
+  color: var(--gray-600);
+  letter-spacing: -0.15px;
+}
+.nav-subitem:hover { background: var(--gray-50); color: var(--gray-900); text-decoration: none; }
+.nav-subitem.active { background: var(--brand-50); color: var(--brand-700); font-weight: 600; }
+
 .nav-icon { width: 19px; height: 19px; color: var(--gray-400); }
 .nav-item:hover .nav-icon { color: var(--gray-600); }
 .nav-item.active .nav-icon { color: var(--brand-600); }

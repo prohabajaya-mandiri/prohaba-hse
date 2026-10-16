@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Plus, Download, Printer, Edit, Trash2, Clock, Users, ShieldCheck, Activity } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { Badge, Card, DataTable, FileInput, FileLinks, FilterBar, FormFields, Kpi, Modal, Pager, useSubmit } from '@/components/ui';
@@ -10,10 +10,8 @@ import { addDays, formatDate, iso, todayIso } from '@/lib/dates';
 import { fmtNum, labelOf } from '@/lib/labels';
 import { calcManhours } from '@/lib/domain/performance';
 
-const TABS = [['recap', 'Rekap & tren'], ['input', 'Input harian'], ['activities', 'Aktivitas HSE'], ['indicators', 'Indikator & target']];
 
 export default function PerformanceClient({ tab, sites, data, activities, daily, indicators, page, canEdit, canIndicator }) {
-  const router = useRouter();
   const params = useSearchParams();
   const { submit, busy } = useSubmit();
   const { showConfirm } = useDialog();
@@ -30,12 +28,6 @@ export default function PerformanceClient({ tab, sites, data, activities, daily,
     { name: 'to', label: 'Sampai', type: 'date', default: todayIso() },
   ];
 
-  const go = (t) => {
-    const next = new URLSearchParams(params.toString());
-    next.set('tab', t);
-    next.delete('page');
-    router.push('/performance?' + next);
-  };
 
   const saveActivity = async (e) => {
     e.preventDefault();
@@ -50,10 +42,6 @@ export default function PerformanceClient({ tab, sites, data, activities, daily,
 
   return (
     <div className="stack">
-      <div className="tabs-bar no-print">
-        {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => go(k)}>{l}</button>)}
-      </div>
-
       {tab === 'recap' && data && (
         <>
           <FilterBar filters={[...periodFilters, { name: 'granularity', label: 'Rekap', type: 'select', noAll: true, default: 'daily', options: [['daily', 'Harian'], ['weekly', 'Mingguan'], ['monthly', 'Bulanan']] }]}>

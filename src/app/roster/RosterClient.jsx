@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Plus, Edit } from 'lucide-react';
 import { Badge, DataTable, FilterBar, FormFields, Kpi, Modal, Pager, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
@@ -15,13 +14,11 @@ const EMPTY_LEAVE = { personnelId: '', type: 'CUTI', startDate: todayIso(), endD
 const EMPTY_POLICY = { name: '', siteId: '', category: 'STAFF', maritalStatus: '', onsiteDays: 90, offDays: 14, countWorkdays: false, notes: '', isActive: true };
 
 export default function RosterClient({ tab, sites, board, leaves, policies, page, canEdit, canPolicy, preselect }) {
-  const router = useRouter();
   const { submit, busy } = useSubmit();
   const { showPrompt, showConfirm } = useDialog();
   const [leave, setLeave] = useState(preselect && canEdit ? { ...EMPTY_LEAVE, personnelId: preselect } : null);
   const [policy, setPolicy] = useState(null);
 
-  const go = (t) => router.push('/roster?tab=' + t);
 
   const act = async (l, action) => {
     if (action === 'RETURN') {
@@ -39,12 +36,6 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
 
   return (
     <div className="stack">
-      <div className="tabs-bar">
-        {[['board', 'Papan roster'], ['leaves', 'Cuti, izin & sakit'], ['policies', 'Pola roster']].map(([k, l]) => (
-          <button key={k} className={tab === k ? 'active' : ''} onClick={() => go(k)}>{l}</button>
-        ))}
-      </div>
-
       {tab === 'board' && board && (
         <>
           <div className="kpi-grid">

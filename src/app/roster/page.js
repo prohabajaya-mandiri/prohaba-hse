@@ -3,6 +3,7 @@ import { canWrite } from '@/lib/access';
 import { query, requirePage, scopedSites } from '@/lib/page';
 import { listLeaves, listPolicies, rosterBoard } from '@/lib/services/roster';
 import RosterClient from './RosterClient';
+import { tabLabel } from '@/lib/module-tabs';
 
 export const metadata = { title: 'Roster & Cuti' };
 
@@ -17,7 +18,7 @@ export default async function RosterPage({ searchParams }) {
     tab === 'policies' ? listPolicies() : null,
   ]);
   return (
-    <AppLayout title="Roster, Cuti & Kehadiran" subtitle="Onsite/offsite, jadwal cuti, izin dan sakit" user={user}>
+    <AppLayout title="Roster, Cuti & Kehadiran" subtitle={tabLabel('/roster', tab)} user={user}>
       <RosterClient tab={tab} sites={sites} board={board} leaves={leaves} policies={policies} page={q.page}
         canEdit={canWrite(user.role, 'roster')} canPolicy={user.role === 'HO_HSE'} preselect={q.personnelId ?? null} />
     </AppLayout>

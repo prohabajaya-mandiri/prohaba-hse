@@ -2,15 +2,17 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 import {
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
-  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X,
+  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown,
 } from 'lucide-react';
 import { useDialog } from './DialogProvider';
 import { canAccess, ROLE_LABELS } from '@/lib/access';
+import { MODULE_TABS, currentTab, tabsFor } from '@/lib/module-tabs';
 
 const NAV_ITEMS = [
   {
@@ -66,7 +68,10 @@ const initials = (name) => (name || 'U').trim().split(/\s+/).map((n) => n[0]).sl
 
 export default function Sidebar({ user, isOpen, setIsOpen }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { showConfirm } = useDialog();
+  // Modul yang dibuka manual lewat panah; modul yang sedang aktif selalu terbuka.
+  const [expanded, setExpanded] = useState({});
   if (!user) return null;
   const role = user.role;
 
@@ -99,17 +104,54 @@ export default function Sidebar({ user, isOpen, setIsOpen }) {
               {visible.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(item.href + '/');
                 const Icon = item.icon;
+                const subs = tabsFor(item.href);
+                const config = MODULE_TABS[item.href];
+                const open = subs.length > 0 && (expanded[item.href] ?? active);
+                const activeSub = active && config ? currentTab(item.href, searchParams.get(config.param)) : null;
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`nav-item ${active ? 'active' : ''}`}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={() => setIsOpen?.(false)}
-                  >
-                    <Icon className="nav-icon" aria-hidden />
-                    <span>{item.label}</span>
-                  </Link>
+                  <div key={item.href} className={`nav-group ${open ? 'open' : ''}`}>
+                    <div className="nav-row">
+                      <Link
+                        href={item.href}
+                        className={`nav-item ${active ? 'active' : ''} ${subs.length ? 'has-sub' : ''}`}
+                        aria-current={active && !subs.length ? 'page' : undefined}
+                        onClick={() => {
+                          if (subs.length) setExpanded((e) => ({ ...e, [item.href]: true }));
+                          else setIsOpen?.(false);
+                        }}
+                      >
+                        <Icon className="nav-icon" aria-hidden />
+                        <span>{item.label}</span>
+                      </Link>
+                      {subs.length > 0 && (
+                        <button
+                          type="button"
+                          className="nav-toggle"
+                          aria-expanded={open}
+                          aria-label={`${open ? 'Tutup' : 'Buka'} sub-menu ${item.label}`}
+                          onClick={() => setExpanded((e) => ({ ...e, [item.href]: !open }))}
+                        >
+                          <ChevronDown aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                    {open && (
+                      <div className="nav-sub" role="list">
+                        {subs.map(([key, label]) => (
+                          <Link
+                            key={key}
+                            role="listitem"
+                            href={`${item.href}?${config.param}=${key}`}
+                            className={`nav-subitem ${activeSub === key ? 'active' : ''}`}
+                            aria-current={activeSub === key ? 'page' : undefined}
+                            onClick={() => setIsOpen?.(false)}
+                          >
+                            {label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

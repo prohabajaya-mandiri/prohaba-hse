@@ -2,16 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Plus, Edit, ClipboardCheck, X } from 'lucide-react';
 import { Badge, Card, DataTable, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, PersonnelPicker, useSubmit } from '@/components/ui';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 
-const TABS = [['certificates', 'Sertifikat personel'], ['sessions', 'Jadwal & hasil training'], ['gaps', 'Kebutuhan kompetensi'], ['master', 'Master kompetensi']];
 
 export default function TrainingClient({ tab, sites, competencies, certificates, sessions, gaps, page, canEdit, canMaster, preselect }) {
-  const router = useRouter();
   const { submit, busy } = useSubmit();
   const [cert, setCert] = useState(preselect && canEdit && tab === 'certificates' ? { personnelId: preselect, competencyId: '', certNumber: '', issuer: '', issueDate: '', expiryDate: '', notes: '' } : null);
   const [files, setFiles] = useState([]);
@@ -34,10 +31,6 @@ export default function TrainingClient({ tab, sites, competencies, certificates,
 
   return (
     <div className="stack">
-      <div className="tabs-bar">
-        {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => router.push('/training?tab=' + k)}>{l}</button>)}
-      </div>
-
       {tab === 'certificates' && certificates && (
         <>
           <FilterBar filters={[
