@@ -1,0 +1,791 @@
+// E-HSE PT. Prohaba Jaya Mandiri
+// Database Schema — Prisma + Supabase PostgreSQL
+// Kolom berakhiran "Enc" berisi data terenkripsi AES-256-GCM di level aplikasi (lib/crypto.js).
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── 01. USER & HAK AKSES ────────────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  password       String
+  role           String // HO_HSE | HSE_SITE | HRD | PJO | PM | DIREKSI
+  region         String? // TIMUR | BARAT (cakupan PM per wilayah)
+  isShared       Boolean   @default(false) // akun bersama site: wajib pilih operator + PIN
+  isActive       Boolean   @default(true)
+  sessionVersion Int       @default(0)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sites         UserSite[]
+  operators     Operator[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+}
+
+model UserSite {
+  userId String
+  siteId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, siteId])
+  @@index([siteId])
+}
+
+// Pelaku aktual pada akun bersama (lihat Modul 01, Ketentuan).
+model Operator {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  pinHash   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
+model LoginAttempt {
+  key      String   @id
+  attempts Int      @default(0)
+  resetAt  DateTime
+
+  @@index([resetAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  actorName  String // nama pengguna / operator akun bersama
+  operatorId String?
+  action     String // CREATE | UPDATE | DELETE | APPROVE | REJECT | SUBMIT | LOGIN | IMPORT | EXPORT | VIEW_SENSITIVE
+  module     String
+  recordId   String?
+  siteId     String?
+  before     Json?
+  after      Json?
+  note       String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([module, createdAt])
+  @@index([recordId])
+  @@index([siteId, createdAt])
+}
+
+// Parameter Bab 7: disimpan sebagai konfigurasi, status DRAFT sampai disetujui HO.
+model Setting {
+  key        String    @id
+  value      Json
+  status     String    @default("DRAFT") // DRAFT | APPROVED
+  note       String?
+  updatedBy  String?
+  approvedBy String?
+  approvedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+}
+
+model Sequence {
+  key   String @id
+  value Int    @default(0)
+}
+
+// ─── 03. MASTER SITE & PROYEK ────────────────────────────────────────────────
+
+model Site {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String
+  location  String?
+  region    String // TIMUR | BARAT | HO
+  isHo      Boolean   @default(false)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projects      Project[]
+  responsibles  SiteResponsible[]
+  users         UserSite[]
+  placements    Placement[]
+  personnel     Personnel[]       @relation("CurrentSite")
+  initialStaff  Personnel[]       @relation("InitialSite")
+  mcus          McuRecord[]
+  permits       Permit[]
+  mobilizations Mobilization[]
+  leaves        LeaveRecord[]
+  rosterPolicies RosterPolicy[]
+  dailyPerf     DailyPerformance[]
+  activities    HseActivity[]
+  reports       HseReport[]
+  incidents     Incident[]
+  trainings     TrainingSession[]
+  documents     HseDocument[]
+  mutationsTo   Mutation[]        @relation("MutationTarget")
+}
+
+model Project {
+  id         String    @id @default(cuid())
+  siteId     String
+  name       String
+  owner      String
+  contractNo String?
+  startDate  DateTime?
+  endDate    DateTime?
+  status     String    @default("ACTIVE") // ACTIVE | SELESAI | NONAKTIF
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  site       Site      @relation(fields: [siteId], references: [id])
+
+  @@index([siteId, status])
+}
+
+// Riwayat penanggung jawab site (PJO / PM / HSE Site).
+model SiteResponsible {
+  id        String    @id @default(cuid())
+  siteId    String
+  role      String // PJO | PM | HSE_SITE
+  name      String
+  phone     String?
+  userId    String?
+  startDate DateTime
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  site      Site      @relation(fields: [siteId], references: [id])
+
+  @@index([siteId, role, endDate])
+}
+
+// ─── 04. DATABASE PERSONEL ───────────────────────────────────────────────────
+
+model Personnel {
+  id               String    @id @default(cuid())
+  code             String    @unique // identitas internal tetap, mis. PJM-000123
+  nikHash          String    @unique // HMAC NIK untuk deteksi duplikasi
+  nikEnc           String
+  nikLast4         String
+  name             String
+  birthPlace       String?
+  birthDate        DateTime?
+  gender           String? // L | P
+  maritalStatus    String? // MENIKAH | BELUM_MENIKAH | CERAI
+  education        String?
+  major            String?
+  phoneWa          String?
+  emergencyName    String?
+  emergencyPhone   String?
+  emergencyRelation String?
+  ktpAddressEnc    String
+  domicileAddress  String?
+  originRegion     String?
+  category         String // STAFF | MANPOWER | HARIAN_KANTOR
+  position         String
+  initialSiteId    String?
+  currentSiteId    String?
+  startDate        DateTime?
+  workStatus       String    @default("ACTIVE") // ACTIVE | CUTI | SAKIT | MCU | RESIGN | DIRUMAHKAN | MUTASI
+  bpjsKesehatan    String?
+  bpjsKetenagakerjaan String?
+  bloodType        String?
+  medicalHistoryEnc String?
+  shirtSize        String?
+  shoeSize         String?
+  bankName         String?
+  bankAccountEnc   String?
+  bankAccountName  String?
+  foremanId        String? // manpower ditautkan ke mandor
+  ktpFileId        String?   @unique
+  ocrVerified      Boolean   @default(false)
+  isFormer         Boolean   @default(false) // mantan personel tetap tersimpan
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  initialSite  Site?               @relation("InitialSite", fields: [initialSiteId], references: [id])
+  currentSite  Site?               @relation("CurrentSite", fields: [currentSiteId], references: [id])
+  foreman      Personnel?          @relation("Foreman", fields: [foremanId], references: [id])
+  crew         Personnel[]         @relation("Foreman")
+  ktpFile      FileObject?         @relation("KtpFile", fields: [ktpFileId], references: [id])
+  placements   Placement[]
+  mutations    Mutation[]
+  mcus         McuRecord[]
+  permits      Permit[]
+  mobilizations MobilizationMember[]
+  leaves       LeaveRecord[]
+  certificates PersonnelCertificate[]
+  trainings    TrainingParticipant[]
+  salaries     Salary[]
+  recommendations HrRecommendation[]
+  incidentVictims IncidentVictim[]
+
+  @@index([currentSiteId, category, workStatus])
+  @@index([name])
+}
+
+// File privat (Supabase Storage / lokal). File sensitif dienkripsi sebelum disimpan.
+model FileObject {
+  id          String   @id @default(cuid())
+  storageKey  String   @unique
+  fileName    String
+  mimeType    String
+  size        Int
+  sha256      String
+  sensitivity String // GENERAL | KTP | MEDICAL | HR
+  encrypted   Boolean  @default(false)
+  entityType  String? // PERSONNEL | MCU | PERMIT | ACTIVITY | REPORT | INCIDENT | CERTIFICATE | DOCUMENT
+  entityId    String?
+  siteId      String?
+  label       String?
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+
+  ktpOf       Personnel? @relation("KtpFile")
+
+  @@index([entityType, entityId])
+}
+
+// ─── 05. PENEMPATAN & MUTASI ─────────────────────────────────────────────────
+
+model Placement {
+  id          String    @id @default(cuid())
+  personnelId String
+  siteId      String
+  position    String
+  startDate   DateTime
+  endDate     DateTime?
+  status      String    @default("ACTIVE") // ACTIVE | ENDED
+  endReason   String? // MUTASI | DEMOBILISASI | RESIGN | DIRUMAHKAN | SELESAI_PROYEK | LAINNYA
+  notes       String?
+  mutationId  String?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  personnel   Personnel @relation(fields: [personnelId], references: [id])
+  site        Site      @relation(fields: [siteId], references: [id])
+
+  @@index([personnelId, status])
+  @@index([siteId, status])
+}
+
+model Mutation {
+  id            String    @id @default(cuid())
+  number        String    @unique
+  personnelId   String
+  fromSiteId    String?
+  toSiteId      String
+  toPosition    String
+  effectiveDate DateTime
+  reason        String
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  requestedBy   String
+  requestedName String
+  decidedBy     String?
+  decidedName   String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime  @default(now())
+  personnel     Personnel @relation(fields: [personnelId], references: [id])
+  toSite        Site      @relation("MutationTarget", fields: [toSiteId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([personnelId])
+}
+
+// ─── 06. MEDICAL CHECK UP ────────────────────────────────────────────────────
+
+model McuRecord {
+  id            String    @id @default(cuid())
+  personnelId   String
+  siteId        String?
+  type          String // PRE_EMPLOYMENT | ANNUAL | FOLLOW_UP | KHUSUS
+  parentId      String? // MCU asal untuk Follow Up
+  clinic        String
+  stage         String    @default("SCREENING") // SCREENING | MCU | MENUNGGU_HASIL | SUBMIT | FEEDBACK | FOLLOW_UP | SUBMIT_FU | MOBILISASI | SELESAI
+  screeningDate DateTime?
+  mcuDate       DateTime?
+  resultDate    DateTime?
+  submitDate    DateTime?
+  feedbackDate  DateTime?
+  result        String    @default("PENDING") // PENDING | FIT | FOLLOW_UP | UNFIT
+  fuDueDate     DateTime? // batas Follow Up
+  validUntil    DateTime? // jatuh tempo MCU annual berikutnya
+  isLatest      Boolean   @default(true) // catatan terbaru per personel (dasar status & pengingat)
+  cost          Decimal?  @db.Decimal(14, 2)
+  notesEnc      String? // catatan medis (terenkripsi)
+  feedback      String?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  personnel     Personnel @relation(fields: [personnelId], references: [id])
+  site          Site?     @relation(fields: [siteId], references: [id])
+  parent        McuRecord?  @relation("McuFollowUp", fields: [parentId], references: [id])
+  followUps     McuRecord[] @relation("McuFollowUp")
+
+  @@index([personnelId, createdAt])
+  @@index([siteId, result])
+  @@index([validUntil])
+  @@index([personnelId, isLatest])
+}
+
+// ─── 07. PERMIT KERJA & SKS ──────────────────────────────────────────────────
+
+model Permit {
+  id           String    @id @default(cuid())
+  personnelId  String
+  siteId       String
+  kind         String // PERMIT | SKS
+  permitType   String // mis. ID Card Tambang, SIMPER, Izin Kerja Ketinggian
+  number       String
+  issuer       String? // owner / otoritas site
+  startDate    DateTime
+  endDate      DateTime
+  basisResult  String? // FIT | FOLLOW_UP (hasil MCU acuan)
+  mcuId        String?
+  isTemporary  Boolean   @default(false) // permit sementara status Follow Up
+  revokedAt    DateTime?
+  revokeReason String?
+  previousId   String? // perpanjangan dari permit sebelumnya
+  notes        String?
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  personnel    Personnel @relation(fields: [personnelId], references: [id])
+  site         Site      @relation(fields: [siteId], references: [id])
+
+  @@index([personnelId, endDate])
+  @@index([siteId, endDate])
+}
+
+// ─── 08. MOBILISASI & DEMOBILISASI ───────────────────────────────────────────
+
+model Mobilization {
+  id          String    @id @default(cuid())
+  code        String    @unique // kloter
+  type        String // MOBILISASI | DEMOBILISASI
+  siteId      String
+  origin      String
+  destination String
+  departDate  DateTime
+  arriveDate  DateTime?
+  transport   String?
+  cost        Decimal?  @db.Decimal(14, 2)
+  status      String    @default("DIRENCANAKAN") // DIRENCANAKAN | MENUNGGU_PERSYARATAN | SIAP | PERJALANAN | TIBA | SELESAI | BATAL
+  notes       String?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  site        Site      @relation(fields: [siteId], references: [id])
+  members     MobilizationMember[]
+
+  @@index([siteId, departDate])
+}
+
+model MobilizationMember {
+  id             String    @id @default(cuid())
+  mobilizationId String
+  personnelId    String
+  arrived        Boolean   @default(false)
+  arrivedAt      DateTime?
+  cost           Decimal?  @db.Decimal(14, 2)
+  demobReason    String?
+  nextStatus     String? // status kerja setelah demobilisasi
+  notes          String?
+  mobilization   Mobilization @relation(fields: [mobilizationId], references: [id], onDelete: Cascade)
+  personnel      Personnel    @relation(fields: [personnelId], references: [id])
+
+  @@unique([mobilizationId, personnelId])
+}
+
+// ─── 09. ROSTER, CUTI & KEHADIRAN ────────────────────────────────────────────
+
+model RosterPolicy {
+  id            String   @id @default(cuid())
+  name          String
+  siteId        String? // null = acuan umum perusahaan
+  category      String // STAFF | MANPOWER | HARIAN_KANTOR
+  maritalStatus String? // MENIKAH | BELUM_MENIKAH | null = semua
+  onsiteDays    Int
+  offDays       Int
+  countWorkdays Boolean  @default(false) // true: hitung hari kerja (mis. 70 hari kerja)
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  site          Site?    @relation(fields: [siteId], references: [id])
+}
+
+model LeaveRecord {
+  id          String    @id @default(cuid())
+  personnelId String
+  siteId      String
+  type        String // CUTI | IZIN | SAKIT | OFF_ROSTER
+  startDate   DateTime
+  endDate     DateTime
+  returnDate  DateTime? // tanggal kembali aktual
+  status      String    @default("RENCANA") // RENCANA | BERJALAN | SELESAI | BATAL
+  reason      String?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  personnel   Personnel @relation(fields: [personnelId], references: [id])
+  site        Site      @relation(fields: [siteId], references: [id])
+
+  @@index([personnelId, startDate])
+  @@index([siteId, startDate])
+}
+
+// ─── 10. HSE PERFORMANCE ─────────────────────────────────────────────────────
+
+model Indicator {
+  code            String   @id // TBM | SAFETY_TALK | ... | LTI
+  name            String
+  group           String // ACTIVITY | OBSERVATION | INCIDENT
+  unit            String   @default("kali")
+  hasParticipants Boolean  @default(false)
+  monthlyTarget   Decimal? @db.Decimal(14, 2)
+  definition      String?
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  status          String   @default("DRAFT") // DRAFT | APPROVED
+  approvedBy      String?
+  approvedAt      DateTime?
+}
+
+// Satu baris per site per tanggal: dasar manhours.
+model DailyPerformance {
+  id            String   @id @default(cuid())
+  siteId        String
+  date          DateTime
+  manpower      Int
+  workHours     Decimal  @db.Decimal(6, 2) // jam kerja normal per pekerja
+  overtimeHours Decimal  @default(0) @db.Decimal(10, 2) // total jam lembur
+  excludedHours Decimal  @default(0) @db.Decimal(10, 2) // pengecualian (cuti/sakit di site, dll)
+  manhours      Decimal  @db.Decimal(14, 2)
+  notes         String?
+  reportedBy    String
+  reporterName  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  site          Site     @relation(fields: [siteId], references: [id])
+
+  @@unique([siteId, date])
+}
+
+model HseActivity {
+  id            String   @id @default(cuid())
+  siteId        String
+  date          DateTime
+  indicatorCode String
+  count         Int      @default(1)
+  participants  Int?
+  title         String?
+  location      String?
+  notes         String?
+  reportedBy    String
+  reporterName  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  site          Site     @relation(fields: [siteId], references: [id])
+
+  @@index([siteId, date])
+  @@index([indicatorCode, date])
+}
+
+// ─── 11. LAPORAN HSE SITE ────────────────────────────────────────────────────
+
+model HseReport {
+  id           String    @id @default(cuid())
+  siteId       String
+  type         String // HARIAN | MINGGUAN | BULANAN
+  periodKey    String // 2026-10-16 | 2026-W42 | 2026-10
+  periodStart  DateTime
+  periodEnd    DateTime
+  dueDate      DateTime?
+  status       String    @default("DRAFT") // DRAFT | SUBMITTED | REVIEWED | REVISION | APPROVED
+  version      Int       @default(1)
+  summary      Json? // snapshot ringkasan performance + insiden saat dikirim
+  narrative    String? // ringkasan aktivitas
+  constraints  String? // kendala
+  nextPlan     String? // rencana periode berikutnya
+  incidentNote String?
+  createdBy    String
+  creatorName  String
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  reviewerName String?
+  reviewNote   String?
+  approvedAt   DateTime?
+  approverName String?
+  approveNote  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  site         Site      @relation(fields: [siteId], references: [id])
+  history      HseReportHistory[]
+
+  @@unique([siteId, type, periodKey])
+  @@index([status, type])
+}
+
+model HseReportHistory {
+  id        String    @id @default(cuid())
+  reportId  String
+  version   Int
+  action    String // CREATE | SUBMIT | REVIEW | REVISION | APPROVE | EDIT
+  actorName String
+  note      String?
+  snapshot  Json?
+  createdAt DateTime  @default(now())
+  report    HseReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, createdAt])
+}
+
+// ─── 12. INSIDEN & KECELAKAAN KERJA ──────────────────────────────────────────
+
+model Incident {
+  id              String    @id @default(cuid())
+  number          String    @unique
+  siteId          String
+  occurredAt      DateTime
+  location        String
+  category        String // NEAR_MISS | FAC | MTC | LTI | FATALITY | PROPERTY_DAMAGE | ENVIRONMENT | LAINNYA
+  title           String
+  chronology      String
+  impact          String?
+  initialAction   String?
+  lostDays        Int       @default(0)
+  status          String    @default("OPEN") // OPEN | INVESTIGASI | TINDAK_LANJUT | CLOSED
+  investigator    String?
+  investigatedAt  DateTime?
+  immediateCause  String?
+  rootCause       String?
+  reportedToOwner Boolean   @default(false)
+  closedAt        DateTime?
+  closedBy        String?
+  createdBy       String
+  creatorName     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  site            Site      @relation(fields: [siteId], references: [id])
+  victims         IncidentVictim[]
+  actions         IncidentAction[]
+
+  @@index([siteId, occurredAt])
+  @@index([category, occurredAt])
+}
+
+model IncidentVictim {
+  id          String     @id @default(cuid())
+  incidentId  String
+  personnelId String?
+  name        String
+  injury      String?
+  bodyPart    String?
+  incident    Incident   @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  personnel   Personnel? @relation(fields: [personnelId], references: [id])
+}
+
+model IncidentAction {
+  id          String    @id @default(cuid())
+  incidentId  String
+  type        String // KOREKTIF | PENCEGAHAN
+  description String
+  pic         String
+  dueDate     DateTime?
+  status      String    @default("OPEN") // OPEN | DONE
+  doneAt      DateTime?
+  incident    Incident  @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+}
+
+// ─── 13. TRAINING & KOMPETENSI ───────────────────────────────────────────────
+
+model Competency {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  category       String? // WAJIB_SITE | OPERATOR | K3 | LAINNYA
+  validityMonths Int? // null = tidak kedaluwarsa
+  isActive       Boolean  @default(true)
+  requirements   PositionRequirement[]
+  certificates   PersonnelCertificate[]
+  sessions       TrainingSession[]
+}
+
+model PositionRequirement {
+  id           String     @id @default(cuid())
+  position     String
+  competencyId String
+  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([position, competencyId])
+}
+
+model PersonnelCertificate {
+  id           String     @id @default(cuid())
+  personnelId  String
+  competencyId String
+  certNumber   String?
+  issuer       String?
+  issueDate    DateTime?
+  expiryDate   DateTime?
+  notes        String?
+  createdBy    String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  personnel    Personnel  @relation(fields: [personnelId], references: [id])
+  competency   Competency @relation(fields: [competencyId], references: [id])
+
+  @@index([personnelId])
+  @@index([expiryDate])
+}
+
+model TrainingSession {
+  id           String      @id @default(cuid())
+  title        String
+  competencyId String?
+  siteId       String
+  startDate    DateTime
+  endDate      DateTime?
+  trainer      String?
+  location     String?
+  status       String      @default("RENCANA") // RENCANA | SELESAI | BATAL
+  notes        String?
+  createdBy    String
+  createdAt    DateTime    @default(now())
+  competency   Competency? @relation(fields: [competencyId], references: [id])
+  site         Site        @relation(fields: [siteId], references: [id])
+  participants TrainingParticipant[]
+
+  @@index([siteId, startDate])
+}
+
+model TrainingParticipant {
+  id          String          @id @default(cuid())
+  sessionId   String
+  personnelId String
+  attended    Boolean?
+  result      String? // LULUS | TIDAK_LULUS
+  score       Decimal?        @db.Decimal(6, 2)
+  session     TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  personnel   Personnel       @relation(fields: [personnelId], references: [id])
+
+  @@unique([sessionId, personnelId])
+}
+
+// ─── 14. MONITORING HRD & EFISIENSI SDM ──────────────────────────────────────
+
+model Salary {
+  id            String    @id @default(cuid())
+  personnelId   String
+  baseEnc       String // gaji pokok (terenkripsi)
+  allowanceEnc  String // tunjangan tetap (terenkripsi)
+  effectiveFrom DateTime
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  personnel     Personnel @relation(fields: [personnelId], references: [id])
+
+  @@index([personnelId, effectiveFrom])
+}
+
+model HrRecommendation {
+  id          String    @id @default(cuid())
+  personnelId String
+  color       String // HIJAU | KUNING | MERAH
+  action      String // LANJUT | DIRUMAHKAN | MUTASI | DIBERHENTIKAN
+  reason      String?
+  createdBy   String
+  creatorName String
+  createdAt   DateTime  @default(now())
+  personnel   Personnel @relation(fields: [personnelId], references: [id])
+
+  @@index([personnelId, createdAt])
+}
+
+model EfficiencyScenario {
+  id        String   @id @default(cuid())
+  name      String
+  notes     String?
+  steps     Json // [{ month: "2026-11", rules: { DIRUMAHKAN: { basis: "POKOK", percent: 100 }, ... } }]
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── 15. DOKUMEN HSE & COMPLIANCE ────────────────────────────────────────────
+
+model HseDocument {
+  id          String    @id @default(cuid())
+  number      String
+  title       String
+  category    String // HSE_PLAN | KPLH | SOP | IBPR | SMKP | AUDIT | STANDARISASI_MITRA | PRAKUALIFIKASI | SERTIFIKASI | COMPLIANCE_OWNER | LAINNYA
+  siteId      String? // null = dokumen HO / seluruh site
+  issueDate   DateTime
+  validUntil  DateTime?
+  ownerName   String // penanggung jawab
+  status      String    @default("BERLAKU") // DRAFT | BERLAKU | ARSIP
+  revision    String    @default("0")
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  site        Site?     @relation(fields: [siteId], references: [id])
+  versions    HseDocumentVersion[]
+
+  @@unique([number, siteId])
+  @@index([category, status])
+}
+
+model HseDocumentVersion {
+  id         String      @id @default(cuid())
+  documentId String
+  revision   String
+  fileId     String      @unique
+  notes      String?
+  uploadedBy String
+  createdAt  DateTime    @default(now())
+  document   HseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, createdAt])
+}
+
+// ─── 16. NOTIFIKASI & APPROVAL ───────────────────────────────────────────────
+
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String // MCU_ANNUAL | PERMIT | FOLLOW_UP | ROSTER | CERTIFICATE | REPORT_DUE | MUTATION | APPROVAL | DOCUMENT
+  title      String
+  body       String
+  link       String?
+  severity   String    @default("INFO") // INFO | WARNING | DANGER
+  dedupeKey  String
+  dueDate    DateTime?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+}
+
+model ApprovalLog {
+  id         String   @id @default(cuid())
+  entityType String // MUTATION | REPORT | SETTING | INDICATOR
+  entityId   String
+  step       String // SUBMIT | REVIEW | APPROVE | REJECT | REVISION | CANCEL
+  decision   String
+  note       String?
+  actorId    String
+  actorName  String
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+}
