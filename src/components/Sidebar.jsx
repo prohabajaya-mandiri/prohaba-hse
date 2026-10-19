@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   {
     section: 'Personel',
     items: [
-      { href: '/personnel', label: 'Database Personel', icon: Users },
+      { href: '/personnel', label: 'Master Data Karyawan', icon: Users },
       { href: '/placements', label: 'Penempatan & Mutasi', icon: ArrowLeftRight },
       { href: '/roster', label: 'Roster & Cuti', icon: CalendarDays },
       { href: '/mobilization', label: 'Mobilisasi', icon: Plane },

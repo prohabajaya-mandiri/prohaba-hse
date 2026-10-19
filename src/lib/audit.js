@@ -25,7 +25,8 @@ export async function audit(db, user, { action, module, recordId = null, siteId 
   const client = db ?? (await import('./prisma.js')).prisma;
   return client.auditLog.create({
     data: {
-      userId: user?.id ?? null,
+      // Pelaku dari aplikasi terintegrasi tidak memiliki User lokal; identitasnya tercatat di actorName.
+      userId: user?.integration ? null : user?.id ?? null,
       operatorId: user?.operatorId ?? null,
       actorName: user ? actorName(user) : 'Sistem',
       action,
