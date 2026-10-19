@@ -30,7 +30,7 @@ export function tenure(start, end = new Date()) {
 
 // Kolom template import Excel standar: [field, header, wajib, alias header lain].
 // Header dicocokkan tanpa memperhatikan huruf besar/kecil, spasi, tanda baca, dan teks dalam kurung.
-// wajib: true = selalu wajib; 'STAFF' = wajib hanya untuk kategori STAFF.
+// wajib: true = wajib diisi. Kolom rekening selalu opsional pada import (boleh dilengkapi kemudian).
 export const IMPORT_COLUMNS = [
   ['nik', 'NIK', true, ['No KTP', 'Nomor KTP', 'NIK KTP']],
   ['name', 'Nama', true, ['Nama Lengkap', 'Nama Karyawan', 'Nama Personel']],
@@ -59,8 +59,8 @@ export const IMPORT_COLUMNS = [
   ['bloodType', 'Golongan Darah', false, ['Gol Darah']],
   ['shirtSize', 'Ukuran Baju'],
   ['shoeSize', 'Ukuran Sepatu'],
-  ['bankName', 'Nama Bank (wajib untuk STAFF)', 'STAFF', ['Bank']],
-  ['bankAccount', 'No Rekening (wajib untuk STAFF)', 'STAFF', ['Nomor Rekening', 'Rekening']],
+  ['bankName', 'Nama Bank', false, ['Bank']],
+  ['bankAccount', 'No Rekening', false, ['Nomor Rekening', 'Rekening']],
   ['bankAccountName', 'Nama Pemilik Rekening', false, ['Atas Nama Rekening']],
   ['foremanCode', 'Kode Mandor', false, ['Mandor']],
 ];
@@ -128,11 +128,12 @@ const digits = (v) => String(v).replace(/[\s.\-/]/g, '');
 
 /**
  * Normalisasi isian bebas dari Excel sebelum divalidasi: tanggal, L/P, status nikah, kategori,
- * golongan darah, nomor telepon, rekening, NPWP. Mengembalikan { body, errors }.
+ * golongan darah, nomor telepon, rekening, NPWP. Mengembalikan { body, errors, warnings }.
  */
 export function normalizeImportRow(row) {
   const body = {};
   const errors = [];
+  const warnings = [];
   for (const [k, v] of Object.entries(row)) {
     if (isBlank(v)) continue;
     body[k] = typeof v === 'number' ? String(v) : String(v).trim();
@@ -140,7 +141,8 @@ export function normalizeImportRow(row) {
   // 16 digit yang tersimpan sebagai angka di Excel kehilangan digit terakhir (presisi Excel 15 digit).
   for (const [k, label] of [['nik', 'NIK'], ['npwp', 'NPWP'], ['bankAccount', 'No rekening']]) {
     if (typeof row[k] === 'number' && String(row[k]).length >= 16 && String(row[k]).endsWith('0')) {
-      errors.push(`${label} tersimpan sebagai angka di Excel sehingga digit terakhir berubah. Format kolom ${label} sebagai Text lalu ketik ulang.`);
+      // Rekening opsional: nilai yang rusak dilewati tanpa menggagalkan baris.
+      (k === 'bankAccount' ? warnings : errors).push(`${label} tersimpan sebagai angka di Excel sehingga digit terakhir berubah${k === 'bankAccount' ? ' — rekening tidak diimpor' : ''}. Format kolom ${label} sebagai Text lalu ketik ulang.`);
       delete body[k];
     }
   }
@@ -158,7 +160,7 @@ export function normalizeImportRow(row) {
   if (body.bankAccount) body.bankAccount = digits(body.bankAccount);
   if (body.npwp) body.npwp = digits(body.npwp);
   for (const k of Object.keys(body)) if (body[k] === null) delete body[k];
-  return { body, errors };
+  return { body, errors, warnings };
 }
 
 // ─── OCR KTP: hasil hanya saran, wajib diverifikasi manual ──────────────────

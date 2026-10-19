@@ -177,3 +177,10 @@ test('NIK 16 digit yang tersimpan sebagai angka Excel ditolak dengan petunjuk', 
   assert.equal(body.nik, undefined);
   assert.match(errors[0], /Format kolom NIK sebagai Text/);
 });
+
+test('rekening tidak pernah wajib pada import; nilai rusak hanya jadi peringatan', () => {
+  const { body, errors, warnings } = normalizeImportRow({ category: 'STAFF', bankAccount: 1234567890123450 });
+  assert.deepEqual(errors, []);
+  assert.equal(body.bankAccount, undefined);
+  assert.match(warnings[0], /rekening tidak diimpor/);
+});

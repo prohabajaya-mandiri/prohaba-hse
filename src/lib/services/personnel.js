@@ -22,8 +22,9 @@ const EDITABLE = [
  * Validasi & normalisasi input personel. `existing` diisi saat edit.
  * `errors` (array) diisi bila ingin mengumpulkan seluruh kesalahan sekaligus (import Excel);
  * tanpa `errors`, kesalahan pertama langsung dilempar.
+ * `requireBank` = false untuk import Excel (rekening boleh dilengkapi kemudian).
  */
-export function parsePersonnel(body, existing = null, { user = null, errors = null } = {}) {
+export function parsePersonnel(body, existing = null, { user = null, errors = null, requireBank = true } = {}) {
   object(body, EDITABLE);
   const f = (fn) => {
     try {
@@ -84,9 +85,9 @@ export function parsePersonnel(body, existing = null, { user = null, errors = nu
     sensitive.bankAccount = acc;
   }
   if (body.medicalHistory !== undefined) sensitive.medicalHistory = f(() => text(body.medicalHistory, 'Riwayat penyakit', 1000, true));
-  // Rekening wajib untuk staff.
-  const hasAccount = sensitive.bankAccount !== undefined ? Boolean(sensitive.bankAccount) : Boolean(existing?.bankAccountEnc);
-  if (v.category === 'STAFF') f(() => ensure(hasAccount && (v.bankName || existing?.bankName), 'Rekening (nama bank & no rekening) wajib untuk kategori STAFF.'));
+  // Rekening wajib untuk staff saat ditambah lewat form. Tidak dipaksakan saat edit, karena personel
+  // hasil import boleh belum memiliki rekening dan field rekening tidak tampil bagi peran tanpa akses BANK.
+  if (requireBank && !existing && v.category === 'STAFF') f(() => ensure(sensitive.bankAccount && v.bankName, 'Rekening (nama bank & no rekening) wajib untuk kategori STAFF.'));
   if (v.category !== 'MANPOWER') v.foremanId = null;
   return { v, sensitive };
 }
@@ -300,7 +301,8 @@ export function importTemplate() {
   const info = XLSX.utils.aoa_to_sheet([
     ['Petunjuk'],
     ['Kolom bertanda * wajib diisi: ' + IMPORT_COLUMNS.filter(([, , r]) => r === true).map(([, h]) => h.replace(/\s*\(.*\)/, '')).join(', ') + '.'],
-    ['Kolom lain boleh dikosongkan (atau diisi "-"). Nama Bank & No Rekening wajib hanya untuk kategori STAFF.'],
+    ['Kolom lain boleh dikosongkan (atau diisi "-"), termasuk Nama Bank & No Rekening untuk semua kategori.'],
+    ['Isian rekening yang tidak valid tidak menggagalkan baris: rekening dilewati dan diberi peringatan, lengkapi kemudian lewat Edit personel.'],
     ['Tanggal boleh YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, atau format tanggal Excel.'],
     ['Format kolom NIK, NPWP dan No Rekening sebagai Text agar digit tidak berubah (template ini sudah diatur).'],
     ['Kategori: STAFF / MANPOWER / HARIAN_KANTOR. Jenis kelamin: L/P (Laki-laki/Perempuan). Status nikah: Menikah / Belum menikah / Cerai.'],
@@ -325,9 +327,19 @@ async function validateImport(user, rawRows) {
   const foremen = await prisma.personnel.findMany({ where: { code: { in: foremanCodes } }, select: { id: true, code: true } });
   const foremanByCode = Object.fromEntries(foremen.map((f) => [f.code, f.id]));
   for (const [index, row] of mapped.entries()) {
-    const { body: normalized, errors } = normalizeImportRow(row);
+    const { body: normalized, errors, warnings } = normalizeImportRow(row);
     const { siteCode, foremanCode, ...body } = normalized;
-    const warnings = [];
+    // Rekening tidak pernah menggagalkan baris import: isian yang tidak valid dilewati dengan peringatan.
+    for (const [k, label, check] of [
+      ['bankName', 'Nama bank', (x) => x.length <= 60],
+      ['bankAccount', 'No rekening', (x) => /^\d{5,30}$/.test(x)],
+      ['bankAccountName', 'Nama pemilik rekening', (x) => x.length <= 120],
+    ]) {
+      if (body[k] && !check(body[k])) {
+        delete body[k];
+        warnings.push(`${label} tidak valid — tidak diimpor.`);
+      }
+    }
     if (!canSetEmployment(user) && (body.employmentType || body.contractEndDate)) {
       delete body.employmentType;
       delete body.contractEndDate;
@@ -349,7 +361,7 @@ async function validateImport(user, rawRows) {
       if (fid) body.foremanId = fid;
       else errors.push(`Kode mandor "${foremanCode}" tidak ditemukan.`);
     }
-    const result = parsePersonnel(body, null, { user, errors });
+    const result = parsePersonnel(body, null, { user, errors, requireBank: false });
     if (!errors.length) parsed = { ...result, siteId };
     let duplicate = null;
     if (parsed) {
