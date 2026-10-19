@@ -86,6 +86,12 @@ test('setiap API bisnis melewati pemeriksaan otorisasi', () => {
       assert.ok(source.includes('CRON_SECRET') && source.includes('timingSafeEqual'), file);
       continue;
     }
+    if (file.includes('/integration/')) {
+      // Route antar-aplikasi wajib memakai tanda tangan HMAC, bukan sesi.
+      assert.ok(/=\s*integrationApi\(/.test(source), file);
+      assert.ok(!/export (async )?function (GET|POST|PUT|DELETE)/.test(source), 'handler tanpa integrationApi(): ' + file);
+      continue;
+    }
     assert.ok(/=\s*api\(/.test(source), file);
     assert.ok(!/export (async )?function (GET|POST|PUT|DELETE)/.test(source), 'handler tanpa api(): ' + file);
   }

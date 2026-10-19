@@ -1,6 +1,9 @@
 import { authorizeApi } from './api-access.js';
 import { InputError } from './validation.js';
+import { errorResponse } from './http-errors.js';
 import { serialize } from './serialization.js';
+
+export { errorResponse };
 
 export function api(handler) {
   return async (request, context) => {
@@ -13,16 +16,6 @@ export function api(handler) {
       return errorResponse(error);
     }
   };
-}
-
-export function errorResponse(error) {
-  if (error instanceof InputError) return Response.json({ error: error.message }, { status: error.status });
-  if (error instanceof SyntaxError) return Response.json({ error: 'JSON tidak valid.' }, { status: 400 });
-  if (error.code === 'P2002') return Response.json({ error: 'Data sudah ada (duplikat).' }, { status: 409 });
-  if (error.code === 'P2025') return Response.json({ error: 'Data tidak ditemukan.' }, { status: 404 });
-  if (error.code === 'P2003') return Response.json({ error: 'Data masih digunakan atau relasi tidak valid.' }, { status: 409 });
-  console.error('API failure', error.code ?? error.name, error.message);
-  return Response.json({ error: 'Transaksi gagal. Silakan coba lagi.' }, { status: 500 });
 }
 
 export async function json(request) {

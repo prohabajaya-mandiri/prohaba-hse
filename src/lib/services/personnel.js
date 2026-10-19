@@ -438,6 +438,65 @@ export async function exportPersonnel(user, f) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
+// ─── Integrasi: umpan perubahan untuk salinan lokal aplikasi lain ───────────
+// Hanya field non-sensitif (tanpa NIK utuh, alamat KTP, rekening, NPWP, data medis).
+const SYNC_SELECT = {
+  id: true, code: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true,
+  employmentType: true, contractEndDate: true, startDate: true, phoneWa: true, bankName: true,
+  bpjsKesehatan: true, bpjsKetenagakerjaan: true, updatedAt: true,
+  currentSite: { select: { code: true, name: true } },
+};
+
+const syncRow = ({ currentSite, nikHash, ...p }) => { void nikHash; return { ...p, siteCode: currentSite?.code ?? null, siteName: currentSite?.name ?? null }; };
+
+/**
+ * Perubahan personel berurutan (updatedAt, id) setelah kursor. Tanpa kursor = seluruh data.
+ * `ids` (dipisah koma, maks. 100) = ambil baris tertentu, mis. tepat setelah disimpan dari aplikasi lain.
+ * `next` berisi kursor halaman berikutnya, null bila sudah habis.
+ */
+export async function personnelChanges({ since, after, limit, ids } = {}) {
+  if (ids) {
+    const list = String(ids).split(',').map((x) => x.trim()).filter(Boolean);
+    ensure(list.length <= 100, 'Maksimal 100 ID per permintaan.');
+    const rows = await prisma.personnel.findMany({ where: { id: { in: list } }, select: SYNC_SELECT });
+    return { rows: rows.map(syncRow), next: null };
+  }
+  const take = Math.min(500, Math.max(1, parseInt(limit ?? '500', 10) || 500));
+  let where = {};
+  if (since) {
+    const at = new Date(since);
+    ensure(Number.isFinite(at.getTime()), 'Kursor sinkronisasi tidak valid.');
+    where = { OR: [{ updatedAt: { gt: at } }, { updatedAt: at, id: { gt: String(after ?? '') } }] };
+  }
+  const rows = await prisma.personnel.findMany({ where, orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }], take, select: SYNC_SELECT });
+  const last = rows.at(-1);
+  return {
+    rows: rows.map(syncRow),
+    next: rows.length === take ? { since: last.updatedAt.toISOString(), after: last.id } : null,
+  };
+}
+
+/** Cocokkan NIK (dicari lewat HMAC) ke profil personel (baris sinkronisasi). Dipakai untuk menautkan data lama aplikasi lain. */
+export async function lookupByNik(body) {
+  object(body, ['niks']);
+  ensure(Array.isArray(body.niks) && body.niks.length <= 1000, 'Kirim 0–1000 NIK.');
+  const hashes = body.niks.map((n) => (/^\d{16}$/.test(String(n ?? '')) ? lookupHash(String(n)) : null));
+  const found = await prisma.personnel.findMany({ where: { nikHash: { in: hashes.filter(Boolean) } }, select: { ...SYNC_SELECT, nikHash: true } });
+  const byHash = new Map(found.map((p) => [p.nikHash, syncRow(p)]));
+  return { matches: hashes.map((h) => (h ? byHash.get(h) ?? null : null)) };
+}
+
+/** File KTP personel (dicatat sebagai VIEW_SENSITIVE). */
+export async function ktpFile(user, id) {
+  const p = await scopedPersonnel(user, id);
+  if (!canSeeSensitive(user, 'KTP', p.currentSiteId)) throw new InputError('Anda tidak memiliki akses ke data ini.', 403);
+  ensure(p.ktpFileId, 'File KTP belum diunggah.', 404);
+  const row = await prisma.fileObject.findUnique({ where: { id: p.ktpFileId } });
+  ensure(row, 'File tidak ditemukan.', 404);
+  await audit(null, user, { action: 'VIEW_SENSITIVE', module: 'files', recordId: row.id, siteId: row.siteId, note: 'KTP ' + row.fileName });
+  return row;
+}
+
 export async function salaryMatrix() {
   return getSetting('access.salary');
 }
