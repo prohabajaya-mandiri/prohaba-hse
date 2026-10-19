@@ -53,6 +53,8 @@ Token Management API dipakai dari `../prohaba-center/.env.management.local` (`SU
     npm run seed          # data referensi: 10 site, indikator, pola roster, kompetensi, skenario
     npm run seed:demo     # hanya schema hse_dev
 
+`npm run db:migrate` hanya memigrasi **development** (schema `hse_dev`). Untuk produksi: `git pull`, lalu `npm run db:status:production` dan `npm run db:migrate:production` **sebelum** deploy kode yang memakai kolom baru.
+
 Produksi memakai schema `public` dan role `hse_migrate` / `hse_runtime` (`... production roles|grants`, dengan `.env.migrations.production.local`). Jalankan `grants` setiap kali migrasi menambah tabel. Jangan memakai `db push`.
 
 ## Storage file
