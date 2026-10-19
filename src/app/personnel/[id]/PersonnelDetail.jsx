@@ -8,13 +8,13 @@ import { useDialog } from '@/components/DialogProvider';
 import { apiFetch } from '@/lib/client-api';
 import { formatDate, iso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
-import { WORK_STATUSES } from '@/lib/domain/personnel';
+import { CONTRACT_WARNING_DAYS, WORK_STATUSES } from '@/lib/domain/personnel';
 import { permitStatus } from '@/lib/domain/permit';
 import PersonnelForm from '../PersonnelForm';
 
 const TABS = [['profil', 'Profil'], ['placement', 'Penempatan'], ['mcu', 'MCU'], ['permit', 'Permit & SKS'], ['roster', 'Cuti & Kehadiran'], ['kompetensi', 'Kompetensi'], ['mobilisasi', 'Mobilisasi']];
 
-export default function PersonnelDetail({ person: p, sites, canEdit, canRequestMutation }) {
+export default function PersonnelDetail({ person: p, sites, canEdit, canEmployment, canRequestMutation }) {
   const [tab, setTab] = useState('profil');
   const [editing, setEditing] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -44,9 +44,15 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canRequestM
     <div className="stack">
       <div className="toolbar">
         <Badge value={p.workStatus} />
+        {p.employmentType && <Badge value={p.employmentType} />}
         <Badge value={p.fitness} />
         <span className="chip">{labelOf(p.category)}</span>
         {p.isFormer && <span className="chip">Mantan personel</span>}
+        {p.contractDaysLeft !== null && p.contractDaysLeft <= CONTRACT_WARNING_DAYS && !p.isFormer && (
+          <span className="chip" style={{ background: p.contractDaysLeft < 0 ? 'var(--red-100)' : 'var(--yellow-100)' }}>
+            {p.contractDaysLeft < 0 ? `Kontrak PKWT berakhir ${-p.contractDaysLeft} hari lalu` : `Kontrak PKWT berakhir ${p.contractDaysLeft} hari lagi`}
+          </span>
+        )}
         {!p.ocrVerified && p.ktpFileId && <span className="chip" style={{ background: 'var(--yellow-100)' }}>Data KTP belum diverifikasi</span>}
         <div className="spacer" />
         {canEdit && <button className="btn btn-outline btn-sm" onClick={() => setStatusOpen(true)}><RefreshCw size={15} /> Status kerja</button>}
@@ -74,6 +80,7 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canRequestM
               {item('Alamat KTP', revealed.ktpAddress ?? (p.access.ktp ? '•••• (klik ikon mata pada NIK)' : '[dibatasi]'))}
               {item('Domisili', p.domicileAddress)}
               {item('Asal daerah', p.originRegion)}
+              {item('NPWP', revealed.npwp ?? p.npwp)}
               <div>
                 <dt>File KTP</dt>
                 <dd>{p.ktpFileId ? <a href={`/api/files/${p.ktpFileId}?inline=1`} target="_blank" rel="noreferrer"><FileText size={14} /> Lihat KTP</a> : p.access.ktp ? 'Belum diunggah' : '[dibatasi]'}</dd>
@@ -87,6 +94,8 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canRequestM
               {item('Site saat ini', p.currentSite ? `${p.currentSite.code} — ${p.currentSite.name}` : null)}
               {item('Site awal', p.initialSite?.code)}
               {item('Tanggal mulai', formatDate(p.startDate))}
+              {item('Masa kerja', p.tenure ? p.tenure.label + (p.isFormer ? ' (sampai penempatan terakhir)' : '') : null)}
+              {item('Status kepegawaian', p.employmentType ? labelOf(p.employmentType) + (p.employmentType === 'PKWT' && p.contractEndDate ? ` · s/d ${formatDate(p.contractEndDate)}` : '') : 'Belum diisi')}
               {item('Mandor', p.foreman ? `${p.foreman.name} (${p.foreman.code})` : null)}
               {item('No WA', p.phoneWa)}
               {item('Kontak darurat', [p.emergencyName, p.emergencyRelation, p.emergencyPhone].filter(Boolean).join(' · '))}
@@ -197,13 +206,14 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canRequestM
 
       <Modal open={editing} onClose={() => setEditing(false)} title="Edit personel" subtitle="Field sensitif (NIK, alamat KTP, rekening) diisi hanya bila diubah." size="modal-xl">
         {editing && (
-          <PersonnelForm editing={p.id} sites={sites} canMedical={p.access.medical} canBank={p.access.bank}
+          <PersonnelForm editing={p.id} sites={sites} canMedical={p.access.medical} canBank={p.access.bank} canEmployment={canEmployment}
             initial={{
               nik: '', nikMasked: p.nik, name: p.name, birthPlace: p.birthPlace ?? '', birthDate: iso(p.birthDate) ?? '', gender: p.gender ?? '',
               maritalStatus: p.maritalStatus ?? '', education: p.education ?? '', major: p.major ?? '', phoneWa: p.phoneWa ?? '',
               emergencyName: p.emergencyName ?? '', emergencyPhone: p.emergencyPhone ?? '', emergencyRelation: p.emergencyRelation ?? '',
               ktpAddress: '', domicileAddress: p.domicileAddress ?? '', originRegion: p.originRegion ?? '', category: p.category, position: p.position,
-              startDate: iso(p.startDate) ?? '', bpjsKesehatan: p.bpjsKesehatan ?? '', bpjsKetenagakerjaan: p.bpjsKetenagakerjaan ?? '',
+              startDate: iso(p.startDate) ?? '', employmentType: p.employmentType ?? '', contractEndDate: iso(p.contractEndDate) ?? '',
+              npwp: '', npwpMasked: p.npwp && p.npwp !== '[dibatasi]' ? p.npwp : '', bpjsKesehatan: p.bpjsKesehatan ?? '', bpjsKetenagakerjaan: p.bpjsKetenagakerjaan ?? '',
               bloodType: p.bloodType ?? '', medicalHistory: '', shirtSize: p.shirtSize ?? '', shoeSize: p.shoeSize ?? '', bankName: p.bankName ?? '',
               bankAccount: '', bankAccountName: p.bankAccountName ?? '', foremanId: p.foremanId ?? '', ocrVerified: p.ocrVerified,
             }}

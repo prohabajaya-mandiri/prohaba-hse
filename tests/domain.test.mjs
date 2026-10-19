@@ -7,7 +7,7 @@ import { addWorkdays, cycleStart, nextLeaveDue, pickPolicy, rosterState } from '
 import { calcManhours, safeManhours, summarize } from '../src/lib/domain/performance.js';
 import { previousMonthKey, reportPeriod, sitesNotReported } from '../src/lib/domain/reports.js';
 import { DISCUSSED_SCENARIO, simulate, validateSteps } from '../src/lib/domain/hrd.js';
-import { mapImportRow, parseKtpText } from '../src/lib/domain/personnel.js';
+import { mapImportRow, normalizeDate, normalizeImportRow, parseKtpText, tenure } from '../src/lib/domain/personnel.js';
 
 const D = (s) => toDate(s);
 const durations = { screening: 1, mcu: 1, waitResult: 3, feedbackMin: 3, feedbackMax: 5, followUp: 2, mobilization: 2 };
@@ -136,4 +136,44 @@ test('header template import dipetakan ke field', () => {
   const row = mapImportRow({ 'NIK': '6402011203900001', 'Nama': 'Budi', 'Kategori (STAFF/MANPOWER/HARIAN_KANTOR)': 'MANPOWER', 'Kode Site': 'TBG', 'Tanggal Mulai (YYYY-MM-DD)': '2026-01-02', 'Kosong': '' });
   assert.deepEqual(row, { nik: '6402011203900001', name: 'Budi', category: 'MANPOWER', siteCode: 'TBG', startDate: '2026-01-02' });
   assert.equal(iso(addDays(D('2026-10-16'), 1)), '2026-10-17');
+});
+
+test('masa kerja dihitung dari tanggal mulai', () => {
+  assert.equal(tenure('2020-01-15', '2026-10-19').label, '6 tahun 9 bulan');
+  assert.equal(tenure('2026-10-01', '2026-10-19').label, '18 hari');
+  assert.equal(tenure('2020-01-31', '2020-03-01').totalMonths, 1);
+  assert.equal(tenure('2027-01-01', '2026-10-19'), null);
+  assert.equal(tenure(null), null);
+});
+
+test('tanggal import menerima format umum Excel/Indonesia', () => {
+  assert.equal(normalizeDate(33100), '1990-08-15');
+  assert.equal(normalizeDate('15/08/1990'), '1990-08-15');
+  assert.equal(normalizeDate('5-8-1990'), '1990-08-05');
+  assert.equal(normalizeDate('5 Agustus 1990'), '1990-08-05');
+  assert.equal(normalizeDate('1990-08-15T00:00:00.000Z'), '1990-08-15');
+  assert.equal(normalizeDate('besok'), 'besok');
+});
+
+test('kolom opsional import: isian kosong/"-" diabaikan, nilai bebas dinormalisasi', () => {
+  const row = mapImportRow({
+    'NIK *': '6402011203900001', 'Nama Lengkap': 'Budi', 'Jenis Kelamin': 'Pria', 'Status Perkawinan': 'Belum Kawin',
+    Kategori: 'Man Power', 'Tgl Masuk': 44562, 'Gol Darah': 'O+', 'No HP': 81234567890, NPWP: '09.254.294.3-407.000',
+    'Status Kepegawaian': 'kontrak', 'BPJS Kesehatan': '-', 'Tanggal Lahir': 'N/A', Alamat: 'Jl. Merdeka',
+  });
+  const { body, errors } = normalizeImportRow(row);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(body, {
+    nik: '6402011203900001', name: 'Budi', gender: 'L', maritalStatus: 'BELUM_MENIKAH', phoneWa: '081234567890', ktpAddress: 'Jl. Merdeka',
+    category: 'MANPOWER', startDate: '2022-01-01', employmentType: 'PKWT', npwp: '092542943407000', bloodType: 'O',
+  });
+  assert.equal(normalizeImportRow({ gender: 'Perempuan', maritalStatus: 'Kawin', employmentType: 'Tetap' }).body.gender, 'P');
+  assert.equal(normalizeImportRow({ maritalStatus: 'Cerai Mati' }).body.maritalStatus, 'CERAI');
+  assert.equal(normalizeImportRow({ employmentType: 'PKWTT' }).body.employmentType, 'PKWTT');
+});
+
+test('NIK 16 digit yang tersimpan sebagai angka Excel ditolak dengan petunjuk', () => {
+  const { body, errors } = normalizeImportRow({ nik: 6402011203900000 });
+  assert.equal(body.nik, undefined);
+  assert.match(errors[0], /Format kolom NIK sebagai Text/);
 });

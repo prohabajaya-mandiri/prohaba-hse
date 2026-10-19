@@ -3,16 +3,16 @@
 import { useState } from 'react';
 import { ScanLine } from 'lucide-react';
 import { FileInput, FormFields, compressImage, useSubmit } from '@/components/ui';
-import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, MARITAL, MARITAL_LABELS, parseKtpText } from '@/lib/domain/personnel';
+import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, EMPLOYMENT_LABELS, EMPLOYMENT_TYPES, MARITAL, MARITAL_LABELS, parseKtpText, tenure } from '@/lib/domain/personnel';
 
 export const EMPTY_PERSONNEL = {
   nik: '', name: '', birthPlace: '', birthDate: '', gender: '', maritalStatus: '', education: '', major: '', phoneWa: '',
   emergencyName: '', emergencyPhone: '', emergencyRelation: '', ktpAddress: '', domicileAddress: '', originRegion: '',
-  category: 'MANPOWER', position: '', siteId: '', startDate: '', bpjsKesehatan: '', bpjsKetenagakerjaan: '', bloodType: '',
+  category: 'MANPOWER', position: '', siteId: '', startDate: '', employmentType: '', contractEndDate: '', npwp: '', bpjsKesehatan: '', bpjsKetenagakerjaan: '', bloodType: '',
   medicalHistory: '', shirtSize: '', shoeSize: '', bankName: '', bankAccount: '', bankAccountName: '', foremanId: '', ocrVerified: false,
 };
 
-export default function PersonnelForm({ initial, sites, editing, canMedical, canBank, onDone }) {
+export default function PersonnelForm({ initial, sites, editing, canMedical, canBank, canEmployment, onDone }) {
   const { submit, busy } = useSubmit();
   const [values, setValues] = useState(initial);
   const [ktp, setKtp] = useState(null);
@@ -58,9 +58,13 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     { name: 'category', label: 'Kategori', type: 'select', options: CATEGORIES.map((c) => [c, CATEGORY_LABELS[c]]), required: true, noEmpty: true },
     { name: 'position', label: 'Jabatan', required: true },
     ...(editing ? [] : [{ name: 'siteId', label: 'Site awal', type: 'select', options: sites.map((s) => [s.id, `${s.code} — ${s.name}`]), required: true }]),
-    { name: 'startDate', label: 'Tanggal mulai', type: 'date' },
+    { name: 'startDate', label: 'Tanggal mulai', type: 'date', hint: values.startDate ? `Masa kerja: ${tenure(values.startDate)?.label ?? 'belum mulai'}` : 'Dasar perhitungan masa kerja.' },
+    { name: 'employmentType', label: 'Status kepegawaian', type: 'select', options: EMPLOYMENT_TYPES.map((t) => [t, EMPLOYMENT_LABELS[t]]), disabled: !canEmployment,
+      hint: canEmployment ? 'PKWT = kontrak waktu tertentu, PKWTT = karyawan tetap.' : 'Hanya dapat diisi/diubah oleh HRD / HO HSE.' },
+    { name: 'contractEndDate', label: 'Akhir kontrak (PKWT)', type: 'date', disabled: !canEmployment, min: values.startDate || undefined, hidden: (v) => v.employmentType !== 'PKWT' },
     { name: 'foremanId', label: 'Mandor', type: 'personnel', hidden: (v) => v.category !== 'MANPOWER', hint: 'Opsional; manpower dapat ditautkan ke mandor.' },
     { section: 'Data pendukung' },
+    { name: 'npwp', label: editing ? 'NPWP (isi hanya bila diubah)' : 'NPWP', inputMode: 'numeric', placeholder: editing ? initial.npwpMasked ?? '' : '', hint: '15 digit (format lama) atau 16 digit (NIK).' },
     { name: 'bpjsKesehatan', label: 'BPJS Kesehatan' },
     { name: 'bpjsKetenagakerjaan', label: 'BPJS Ketenagakerjaan' },
     { name: 'bloodType', label: 'Golongan darah', type: 'select', options: BLOOD_TYPES },
@@ -79,7 +83,12 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     e.preventDefault();
     const data = { ...values };
     delete data.nikMasked;
+    delete data.npwpMasked;
+    // Status kepegawaian dikirim apa adanya (kosong = dihapus); hanya HRD/HO HSE yang dapat mengubahnya.
+    const employment = { employmentType: data.employmentType || null, contractEndDate: data.employmentType === 'PKWT' ? data.contractEndDate || null : null };
+    if (!canEmployment && !editing) { delete data.employmentType; delete data.contractEndDate; }
     for (const k of Object.keys(data)) if (data[k] === '' && editing) delete data[k];
+    if (editing) Object.assign(data, employment);
     if (!editing) for (const k of Object.keys(data)) if (data[k] === '') delete data[k];
     if (editing) delete data.siteId;
     const form = new FormData();

@@ -195,9 +195,12 @@ model Personnel {
   initialSiteId    String?
   currentSiteId    String?
   startDate        DateTime?
-  workStatus       String    @default("ACTIVE") // ACTIVE | CUTI | SAKIT | MCU | RESIGN | DIRUMAHKAN | MUTASI
+  workStatus       String    @default("ACTIVE") // ACTIVE | CUTI | SAKIT | MCU | RESIGN | DIRUMAHKAN | MUTASI (status operasional)
+  employmentType   String? // PKWT | PKWTT (status kepegawaian; diubah hanya oleh HRD/HO HSE)
+  contractEndDate  DateTime? // akhir kontrak, khusus PKWT
   bpjsKesehatan    String?
   bpjsKetenagakerjaan String?
+  npwpEnc          String? // NPWP (15/16 digit) terenkripsi
   bloodType        String?
   medicalHistoryEnc String?
   shirtSize        String?

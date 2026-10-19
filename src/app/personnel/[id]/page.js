@@ -1,5 +1,5 @@
 import AppLayout from '@/components/AppLayout';
-import { canWrite } from '@/lib/access';
+import { canSetEmployment, canWrite } from '@/lib/access';
 import { requirePage, scopedSites } from '@/lib/page';
 import { getPersonnel } from '@/lib/services/personnel';
 import { redirect } from 'next/navigation';
@@ -19,7 +19,7 @@ export default async function PersonnelDetailPage({ params }) {
   const sites = await scopedSites(user);
   return (
     <AppLayout title={person.name} subtitle={`${person.code} · ${person.position} · ${person.currentSite?.code ?? '-'}`} user={user}>
-      <PersonnelDetail person={person} sites={sites} canEdit={canWrite(user.role, 'personnel')} canRequestMutation={canWrite(user.role, 'placements')} />
+      <PersonnelDetail person={person} sites={sites} canEdit={canWrite(user.role, 'personnel')} canEmployment={canSetEmployment(user)} canRequestMutation={canWrite(user.role, 'placements')} />
     </AppLayout>
   );
 }

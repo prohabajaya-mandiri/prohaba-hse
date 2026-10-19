@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { UserPlus, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import { Badge, DataTable, FilterBar, Modal, Pager, useSubmit } from '@/components/ui';
-import { CATEGORIES, WORK_STATUSES } from '@/lib/domain/personnel';
+import { CATEGORIES, EMPLOYMENT_TYPES, WORK_STATUSES } from '@/lib/domain/personnel';
 import { formatDate } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 import PersonnelForm, { EMPTY_PERSONNEL } from './PersonnelForm';
 
-export default function PersonnelClient({ sites, rows, total, page, canEdit }) {
+export default function PersonnelClient({ sites, rows, total, page, canEdit, canEmployment }) {
   const router = useRouter();
   const params = useSearchParams();
   const [adding, setAdding] = useState(false);
@@ -22,6 +22,7 @@ export default function PersonnelClient({ sites, rows, total, page, canEdit }) {
         { name: 'siteId', label: 'Site', type: 'select', options: sites.map((s) => [s.id, s.code]) },
         { name: 'category', label: 'Kategori', type: 'select', options: CATEGORIES },
         { name: 'workStatus', label: 'Status kerja', type: 'select', options: WORK_STATUSES },
+        { name: 'employmentType', label: 'Kepegawaian', type: 'select', options: [...EMPLOYMENT_TYPES, ['NONE', 'Belum diisi']] },
         { name: 'former', label: 'Data', type: 'select', allLabel: 'Personel aktif', options: [['1', 'Mantan personel'], ['all', 'Semua']] },
       ]}>
         <a className="btn btn-outline" href={'/api/personnel/export?' + params.toString()}><Download size={16} /> Export</a>
@@ -39,6 +40,8 @@ export default function PersonnelClient({ sites, rows, total, page, canEdit }) {
             { key: 'category', label: 'Kategori', render: (p) => labelOf(p.category) },
             { key: 'position', label: 'Jabatan', render: (p) => (<div>{p.position}{p.foreman && <div className="muted">Mandor: {p.foreman.name}</div>}</div>) },
             { key: 'siteName', label: 'Site' },
+            { key: 'employmentType', label: 'Kepegawaian', render: (p) => (<div><Badge value={p.employmentType} />{p.employmentType === 'PKWT' && p.contractEndDate && <div className="muted">s/d {formatDate(p.contractEndDate)}</div>}</div>) },
+            { key: 'tenure', label: 'Masa kerja', render: (p) => p.tenure ?? '-' },
             { key: 'workStatus', label: 'Status kerja', render: (p) => <Badge value={p.workStatus} /> },
             { key: 'fitness', label: 'Kesehatan', render: (p) => <Badge value={p.fitness} /> },
             { key: 'permitEnd', label: 'Permit s/d', render: (p) => formatDate(p.permitEnd) },
@@ -48,7 +51,7 @@ export default function PersonnelClient({ sites, rows, total, page, canEdit }) {
       <Pager page={page} total={total} />
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Tambah personel" subtitle="Satu NIK hanya untuk satu profil. Penempatan awal dibuat otomatis." size="modal-xl">
-        {adding && <PersonnelForm initial={{ ...EMPTY_PERSONNEL, siteId: sites.length === 1 ? sites[0].id : '' }} sites={sites.filter((s) => s.isActive)} canMedical canBank
+        {adding && <PersonnelForm initial={{ ...EMPTY_PERSONNEL, siteId: sites.length === 1 ? sites[0].id : '' }} sites={sites.filter((s) => s.isActive)} canMedical canBank canEmployment={canEmployment}
           onDone={(r) => { setAdding(false); router.push('/personnel/' + r.id); }} />}
       </Modal>
       <Modal open={importing} onClose={() => setImporting(false)} title="Import personel dari Excel" subtitle="File divalidasi dan ditinjau sebelum disimpan." size="modal-xl">
@@ -66,10 +69,11 @@ function ImportPanel({ onDone }) {
 
   const readFile = async (file) => {
     const XLSX = await import('xlsx');
-    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+    const wb = XLSX.read(await file.arrayBuffer());
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    // Hilangkan tanda * pada header wajib agar cocok dengan template.
-    const raw = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' })
+    // Nilai mentah: tanggal Excel tetap berupa nomor seri (dikonversi di server tanpa geser zona waktu),
+    // angka tidak diformat ulang. Tanda * pada header wajib dihilangkan agar cocok dengan template.
+    const raw = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true })
       .map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.replace(/\s*\*\s*$/, ''), v])))
       .filter((r) => Object.values(r).some((v) => String(v).trim() !== ''));
     setFileName(file.name);
@@ -113,7 +117,7 @@ function ImportPanel({ onDone }) {
                 { key: 'nik', label: 'NIK' },
                 { key: 'siteCode', label: 'Site' },
                 { key: 'category', label: 'Kategori' },
-                { key: 'status', label: 'Hasil', render: (r) => r.errors.length ? <span className="text-red">{r.errors.join(' ')}</span> : r.duplicate ? <span className="text-orange">Sudah terdaftar ({r.duplicate}) — dilewati</span> : <span className="text-green">OK</span> },
+                { key: 'status', label: 'Hasil', render: (r) => r.errors.length ? <ul className="text-red" style={{ margin: 0, paddingLeft: 16 }}>{r.errors.map((e) => <li key={e}>{e}</li>)}</ul> : r.duplicate ? <span className="text-orange">Sudah terdaftar ({r.duplicate}) — dilewati</span> : <span className="text-green">OK{r.warnings?.length ? <span className="text-orange"> — {r.warnings.join(' ')}</span> : null}</span> },
               ]} />
           </div>
           <div className="modal-footer" style={{ padding: 0 }}>

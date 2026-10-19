@@ -19,12 +19,12 @@ export function object(value, allowed) {
   return value;
 }
 export function text(value, name, max = 200, optional = false) {
-  if (optional && (value === undefined || value === null || value === ""))
+  // Isian opsional yang hanya berisi spasi dianggap kosong.
+  if (optional && (value === undefined || value === null || (typeof value === "string" && value.trim() === "")))
     return null;
-  ensure(
-    typeof value === "string" && value.trim().length > 0 && value.length <= max,
-    name + " tidak valid.",
-  );
+  ensure(value !== undefined && value !== null && String(value).trim() !== "", name + " wajib diisi.");
+  ensure(typeof value === "string", name + " tidak valid.");
+  ensure(value.trim().length <= max, name + " maksimal " + max + " karakter.");
   return value.trim();
 }
 export function number(value, name, min = 0, max = 1e12) {
@@ -47,7 +47,8 @@ export function money(value, name = "Nominal", min = 0) {
   return n;
 }
 export function choice(value, values, name = "Status") {
-  ensure(values.includes(value), name + " tidak valid.");
+  ensure(value !== undefined && value !== null && value !== "", name + " wajib diisi.");
+  ensure(values.includes(value), name + " tidak valid (pilihan: " + values.join(", ") + ").");
   return value;
 }
 export function date(value, name = "Tanggal") {
@@ -106,6 +107,12 @@ export function optionalId(value, name) {
 }
 export function optionalChoice(value, values, name) {
   return value === undefined || value === null || value === "" ? null : choice(value, values, name);
+}
+export function npwp(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const s = String(value).replace(/[\s.\-/]/g, "");
+  ensure(/^(\d{15}|\d{16})$/.test(s), "NPWP harus 15 atau 16 digit angka.");
+  return s;
 }
 export function nik(value) {
   const s = typeof value === "number" ? String(value) : String(value ?? "").replace(/\s/g, "");

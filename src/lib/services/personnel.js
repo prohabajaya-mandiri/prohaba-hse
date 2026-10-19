@@ -1,66 +1,92 @@
 import * as XLSX from 'xlsx';
 import { prisma } from '../prisma.js';
-import { canSeeSensitive, siteFilter, siteScope } from '../access.js';
+import { canSeeSensitive, canSetEmployment, siteFilter, siteScope } from '../access.js';
 import { audit, diff } from '../audit.js';
 import { decrypt, encrypt, lookupHash, maskAccount, maskNik } from '../crypto.js';
-import { iso, today } from '../dates.js';
+import { daysBetween, iso, today } from '../dates.js';
 import { nextNumber } from '../sequence.js';
-import { BLOOD_TYPES, CATEGORIES, IMPORT_COLUMNS, MARITAL, WORK_STATUSES, mapImportRow } from '../domain/personnel.js';
+import { BLOOD_TYPES, CATEGORIES, EMPLOYMENT_TYPES, IMPORT_COLUMNS, MARITAL, WORK_STATUSES, mapImportRow, normalizeImportRow, tenure } from '../domain/personnel.js';
 import { fitness } from '../domain/mcu.js';
 import { getSetting } from '../settings.js';
-import { bool, choice, ensure, InputError, nik as parseNik, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
+import { bool, choice, ensure, InputError, nik as parseNik, npwp as parseNpwp, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
 import { attachFiles, requireSite, scopedPersonnel, siteExists } from './common.js';
 
 const EDITABLE = [
   'nik', 'name', 'birthPlace', 'birthDate', 'gender', 'maritalStatus', 'education', 'major', 'phoneWa',
   'emergencyName', 'emergencyPhone', 'emergencyRelation', 'ktpAddress', 'domicileAddress', 'originRegion',
-  'category', 'position', 'siteId', 'startDate', 'bpjsKesehatan', 'bpjsKetenagakerjaan', 'bloodType',
+  'category', 'position', 'siteId', 'startDate', 'employmentType', 'contractEndDate', 'npwp', 'bpjsKesehatan', 'bpjsKetenagakerjaan', 'bloodType',
   'medicalHistory', 'shirtSize', 'shoeSize', 'bankName', 'bankAccount', 'bankAccountName', 'foremanId', 'ocrVerified',
 ];
 
-/** Validasi & normalisasi input personel. `existing` diisi saat edit. */
-export function parsePersonnel(body, existing = null) {
+/**
+ * Validasi & normalisasi input personel. `existing` diisi saat edit.
+ * `errors` (array) diisi bila ingin mengumpulkan seluruh kesalahan sekaligus (import Excel);
+ * tanpa `errors`, kesalahan pertama langsung dilempar.
+ */
+export function parsePersonnel(body, existing = null, { user = null, errors = null } = {}) {
   object(body, EDITABLE);
+  const f = (fn) => {
+    try {
+      return fn();
+    } catch (e) {
+      if (!errors || !(e instanceof InputError)) throw e;
+      errors.push(e.message);
+      return null;
+    }
+  };
   const v = {
-    name: text(body.name, 'Nama', 150),
-    birthPlace: text(body.birthPlace, 'Tempat lahir', 80, true),
-    birthDate: optionalDate(body.birthDate, 'Tanggal lahir'),
-    gender: optionalChoice(body.gender, ['L', 'P'], 'Jenis kelamin'),
-    maritalStatus: optionalChoice(body.maritalStatus, MARITAL, 'Status nikah'),
-    education: text(body.education, 'Pendidikan', 60, true),
-    major: text(body.major, 'Jurusan', 100, true),
-    phoneWa: text(body.phoneWa, 'No WA', 30, true),
-    emergencyName: text(body.emergencyName, 'Kontak darurat', 120, true),
-    emergencyPhone: text(body.emergencyPhone, 'No kontak darurat', 30, true),
-    emergencyRelation: text(body.emergencyRelation, 'Hubungan kontak darurat', 60, true),
-    domicileAddress: text(body.domicileAddress, 'Alamat domisili', 500, true),
-    originRegion: text(body.originRegion, 'Asal daerah', 100, true),
-    category: choice(body.category, CATEGORIES, 'Kategori'),
-    position: text(body.position, 'Jabatan', 100),
-    startDate: optionalDate(body.startDate, 'Tanggal mulai'),
-    bpjsKesehatan: text(body.bpjsKesehatan, 'BPJS Kesehatan', 30, true),
-    bpjsKetenagakerjaan: text(body.bpjsKetenagakerjaan, 'BPJS Ketenagakerjaan', 30, true),
-    bloodType: optionalChoice(body.bloodType ? String(body.bloodType).toUpperCase() : body.bloodType, BLOOD_TYPES, 'Golongan darah'),
-    shirtSize: text(body.shirtSize, 'Ukuran baju', 10, true),
-    shoeSize: text(body.shoeSize, 'Ukuran sepatu', 10, true),
-    bankName: text(body.bankName, 'Nama bank', 60, true),
-    bankAccountName: text(body.bankAccountName, 'Nama pemilik rekening', 120, true),
-    foremanId: optionalId(body.foremanId, 'Mandor'),
+    name: f(() => text(body.name, 'Nama', 150)),
+    birthPlace: f(() => text(body.birthPlace, 'Tempat lahir', 80, true)),
+    birthDate: f(() => optionalDate(body.birthDate, 'Tanggal lahir')),
+    gender: f(() => optionalChoice(body.gender, ['L', 'P'], 'Jenis kelamin')),
+    maritalStatus: f(() => optionalChoice(body.maritalStatus, MARITAL, 'Status nikah')),
+    education: f(() => text(body.education, 'Pendidikan', 60, true)),
+    major: f(() => text(body.major, 'Jurusan', 100, true)),
+    phoneWa: f(() => text(body.phoneWa, 'No WA', 30, true)),
+    emergencyName: f(() => text(body.emergencyName, 'Kontak darurat', 120, true)),
+    emergencyPhone: f(() => text(body.emergencyPhone, 'No kontak darurat', 30, true)),
+    emergencyRelation: f(() => text(body.emergencyRelation, 'Hubungan kontak darurat', 60, true)),
+    domicileAddress: f(() => text(body.domicileAddress, 'Alamat domisili', 500, true)),
+    originRegion: f(() => text(body.originRegion, 'Asal daerah', 100, true)),
+    category: f(() => choice(body.category, CATEGORIES, 'Kategori')),
+    position: f(() => text(body.position, 'Jabatan', 100)),
+    startDate: f(() => optionalDate(body.startDate, 'Tanggal mulai')),
+    bpjsKesehatan: f(() => text(body.bpjsKesehatan, 'BPJS Kesehatan', 30, true)),
+    bpjsKetenagakerjaan: f(() => text(body.bpjsKetenagakerjaan, 'BPJS Ketenagakerjaan', 30, true)),
+    bloodType: f(() => optionalChoice(body.bloodType ? String(body.bloodType).toUpperCase() : body.bloodType, BLOOD_TYPES, 'Golongan darah')),
+    shirtSize: f(() => text(body.shirtSize, 'Ukuran baju', 10, true)),
+    shoeSize: f(() => text(body.shoeSize, 'Ukuran sepatu', 10, true)),
+    bankName: f(() => text(body.bankName, 'Nama bank', 60, true)),
+    bankAccountName: f(() => text(body.bankAccountName, 'Nama pemilik rekening', 120, true)),
+    foremanId: f(() => optionalId(body.foremanId, 'Mandor')),
     ocrVerified: body.ocrVerified === undefined ? existing?.ocrVerified ?? false : bool(body.ocrVerified),
   };
+  // Status kepegawaian: undefined = tidak diubah. Hanya HRD/HO HSE yang boleh menetapkan atau mengubah.
+  if (!existing || body.employmentType !== undefined || body.contractEndDate !== undefined) {
+    const type = body.employmentType !== undefined ? f(() => optionalChoice(body.employmentType, EMPLOYMENT_TYPES, 'Status kepegawaian')) : existing?.employmentType ?? null;
+    let end = body.contractEndDate !== undefined ? f(() => optionalDate(body.contractEndDate, 'Akhir kontrak')) : existing?.contractEndDate ?? null;
+    if (type !== 'PKWT') end = null; // PKWTT tidak memiliki akhir kontrak
+    const start = v.startDate ?? existing?.startDate;
+    f(() => ensure(!end || !start || end >= start, 'Akhir kontrak tidak boleh sebelum tanggal mulai.'));
+    const changed = type !== (existing?.employmentType ?? null) || (end?.getTime() ?? null) !== (existing?.contractEndDate ? new Date(existing.contractEndDate).getTime() : null);
+    if (changed) f(() => ensure(canSetEmployment(user), 'Status kepegawaian (PKWT/PKWTT) hanya dapat diisi atau diubah oleh HRD / HO HSE.', 403));
+    v.employmentType = type;
+    v.contractEndDate = end;
+  }
   // Field sensitif: undefined = tidak diubah (form edit tidak menampilkan nilai terbuka).
   const sensitive = {};
-  if (!existing || body.nik !== undefined) sensitive.nik = parseNik(body.nik);
-  if (!existing || body.ktpAddress !== undefined) sensitive.ktpAddress = text(body.ktpAddress, 'Alamat KTP', 500);
+  if (!existing || body.nik !== undefined) sensitive.nik = f(() => parseNik(body.nik));
+  if (!existing || body.ktpAddress !== undefined) sensitive.ktpAddress = f(() => text(body.ktpAddress, 'Alamat KTP', 500));
+  if (body.npwp !== undefined) sensitive.npwp = f(() => parseNpwp(body.npwp));
   if (body.bankAccount !== undefined) {
-    const acc = body.bankAccount ? String(body.bankAccount).replace(/\s/g, '') : null;
-    ensure(!acc || /^\d{5,30}$/.test(acc), 'No rekening hanya angka.');
+    const acc = body.bankAccount ? String(body.bankAccount).replace(/[\s.-]/g, '') : null;
+    f(() => ensure(!acc || /^\d{5,30}$/.test(acc), 'No rekening hanya angka (5–30 digit).'));
     sensitive.bankAccount = acc;
   }
-  if (body.medicalHistory !== undefined) sensitive.medicalHistory = text(body.medicalHistory, 'Riwayat penyakit', 1000, true);
+  if (body.medicalHistory !== undefined) sensitive.medicalHistory = f(() => text(body.medicalHistory, 'Riwayat penyakit', 1000, true));
   // Rekening wajib untuk staff.
   const hasAccount = sensitive.bankAccount !== undefined ? Boolean(sensitive.bankAccount) : Boolean(existing?.bankAccountEnc);
-  if (v.category === 'STAFF') ensure(hasAccount && (v.bankName || existing?.bankName), 'Rekening (bank & nomor) wajib untuk staff.');
+  if (v.category === 'STAFF') f(() => ensure(hasAccount && (v.bankName || existing?.bankName), 'Rekening (nama bank & no rekening) wajib untuk kategori STAFF.'));
   if (v.category !== 'MANPOWER') v.foremanId = null;
   return { v, sensitive };
 }
@@ -70,6 +96,7 @@ function encryptSensitive(sensitive) {
   if (sensitive.nik !== undefined) Object.assign(out, { nikHash: lookupHash(sensitive.nik), nikEnc: encrypt(sensitive.nik), nikLast4: sensitive.nik.slice(-4) });
   if (sensitive.ktpAddress !== undefined) out.ktpAddressEnc = encrypt(sensitive.ktpAddress);
   if (sensitive.bankAccount !== undefined) out.bankAccountEnc = encrypt(sensitive.bankAccount);
+  if (sensitive.npwp !== undefined) out.npwpEnc = encrypt(sensitive.npwp);
   if (sensitive.medicalHistory !== undefined) out.medicalHistoryEnc = encrypt(sensitive.medicalHistory);
   return out;
 }
@@ -88,7 +115,7 @@ async function checkForeman(db, foremanId, selfId) {
 
 export async function createPersonnel(user, body, ktpFile) {
   const siteId = requireSite(user, body.siteId);
-  const { v, sensitive } = parsePersonnel(body);
+  const { v, sensitive } = parsePersonnel(body, null, { user });
   return prisma.$transaction(async (tx) => {
     await siteExists(tx, siteId);
     await checkDuplicate(tx, sensitive.nik);
@@ -114,10 +141,10 @@ async function saveKtp(tx, user, person, file) {
 export async function updatePersonnel(user, id, body, ktpFile) {
   const existing = await scopedPersonnel(user, id);
   // Field sensitif kosong pada form edit berarti tidak diubah.
-  for (const k of ['nik', 'ktpAddress', 'bankAccount', 'medicalHistory']) if (body[k] === '') delete body[k];
+  for (const k of ['nik', 'ktpAddress', 'npwp', 'bankAccount', 'medicalHistory']) if (body[k] === '') delete body[k];
   delete body.siteId; // site berubah hanya melalui mutasi
 
-  const { v, sensitive } = parsePersonnel(body, existing);
+  const { v, sensitive } = parsePersonnel(body, existing, { user });
   return prisma.$transaction(async (tx) => {
     if (sensitive.nik) await checkDuplicate(tx, sensitive.nik, id);
     await checkForeman(tx, v.foremanId, id);
@@ -146,6 +173,8 @@ export function personnelWhere(user, f = {}) {
   const where = { ...siteFilter(user, f.siteId, 'currentSiteId') };
   if (f.category && CATEGORIES.includes(f.category)) where.category = f.category;
   if (f.workStatus && WORK_STATUSES.includes(f.workStatus)) where.workStatus = f.workStatus;
+  if (f.employmentType === 'NONE') where.employmentType = null;
+  else if (f.employmentType && EMPLOYMENT_TYPES.includes(f.employmentType)) where.employmentType = f.employmentType;
   if (f.former === '1') where.isFormer = true;
   else if (f.former !== 'all') where.isFormer = false;
   if (f.q) {
@@ -166,6 +195,8 @@ export async function listPersonnel(user, f, { skip = 0, take = 50 } = {}) {
       orderBy: [{ name: 'asc' }],
       select: {
         id: true, code: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true, phoneWa: true,
+        startDate: true, employmentType: true, contractEndDate: true,
+        placements: { where: { endDate: { not: null } }, orderBy: { endDate: 'desc' }, take: 1, select: { endDate: true } },
         currentSite: { select: { code: true, name: true } },
         foreman: { select: { name: true } },
         mcus: { where: { isLatest: true }, take: 1, select: { result: true, validUntil: true, fuDueDate: true } },
@@ -183,9 +214,13 @@ export async function listPersonnel(user, f, { skip = 0, take = 50 } = {}) {
       siteName: p.currentSite ? `${p.currentSite.code}` : '-',
       fitness: fitness(p.mcus[0], now),
       permitEnd: p.permits[0]?.endDate ?? null,
+      tenure: tenure(p.startDate, tenureEnd(p, now))?.label ?? null,
     })),
   };
 }
+
+// Masa kerja mantan personel dihitung sampai penempatan terakhir berakhir.
+const tenureEnd = (p, now) => (p.isFormer && p.placements?.[0]?.endDate ? p.placements[0].endDate : now);
 
 export async function pickPersonnel(user, f) {
   const where = personnelWhere(user, { q: f.q, siteId: f.siteId, category: f.category, workStatus: f.workStatus, former: f.former });
@@ -219,24 +254,28 @@ export async function getPersonnel(user, id) {
   const ktp = canSeeSensitive(user, 'KTP', siteId);
   const medical = canSeeSensitive(user, 'MEDICAL', siteId);
   const bank = canSeeSensitive(user, 'BANK', siteId);
-  const { nikEnc, nikHash, ktpAddressEnc, bankAccountEnc, medicalHistoryEnc, ...rest } = p;
+  const { nikEnc, nikHash, ktpAddressEnc, bankAccountEnc, medicalHistoryEnc, npwpEnc, ...rest } = p;
   void nikEnc; void nikHash; void ktpAddressEnc;
+  const now = today();
   return {
     ...rest,
     nik: maskNik(p.nikLast4),
+    npwp: ktp ? maskAccount(decrypt(npwpEnc)) : npwpEnc ? '[dibatasi]' : null,
+    tenure: tenure(p.startDate, p.isFormer ? p.placements.find((x) => x.endDate)?.endDate ?? now : now),
+    contractDaysLeft: p.employmentType === 'PKWT' && p.contractEndDate ? daysBetween(now, p.contractEndDate) : null,
     bankAccount: bank ? maskAccount(decrypt(bankAccountEnc)) : bankAccountEnc ? '[dibatasi]' : null,
     medicalHistory: medical ? decrypt(medicalHistoryEnc) : medicalHistoryEnc ? '[dibatasi]' : null,
     mcus: p.mcus.map(({ notesEnc, ...m }) => ({ ...m, notes: medical ? decrypt(notesEnc) : notesEnc ? '[dibatasi]' : null })),
     ktpFileId: ktp ? p.ktpFileId : null,
     access: { ktp, medical, bank },
-    fitness: fitness(p.mcus.find((m) => m.isLatest), today()),
+    fitness: fitness(p.mcus.find((m) => m.isLatest), now),
   };
 }
 
 /** Tampilkan data sensitif utuh (dicatat di audit log). */
 export async function revealSensitive(user, id, kind) {
   const p = await scopedPersonnel(user, id);
-  const map = { KTP: ['KTP', () => ({ nik: decrypt(p.nikEnc), ktpAddress: decrypt(p.ktpAddressEnc) })], BANK: ['BANK', () => ({ bankAccount: decrypt(p.bankAccountEnc) })] };
+  const map = { KTP: ['KTP', () => ({ nik: decrypt(p.nikEnc), ktpAddress: decrypt(p.ktpAddressEnc), npwp: decrypt(p.npwpEnc) })], BANK: ['BANK', () => ({ bankAccount: decrypt(p.bankAccountEnc) })] };
   ensure(Object.hasOwn(map, kind), 'Jenis data tidak valid.');
   if (!canSeeSensitive(user, map[kind][0], p.currentSiteId)) throw new InputError('Anda tidak memiliki akses ke data ini.', 403);
   await audit(null, user, { action: 'VIEW_SENSITIVE', module: 'personnel', recordId: id, siteId: p.currentSiteId, note: kind });
@@ -244,19 +283,33 @@ export async function revealSensitive(user, id, kind) {
 }
 
 // ─── Import Excel: preview → tinjau → simpan ────────────────────────────────
+const requiredMark = (req) => (req === true ? ' *' : '');
+
 export function importTemplate() {
-  const ws = XLSX.utils.aoa_to_sheet([IMPORT_COLUMNS.map(([, h, req]) => (req ? h + ' *' : h))]);
-  ws['!cols'] = IMPORT_COLUMNS.map(() => ({ wch: 22 }));
+  const ws = XLSX.utils.aoa_to_sheet([IMPORT_COLUMNS.map(([, h, req]) => h + requiredMark(req))]);
+  ws['!cols'] = IMPORT_COLUMNS.map(([, h]) => ({ wch: Math.max(16, h.length + 3) }));
+  // Kolom identitas berupa teks agar Excel tidak mengubah 16 digit / menghapus angka 0 di depan.
+  const textCols = new Set(['nik', 'npwp', 'bankAccount', 'phoneWa', 'emergencyPhone', 'bpjsKesehatan', 'bpjsKetenagakerjaan']);
+  IMPORT_COLUMNS.forEach(([field], c) => {
+    if (!textCols.has(field)) return;
+    for (let r = 1; r <= 1000; r++) ws[XLSX.utils.encode_cell({ r, c })] = { t: 's', v: '', z: '@' };
+  });
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 1000, c: IMPORT_COLUMNS.length - 1 } });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Personel');
   const info = XLSX.utils.aoa_to_sheet([
     ['Petunjuk'],
-    ['Kolom bertanda * wajib. Tanggal format YYYY-MM-DD.'],
-    ['Format kolom NIK dan No Rekening sebagai Text agar digit tidak berubah.'],
-    ['Kategori: STAFF / MANPOWER / HARIAN_KANTOR. Rekening wajib untuk STAFF.'],
+    ['Kolom bertanda * wajib diisi: ' + IMPORT_COLUMNS.filter(([, , r]) => r === true).map(([, h]) => h.replace(/\s*\(.*\)/, '')).join(', ') + '.'],
+    ['Kolom lain boleh dikosongkan (atau diisi "-"). Nama Bank & No Rekening wajib hanya untuk kategori STAFF.'],
+    ['Tanggal boleh YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, atau format tanggal Excel.'],
+    ['Format kolom NIK, NPWP dan No Rekening sebagai Text agar digit tidak berubah (template ini sudah diatur).'],
+    ['Kategori: STAFF / MANPOWER / HARIAN_KANTOR. Jenis kelamin: L/P (Laki-laki/Perempuan). Status nikah: Menikah / Belum menikah / Cerai.'],
+    ['Status Kepegawaian: PKWT (kontrak) / PKWTT (tetap) — hanya diproses bila import dilakukan oleh HRD / HO HSE. Akhir Kontrak hanya untuk PKWT.'],
+    ['NPWP 15 digit (format lama) atau 16 digit (NIK/NPWP baru); titik dan strip boleh disertakan.'],
     ['Kode Site mengacu Master Site. Kode Mandor = kode personel PJM-xxxxxx (opsional, khusus manpower).'],
     ['NIK yang sudah terdaftar tidak akan membuat profil baru.'],
   ]);
+  info['!cols'] = [{ wch: 120 }];
   XLSX.utils.book_append_sheet(wb, info, 'Petunjuk');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
@@ -267,30 +320,37 @@ async function validateImport(user, rawRows) {
   const siteByCode = Object.fromEntries(sites.map((s) => [s.code.toUpperCase(), s.id]));
   const seen = new Map();
   const results = [];
-  const foremanCodes = [...new Set(rawRows.map((r) => mapImportRow(r).foremanCode).filter(Boolean))];
+  const mapped = rawRows.map((r) => mapImportRow(r && typeof r === 'object' ? r : {}));
+  const foremanCodes = [...new Set(mapped.map((r) => r.foremanCode).filter(Boolean).map((c) => String(c).trim().toUpperCase()))];
   const foremen = await prisma.personnel.findMany({ where: { code: { in: foremanCodes } }, select: { id: true, code: true } });
   const foremanByCode = Object.fromEntries(foremen.map((f) => [f.code, f.id]));
-  for (const [index, raw] of rawRows.entries()) {
-    const row = mapImportRow(raw);
-    const errors = [];
-    let parsed = null;
-    try {
-      const siteId = siteByCode[String(row.siteCode ?? '').toUpperCase()];
-      ensure(siteId, 'Kode site tidak dikenal.');
-      requireSite(user, siteId);
-      const { siteCode, foremanCode, ...body } = row;
-      void siteCode;
-      if (foremanCode) {
-        ensure(foremanByCode[foremanCode], 'Kode mandor tidak ditemukan.');
-        body.foremanId = foremanByCode[foremanCode];
-      }
-      if (body.category) body.category = body.category.toUpperCase().replace(/\s+/g, '_');
-      if (body.maritalStatus) body.maritalStatus = body.maritalStatus.toUpperCase().replace(/\s+/g, '_');
-      if (body.gender) body.gender = body.gender.toUpperCase().slice(0, 1);
-      parsed = { ...parsePersonnel({ ...body, siteId: undefined }), siteId };
-    } catch (e) {
-      errors.push(e.message);
+  for (const [index, row] of mapped.entries()) {
+    const { body: normalized, errors } = normalizeImportRow(row);
+    const { siteCode, foremanCode, ...body } = normalized;
+    const warnings = [];
+    if (!canSetEmployment(user) && (body.employmentType || body.contractEndDate)) {
+      delete body.employmentType;
+      delete body.contractEndDate;
+      warnings.push('Status kepegawaian diabaikan (hanya HRD / HO HSE yang dapat mengisi).');
     }
+    let parsed = null;
+    const siteId = siteByCode[String(siteCode ?? '').toUpperCase()];
+    if (!siteCode) errors.push('Kode site wajib diisi.');
+    else if (!siteId) errors.push(`Kode site "${siteCode}" tidak dikenal.`);
+    else {
+      try {
+        requireSite(user, siteId);
+      } catch (e) {
+        errors.push(e.message);
+      }
+    }
+    if (foremanCode) {
+      const fid = foremanByCode[foremanCode.toUpperCase()];
+      if (fid) body.foremanId = fid;
+      else errors.push(`Kode mandor "${foremanCode}" tidak ditemukan.`);
+    }
+    const result = parsePersonnel(body, null, { user, errors });
+    if (!errors.length) parsed = { ...result, siteId };
     let duplicate = null;
     if (parsed) {
       const nik = parsed.sensitive.nik;
@@ -299,7 +359,7 @@ async function validateImport(user, rawRows) {
       const dup = await prisma.personnel.findUnique({ where: { nikHash: lookupHash(nik) }, select: { code: true } });
       if (dup) duplicate = dup.code;
     }
-    results.push({ row: index + 2, name: row.name ?? '-', nik: row.nik ? maskNik(String(row.nik).slice(-4)) : '-', siteCode: row.siteCode ?? '-', category: row.category ?? '-', errors, duplicate, parsed });
+    results.push({ row: index + 2, name: body.name ?? '-', nik: body.nik ? maskNik(String(body.nik).slice(-4)) : '-', siteCode: siteCode ?? '-', category: body.category ?? '-', errors, warnings, duplicate, parsed });
   }
   return results;
 }
@@ -340,8 +400,12 @@ export async function importCommit(user, rows) {
 export async function exportPersonnel(user, f) {
   const rows = await prisma.personnel.findMany({
     where: personnelWhere(user, f), orderBy: { name: 'asc' }, take: 10000,
-    include: { currentSite: { select: { code: true } }, foreman: { select: { code: true } } },
+    include: {
+      currentSite: { select: { code: true } }, foreman: { select: { code: true } },
+      placements: { where: { endDate: { not: null } }, orderBy: { endDate: 'desc' }, take: 1, select: { endDate: true } },
+    },
   });
+  const now = today();
   const ktpAll = siteScope(user) === null && canSeeSensitive(user, 'KTP');
   const data = rows.map((p) => {
     const ktp = ktpAll || canSeeSensitive(user, 'KTP', p.currentSiteId);
@@ -350,7 +414,9 @@ export async function exportPersonnel(user, f) {
       'Jenis Kelamin': p.gender, 'Status Nikah': p.maritalStatus, Pendidikan: p.education, Jurusan: p.major, 'No WA': p.phoneWa,
       'Kontak Darurat': p.emergencyName, 'No Kontak Darurat': p.emergencyPhone, 'Alamat KTP': ktp ? decrypt(p.ktpAddressEnc) : '[dibatasi]',
       'Alamat Domisili': p.domicileAddress, 'Asal Daerah': p.originRegion, Kategori: p.category, Jabatan: p.position, Site: p.currentSite?.code,
-      'Tanggal Mulai': iso(p.startDate), 'Status Kerja': p.workStatus, 'BPJS Kesehatan': p.bpjsKesehatan, 'BPJS Ketenagakerjaan': p.bpjsKetenagakerjaan,
+      'Tanggal Mulai': iso(p.startDate), 'Masa Kerja': tenure(p.startDate, tenureEnd(p, now))?.label ?? '',
+      'Status Kepegawaian': p.employmentType, 'Akhir Kontrak': iso(p.contractEndDate), 'Status Kerja': p.workStatus,
+      NPWP: p.npwpEnc ? (ktp ? decrypt(p.npwpEnc) : '[dibatasi]') : '', 'BPJS Kesehatan': p.bpjsKesehatan, 'BPJS Ketenagakerjaan': p.bpjsKetenagakerjaan,
       'Gol Darah': p.bloodType, 'Ukuran Baju': p.shirtSize, 'Ukuran Sepatu': p.shoeSize, Mandor: p.foreman?.code, 'Mantan Personel': p.isFormer ? 'Ya' : '',
     };
   });

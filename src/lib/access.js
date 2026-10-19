@@ -111,6 +111,9 @@ export function canSeeSensitive(user, kind, siteId, salaryMatrix) {
 export const canEditSalary = (user, salaryMatrix) => Boolean(salaryMatrix?.edit?.includes(user?.role));
 export const canDecideMutation = (user) => user?.role === 'HO_HSE';
 export const canManageMaster = (user) => user?.role === 'HO_HSE';
+// Status kepegawaian (PKWT/PKWTT) & akhir kontrak menyangkut hubungan kerja: hanya HRD dan HO HSE.
+export const EMPLOYMENT_ROLES = ['HRD', 'HO_HSE'];
+export const canSetEmployment = (user) => EMPLOYMENT_ROLES.includes(user?.role);
 
 // ─── Alur laporan HSE: Draft → dikirim HSE Site → diperiksa PJO/PM → disahkan HO ──
 const REPORT_TRANSITIONS = {
