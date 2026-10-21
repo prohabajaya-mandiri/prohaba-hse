@@ -18,7 +18,7 @@ export default async function PersonnelDetailPage({ params }) {
   }
   const sites = await scopedSites(user);
   return (
-    <AppLayout title={person.name} subtitle={`${person.code} · ${person.position} · ${person.currentSite?.code ?? '-'}`} user={user}>
+    <AppLayout title={person.name} subtitle={`${person.nip ? `NIP ${person.nip} · ` : ''}${person.position} · ${person.currentSite?.code ?? '-'}`} user={user}>
       <PersonnelDetail person={person} sites={sites} canEdit={canWrite(user.role, 'personnel')} canEmployment={canSetEmployment(user)} canRequestMutation={canWrite(user.role, 'placements')} />
     </AppLayout>
   );

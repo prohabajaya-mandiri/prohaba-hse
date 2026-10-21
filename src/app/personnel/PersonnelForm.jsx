@@ -6,7 +6,7 @@ import { FileInput, FormFields, compressImage, useSubmit } from '@/components/ui
 import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, EMPLOYMENT_LABELS, EMPLOYMENT_TYPES, MARITAL, MARITAL_LABELS, parseKtpText, tenure } from '@/lib/domain/personnel';
 
 export const EMPTY_PERSONNEL = {
-  nik: '', name: '', birthPlace: '', birthDate: '', gender: '', maritalStatus: '', education: '', major: '', phoneWa: '',
+  nik: '', nip: '', name: '', birthPlace: '', birthDate: '', gender: '', maritalStatus: '', education: '', major: '', phoneWa: '',
   emergencyName: '', emergencyPhone: '', emergencyRelation: '', ktpAddress: '', domicileAddress: '', originRegion: '',
   category: 'MANPOWER', position: '', siteId: '', startDate: '', employmentType: '', contractEndDate: '', npwp: '', bpjsKesehatan: '', bpjsKetenagakerjaan: '', bloodType: '',
   medicalHistory: '', shirtSize: '', shoeSize: '', bankName: '', bankAccount: '', bankAccountName: '', foremanId: '', ocrVerified: false,
@@ -55,6 +55,7 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     { name: 'emergencyPhone', label: 'No kontak darurat', type: 'tel' },
     { name: 'emergencyRelation', label: 'Hubungan' },
     { section: 'Pekerjaan' },
+    { name: 'nip', label: 'NIP', hint: 'Nomor Induk Pegawai dari HRD. Boleh dikosongkan bila belum terbit; tidak boleh sama dengan karyawan lain.' },
     { name: 'category', label: 'Kategori', type: 'select', options: CATEGORIES.map((c) => [c, CATEGORY_LABELS[c]]), required: true, noEmpty: true },
     { name: 'position', label: 'Jabatan', required: true },
     ...(editing ? [] : [{ name: 'siteId', label: 'Site awal', type: 'select', options: sites.map((s) => [s.id, `${s.code} — ${s.name}`]), required: true }]),
@@ -87,7 +88,7 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     // Status kepegawaian dikirim apa adanya (kosong = dihapus); hanya HRD/HO HSE yang dapat mengubahnya.
     const employment = { employmentType: data.employmentType || null, contractEndDate: data.employmentType === 'PKWT' ? data.contractEndDate || null : null };
     if (!canEmployment && !editing) { delete data.employmentType; delete data.contractEndDate; }
-    for (const k of Object.keys(data)) if (data[k] === '' && editing) delete data[k];
+    for (const k of Object.keys(data)) if (data[k] === '' && editing && k !== 'nip') delete data[k];
     if (editing) Object.assign(data, employment);
     if (!editing) for (const k of Object.keys(data)) if (data[k] === '') delete data[k];
     if (editing) delete data.siteId;

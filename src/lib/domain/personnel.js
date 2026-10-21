@@ -33,6 +33,7 @@ export function tenure(start, end = new Date()) {
 // wajib: true = wajib diisi. Kolom rekening selalu opsional pada import (boleh dilengkapi kemudian).
 export const IMPORT_COLUMNS = [
   ['nik', 'NIK', true, ['No KTP', 'Nomor KTP', 'NIK KTP']],
+  ['nip', 'NIP', false, ['Nomor Induk Pegawai', 'No Induk Pegawai', 'NIP Karyawan', 'No Pegawai']],
   ['name', 'Nama', true, ['Nama Lengkap', 'Nama Karyawan', 'Nama Personel']],
   ['birthPlace', 'Tempat Lahir'],
   ['birthDate', 'Tanggal Lahir (YYYY-MM-DD)', false, ['Tgl Lahir']],
@@ -62,7 +63,7 @@ export const IMPORT_COLUMNS = [
   ['bankName', 'Nama Bank', false, ['Bank']],
   ['bankAccount', 'No Rekening', false, ['Nomor Rekening', 'Rekening']],
   ['bankAccountName', 'Nama Pemilik Rekening', false, ['Atas Nama Rekening']],
-  ['foremanCode', 'Kode Mandor', false, ['Mandor']],
+  ['foremanRef', 'NIP Mandor', false, ['Mandor', 'Kode Mandor']],
 ];
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]/g, '');

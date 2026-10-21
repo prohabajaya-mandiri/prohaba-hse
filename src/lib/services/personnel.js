@@ -8,11 +8,11 @@ import { nextNumber } from '../sequence.js';
 import { BLOOD_TYPES, CATEGORIES, EMPLOYMENT_TYPES, IMPORT_COLUMNS, MARITAL, WORK_STATUSES, mapImportRow, normalizeImportRow, tenure } from '../domain/personnel.js';
 import { fitness } from '../domain/mcu.js';
 import { getSetting } from '../settings.js';
-import { bool, choice, ensure, InputError, nik as parseNik, npwp as parseNpwp, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
+import { bool, choice, ensure, InputError, nik as parseNik, nip as parseNip, npwp as parseNpwp, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
 import { attachFiles, requireSite, scopedPersonnel, siteExists } from './common.js';
 
 const EDITABLE = [
-  'nik', 'name', 'birthPlace', 'birthDate', 'gender', 'maritalStatus', 'education', 'major', 'phoneWa',
+  'nik', 'nip', 'name', 'birthPlace', 'birthDate', 'gender', 'maritalStatus', 'education', 'major', 'phoneWa',
   'emergencyName', 'emergencyPhone', 'emergencyRelation', 'ktpAddress', 'domicileAddress', 'originRegion',
   'category', 'position', 'siteId', 'startDate', 'employmentType', 'contractEndDate', 'npwp', 'bpjsKesehatan', 'bpjsKetenagakerjaan', 'bloodType',
   'medicalHistory', 'shirtSize', 'shoeSize', 'bankName', 'bankAccount', 'bankAccountName', 'foremanId', 'ocrVerified',
@@ -74,6 +74,8 @@ export function parsePersonnel(body, existing = null, { user = null, errors = nu
     v.employmentType = type;
     v.contractEndDate = end;
   }
+  // NIP: undefined = tidak diubah. Opsional agar data lama tetap dapat disimpan sebelum NIP-nya dilengkapi.
+  if (!existing || body.nip !== undefined) v.nip = f(() => parseNip(body.nip));
   // Field sensitif: undefined = tidak diubah (form edit tidak menampilkan nilai terbuka).
   const sensitive = {};
   if (!existing || body.nik !== undefined) sensitive.nik = f(() => parseNik(body.nik));
@@ -102,9 +104,18 @@ function encryptSensitive(sensitive) {
   return out;
 }
 
+// Nama + NIP untuk pesan kepada pengguna (kode internal tidak ditampilkan).
+const personLabel = (p) => (p.nip ? `${p.name} (NIP ${p.nip})` : p.name);
+
 async function checkDuplicate(db, nik, exceptId = null) {
-  const dup = await db.personnel.findUnique({ where: { nikHash: lookupHash(nik) }, select: { id: true, code: true } });
-  if (dup && dup.id !== exceptId) throw new InputError(`NIK sudah terdaftar sebagai ${dup.code}. Gunakan profil yang ada (satu NIK satu profil).`, 409);
+  const dup = await db.personnel.findUnique({ where: { nikHash: lookupHash(nik) }, select: { id: true, name: true, nip: true } });
+  if (dup && dup.id !== exceptId) throw new InputError(`NIK sudah terdaftar atas nama ${personLabel(dup)}. Gunakan profil yang ada (satu NIK satu profil).`, 409);
+}
+
+async function checkNip(db, nip, exceptId = null) {
+  if (!nip) return;
+  const dup = await db.personnel.findUnique({ where: { nip }, select: { id: true, name: true } });
+  if (dup && dup.id !== exceptId) throw new InputError(`NIP ${nip} sudah dipakai oleh ${dup.name}.`, 409);
 }
 
 async function checkForeman(db, foremanId, selfId) {
@@ -120,6 +131,7 @@ export async function createPersonnel(user, body, ktpFile) {
   return prisma.$transaction(async (tx) => {
     await siteExists(tx, siteId);
     await checkDuplicate(tx, sensitive.nik);
+    await checkNip(tx, v.nip);
     await checkForeman(tx, v.foremanId);
     const code = await nextNumber(tx, 'personnel', 'PJM-', 6);
     const person = await tx.personnel.create({
@@ -148,6 +160,7 @@ export async function updatePersonnel(user, id, body, ktpFile) {
   const { v, sensitive } = parsePersonnel(body, existing, { user });
   return prisma.$transaction(async (tx) => {
     if (sensitive.nik) await checkDuplicate(tx, sensitive.nik, id);
+    await checkNip(tx, v.nip, id);
     await checkForeman(tx, v.foremanId, id);
     const enc = encryptSensitive(sensitive);
     await tx.personnel.update({ where: { id }, data: { ...v, ...enc } });
@@ -176,6 +189,8 @@ export function personnelWhere(user, f = {}) {
   if (f.workStatus && WORK_STATUSES.includes(f.workStatus)) where.workStatus = f.workStatus;
   if (f.employmentType === 'NONE') where.employmentType = null;
   else if (f.employmentType && EMPLOYMENT_TYPES.includes(f.employmentType)) where.employmentType = f.employmentType;
+  if (f.nip === 'NONE') where.nip = null;
+  else if (f.nip === 'SET') where.nip = { not: null };
   if (f.former === '1') where.isFormer = true;
   else if (f.former !== 'all') where.isFormer = false;
   if (f.q) {
@@ -183,7 +198,7 @@ export function personnelWhere(user, f = {}) {
     const nikLike = /^\d{16}$/.test(q);
     where.OR = nikLike
       ? [{ nikHash: lookupHash(q) }]
-      : [{ name: { contains: q, mode: 'insensitive' } }, { code: { contains: q, mode: 'insensitive' } }, { position: { contains: q, mode: 'insensitive' } }, ...(/^\d{4}$/.test(q) ? [{ nikLast4: q }] : [])];
+      : [{ name: { contains: q, mode: 'insensitive' } }, { nip: { contains: q, mode: 'insensitive' } }, { code: { contains: q, mode: 'insensitive' } }, { position: { contains: q, mode: 'insensitive' } }, ...(/^\d{4}$/.test(q) ? [{ nikLast4: q }] : [])];
   }
   return where;
 }
@@ -195,7 +210,7 @@ export async function listPersonnel(user, f, { skip = 0, take = 50 } = {}) {
       where, skip, take,
       orderBy: [{ name: 'asc' }],
       select: {
-        id: true, code: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true, phoneWa: true,
+        id: true, code: true, nip: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true, phoneWa: true,
         startDate: true, employmentType: true, contractEndDate: true,
         placements: { where: { endDate: { not: null } }, orderBy: { endDate: 'desc' }, take: 1, select: { endDate: true } },
         currentSite: { select: { code: true, name: true } },
@@ -227,7 +242,7 @@ export async function pickPersonnel(user, f) {
   const where = personnelWhere(user, { q: f.q, siteId: f.siteId, category: f.category, workStatus: f.workStatus, former: f.former });
   const rows = await prisma.personnel.findMany({
     where, take: 20, orderBy: { name: 'asc' },
-    select: { id: true, code: true, name: true, position: true, category: true, currentSiteId: true, currentSite: { select: { code: true } } },
+    select: { id: true, code: true, nip: true, name: true, position: true, category: true, currentSiteId: true, currentSite: { select: { code: true } } },
   });
   return { rows: rows.map((r) => ({ ...r, siteName: r.currentSite?.code })) };
 }
@@ -240,8 +255,8 @@ export async function getPersonnel(user, id) {
     include: {
       currentSite: { select: { id: true, code: true, name: true } },
       initialSite: { select: { code: true, name: true } },
-      foreman: { select: { id: true, name: true, code: true } },
-      crew: { select: { id: true, name: true, code: true, position: true } },
+      foreman: { select: { id: true, name: true, code: true, nip: true } },
+      crew: { select: { id: true, name: true, code: true, nip: true, position: true } },
       placements: { orderBy: { startDate: 'desc' }, include: { site: { select: { code: true, name: true } } } },
       mutations: { orderBy: { createdAt: 'desc' }, include: { toSite: { select: { code: true } } } },
       mcus: { orderBy: [{ mcuDate: 'desc' }, { createdAt: 'desc' }] },
@@ -290,7 +305,7 @@ export function importTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([IMPORT_COLUMNS.map(([, h, req]) => h + requiredMark(req))]);
   ws['!cols'] = IMPORT_COLUMNS.map(([, h]) => ({ wch: Math.max(16, h.length + 3) }));
   // Kolom identitas berupa teks agar Excel tidak mengubah 16 digit / menghapus angka 0 di depan.
-  const textCols = new Set(['nik', 'npwp', 'bankAccount', 'phoneWa', 'emergencyPhone', 'bpjsKesehatan', 'bpjsKetenagakerjaan']);
+  const textCols = new Set(['nik', 'nip', 'npwp', 'bankAccount', 'phoneWa', 'emergencyPhone', 'bpjsKesehatan', 'bpjsKetenagakerjaan']);
   IMPORT_COLUMNS.forEach(([field], c) => {
     if (!textCols.has(field)) return;
     for (let r = 1; r <= 1000; r++) ws[XLSX.utils.encode_cell({ r, c })] = { t: 's', v: '', z: '@' };
@@ -304,11 +319,12 @@ export function importTemplate() {
     ['Kolom lain boleh dikosongkan (atau diisi "-"), termasuk Nama Bank & No Rekening untuk semua kategori.'],
     ['Isian rekening yang tidak valid tidak menggagalkan baris: rekening dilewati dan diberi peringatan, lengkapi kemudian lewat Edit personel.'],
     ['Tanggal boleh YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, atau format tanggal Excel.'],
-    ['Format kolom NIK, NPWP dan No Rekening sebagai Text agar digit tidak berubah (template ini sudah diatur).'],
+    ['Format kolom NIK, NIP, NPWP dan No Rekening sebagai Text agar digit tidak berubah (template ini sudah diatur).'],
     ['Kategori: STAFF / MANPOWER / HARIAN_KANTOR. Jenis kelamin: L/P (Laki-laki/Perempuan). Status nikah: Menikah / Belum menikah / Cerai.'],
     ['Status Kepegawaian: PKWT (kontrak) / PKWTT (tetap) — hanya diproses bila import dilakukan oleh HRD / HO HSE. Akhir Kontrak hanya untuk PKWT.'],
     ['NPWP 15 digit (format lama) atau 16 digit (NIK/NPWP baru); titik dan strip boleh disertakan.'],
-    ['Kode Site mengacu Master Site. Kode Mandor = kode personel PJM-xxxxxx (opsional, khusus manpower).'],
+    ['NIP opsional dan bebas format (disimpan apa adanya), tetapi tidak boleh sama dengan NIP personel lain.'],
+    ['Kode Site mengacu Master Site. NIP Mandor = NIP personel mandor (opsional, khusus manpower).'],
     ['NIK yang sudah terdaftar tidak akan membuat profil baru.'],
   ]);
   info['!cols'] = [{ wch: 120 }];
@@ -323,12 +339,17 @@ async function validateImport(user, rawRows) {
   const seen = new Map();
   const results = [];
   const mapped = rawRows.map((r) => mapImportRow(r && typeof r === 'object' ? r : {}));
-  const foremanCodes = [...new Set(mapped.map((r) => r.foremanCode).filter(Boolean).map((c) => String(c).trim().toUpperCase()))];
-  const foremen = await prisma.personnel.findMany({ where: { code: { in: foremanCodes } }, select: { id: true, code: true } });
-  const foremanByCode = Object.fromEntries(foremen.map((f) => [f.code, f.id]));
+  // Mandor dirujuk dengan NIP; kode internal lama (PJM-xxxxxx) tetap diterima untuk file yang sudah ada.
+  const ref = (c) => String(c).trim();
+  const foremanRefs = [...new Set(mapped.map((r) => r.foremanRef).filter(Boolean).map(ref))];
+  const foremen = await prisma.personnel.findMany({ where: { OR: [{ nip: { in: foremanRefs } }, { code: { in: foremanRefs.map((r) => r.toUpperCase()) } }] }, select: { id: true, code: true, nip: true } });
+  const foremanByRef = Object.fromEntries(foremen.flatMap((f) => [[f.code, f.id], ...(f.nip ? [[f.nip, f.id]] : [])]));
+  const nips = mapped.map((r) => (r.nip ? ref(r.nip) : null)).filter(Boolean);
+  const nipTaken = new Map((await prisma.personnel.findMany({ where: { nip: { in: nips } }, select: { nip: true, name: true } })).map((p) => [p.nip, p.name]));
+  const seenNip = new Map();
   for (const [index, row] of mapped.entries()) {
     const { body: normalized, errors, warnings } = normalizeImportRow(row);
-    const { siteCode, foremanCode, ...body } = normalized;
+    const { siteCode, foremanRef, ...body } = normalized;
     // Rekening tidak pernah menggagalkan baris import: isian yang tidak valid dilewati dengan peringatan.
     for (const [k, label, check] of [
       ['bankName', 'Nama bank', (x) => x.length <= 60],
@@ -356,10 +377,10 @@ async function validateImport(user, rawRows) {
         errors.push(e.message);
       }
     }
-    if (foremanCode) {
-      const fid = foremanByCode[foremanCode.toUpperCase()];
+    if (foremanRef) {
+      const fid = foremanByRef[ref(foremanRef)] ?? foremanByRef[ref(foremanRef).toUpperCase()];
       if (fid) body.foremanId = fid;
-      else errors.push(`Kode mandor "${foremanCode}" tidak ditemukan.`);
+      else errors.push(`Mandor dengan NIP "${foremanRef}" tidak ditemukan.`);
     }
     const result = parsePersonnel(body, null, { user, errors, requireBank: false });
     if (!errors.length) parsed = { ...result, siteId };
@@ -368,8 +389,12 @@ async function validateImport(user, rawRows) {
       const nik = parsed.sensitive.nik;
       if (seen.has(nik)) errors.push(`NIK ganda dengan baris ${seen.get(nik) + 2}.`);
       seen.set(nik, index);
-      const dup = await prisma.personnel.findUnique({ where: { nikHash: lookupHash(nik) }, select: { code: true } });
-      if (dup) duplicate = dup.code;
+      const dup = await prisma.personnel.findUnique({ where: { nikHash: lookupHash(nik) }, select: { name: true, nip: true } });
+      if (dup) duplicate = personLabel(dup);
+      const nip = parsed.v.nip;
+      if (nip && seenNip.has(nip)) errors.push(`NIP ganda dengan baris ${seenNip.get(nip) + 2}.`);
+      if (nip) seenNip.set(nip, index);
+      if (nip && !dup && nipTaken.has(nip)) errors.push(`NIP ${nip} sudah dipakai oleh ${nipTaken.get(nip)}.`);
     }
     results.push({ row: index + 2, name: body.name ?? '-', nik: body.nik ? maskNik(String(body.nik).slice(-4)) : '-', siteCode: siteCode ?? '-', category: body.category ?? '-', errors, warnings, duplicate, parsed });
   }
@@ -413,7 +438,7 @@ export async function exportPersonnel(user, f) {
   const rows = await prisma.personnel.findMany({
     where: personnelWhere(user, f), orderBy: { name: 'asc' }, take: 10000,
     include: {
-      currentSite: { select: { code: true } }, foreman: { select: { code: true } },
+      currentSite: { select: { code: true } }, foreman: { select: { nip: true } },
       placements: { where: { endDate: { not: null } }, orderBy: { endDate: 'desc' }, take: 1, select: { endDate: true } },
     },
   });
@@ -422,14 +447,14 @@ export async function exportPersonnel(user, f) {
   const data = rows.map((p) => {
     const ktp = ktpAll || canSeeSensitive(user, 'KTP', p.currentSiteId);
     return {
-      Kode: p.code, NIK: ktp ? decrypt(p.nikEnc) : maskNik(p.nikLast4), Nama: p.name, 'Tempat Lahir': p.birthPlace, 'Tanggal Lahir': iso(p.birthDate),
+      NIP: p.nip, NIK: ktp ? decrypt(p.nikEnc) : maskNik(p.nikLast4), Nama: p.name, 'Tempat Lahir': p.birthPlace, 'Tanggal Lahir': iso(p.birthDate),
       'Jenis Kelamin': p.gender, 'Status Nikah': p.maritalStatus, Pendidikan: p.education, Jurusan: p.major, 'No WA': p.phoneWa,
       'Kontak Darurat': p.emergencyName, 'No Kontak Darurat': p.emergencyPhone, 'Alamat KTP': ktp ? decrypt(p.ktpAddressEnc) : '[dibatasi]',
       'Alamat Domisili': p.domicileAddress, 'Asal Daerah': p.originRegion, Kategori: p.category, Jabatan: p.position, Site: p.currentSite?.code,
       'Tanggal Mulai': iso(p.startDate), 'Masa Kerja': tenure(p.startDate, tenureEnd(p, now))?.label ?? '',
       'Status Kepegawaian': p.employmentType, 'Akhir Kontrak': iso(p.contractEndDate), 'Status Kerja': p.workStatus,
       NPWP: p.npwpEnc ? (ktp ? decrypt(p.npwpEnc) : '[dibatasi]') : '', 'BPJS Kesehatan': p.bpjsKesehatan, 'BPJS Ketenagakerjaan': p.bpjsKetenagakerjaan,
-      'Gol Darah': p.bloodType, 'Ukuran Baju': p.shirtSize, 'Ukuran Sepatu': p.shoeSize, Mandor: p.foreman?.code, 'Mantan Personel': p.isFormer ? 'Ya' : '',
+      'Gol Darah': p.bloodType, 'Ukuran Baju': p.shirtSize, 'Ukuran Sepatu': p.shoeSize, 'NIP Mandor': p.foreman?.nip, 'Mantan Personel': p.isFormer ? 'Ya' : '',
     };
   });
   const wb = XLSX.utils.book_new();
@@ -441,7 +466,7 @@ export async function exportPersonnel(user, f) {
 // ─── Integrasi: umpan perubahan untuk salinan lokal aplikasi lain ───────────
 // Hanya field non-sensitif (tanpa NIK utuh, alamat KTP, rekening, NPWP, data medis).
 const SYNC_SELECT = {
-  id: true, code: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true,
+  id: true, code: true, nip: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true,
   employmentType: true, contractEndDate: true, startDate: true, phoneWa: true, bankName: true,
   bpjsKesehatan: true, bpjsKetenagakerjaan: true, updatedAt: true,
   currentSite: { select: { code: true, name: true } },

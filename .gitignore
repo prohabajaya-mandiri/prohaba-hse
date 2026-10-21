@@ -51,3 +51,6 @@ next-env.d.ts
 
 # Dokumen requirement internal (repo publik)
 *.docx
+
+# Ekspor lokal berisi data pribadi (mis. daftar isi NIP dengan NIK lengkap)
+/exports
