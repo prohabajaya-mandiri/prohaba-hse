@@ -114,6 +114,13 @@ export function npwp(value) {
   ensure(/^(\d{15}|\d{16})$/.test(s), "NPWP harus 15 atau 16 digit angka.");
   return s;
 }
+// NIP perusahaan: opsional dan bebas format (disimpan apa adanya, hanya spasi di awal/akhir dibuang).
+export function nip(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const s = String(value).trim();
+  ensure(s.length <= 100, "NIP maksimal 100 karakter.");
+  return s;
+}
 export function nik(value) {
   const s = typeof value === "number" ? String(value) : String(value ?? "").replace(/\s/g, "");
   ensure(/^\d{16}$/.test(s), "NIK harus 16 digit angka.");

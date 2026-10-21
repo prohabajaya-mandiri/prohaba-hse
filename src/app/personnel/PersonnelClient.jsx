@@ -18,11 +18,12 @@ export default function PersonnelClient({ sites, rows, total, page, canEdit, can
   return (
     <div className="stack">
       <FilterBar filters={[
-        { type: 'search', label: 'Cari', placeholder: 'Nama, kode, jabatan, NIK' },
+        { type: 'search', label: 'Cari', placeholder: 'Nama, NIP, jabatan, NIK' },
         { name: 'siteId', label: 'Site', type: 'select', options: sites.map((s) => [s.id, s.code]) },
         { name: 'category', label: 'Kategori', type: 'select', options: CATEGORIES },
         { name: 'workStatus', label: 'Status kerja', type: 'select', options: WORK_STATUSES },
         { name: 'employmentType', label: 'Kepegawaian', type: 'select', options: [...EMPLOYMENT_TYPES, ['NONE', 'Belum diisi']] },
+        { name: 'nip', label: 'NIP', type: 'select', options: [['NONE', 'Belum diisi'], ['SET', 'Sudah diisi']] },
         { name: 'former', label: 'Data', type: 'select', allLabel: 'Personel aktif', options: [['1', 'Mantan personel'], ['all', 'Semua']] },
       ]}>
         <a className="btn btn-outline" href={'/api/personnel/export?' + params.toString()}><Download size={16} /> Export</a>
@@ -36,7 +37,7 @@ export default function PersonnelClient({ sites, rows, total, page, canEdit, can
           empty="Belum ada personel sesuai filter."
           onRowClick={(p) => router.push('/personnel/' + p.id)}
           columns={[
-            { key: 'name', label: 'Nama', render: (p) => (<div><strong>{p.name}</strong><div className="muted">{p.code} · NIK {p.nik}</div></div>) },
+            { key: 'name', label: 'Nama', render: (p) => (<div><strong>{p.name}</strong><div className="muted">{p.nip ? `NIP ${p.nip}` : 'NIP belum diisi'} · NIK {p.nik}</div></div>) },
             { key: 'category', label: 'Kategori', render: (p) => labelOf(p.category) },
             { key: 'position', label: 'Jabatan', render: (p) => (<div>{p.position}{p.foreman && <div className="muted">Mandor: {p.foreman.name}</div>}</div>) },
             { key: 'siteName', label: 'Site' },
