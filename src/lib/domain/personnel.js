@@ -165,35 +165,281 @@ export function normalizeImportRow(row) {
 }
 
 // ─── OCR KTP: hasil hanya saran, wajib diverifikasi manual ──────────────────
-export function parseKtpText(text) {
-  const lines = String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const after = (re) => {
-    const i = lines.findIndex((l) => re.test(l));
-    if (i < 0) return null;
-    const v = lines[i].replace(re, '').replace(/^[\s:.=-]+/, '').trim();
-    return v || lines[i + 1] || null;
-  };
-  const digits = String(text).replace(/[OoD]/g, '0').replace(/[Il|]/g, '1').match(/\d{16}/);
-  const ttl = after(/^tempat\s*\/?\s*tgl\.?\s*lahir/i);
-  let birthPlace = null, birthDate = null;
-  if (ttl) {
-    const m = ttl.match(/^(.*?)[,.\s]+(\d{2})[-/.](\d{2})[-/.](\d{4})/);
-    if (m) {
-      birthPlace = m[1].trim() || null;
-      birthDate = `${m[4]}-${m[3]}-${m[2]}`;
+// Kode provinsi = 2 digit awal NIK. Dipakai memvalidasi NIK dan menormalkan nama provinsi di kepala KTP.
+export const PROVINCES = {
+  11: 'ACEH', 12: 'SUMATERA UTARA', 13: 'SUMATERA BARAT', 14: 'RIAU', 15: 'JAMBI', 16: 'SUMATERA SELATAN', 17: 'BENGKULU', 18: 'LAMPUNG',
+  19: 'KEPULAUAN BANGKA BELITUNG', 21: 'KEPULAUAN RIAU', 31: 'DKI JAKARTA', 32: 'JAWA BARAT', 33: 'JAWA TENGAH', 34: 'DI YOGYAKARTA',
+  35: 'JAWA TIMUR', 36: 'BANTEN', 51: 'BALI', 52: 'NUSA TENGGARA BARAT', 53: 'NUSA TENGGARA TIMUR', 61: 'KALIMANTAN BARAT',
+  62: 'KALIMANTAN TENGAH', 63: 'KALIMANTAN SELATAN', 64: 'KALIMANTAN TIMUR', 65: 'KALIMANTAN UTARA', 71: 'SULAWESI UTARA',
+  72: 'SULAWESI TENGAH', 73: 'SULAWESI SELATAN', 74: 'SULAWESI TENGGARA', 75: 'GORONTALO', 76: 'SULAWESI BARAT', 81: 'MALUKU',
+  82: 'MALUKU UTARA', 91: 'PAPUA', 92: 'PAPUA BARAT', 93: 'PAPUA SELATAN', 94: 'PAPUA TENGAH', 95: 'PAPUA PEGUNUNGAN', 96: 'PAPUA BARAT DAYA',
+};
+// Penulisan lain yang masih tercetak di KTP lama.
+const PROVINCE_ALIASES = { NANGGROEACEHDARUSSALAM: '11', DAERAHISTIMEWAYOGYAKARTA: '34', DAERAHKHUSUSIBUKOTAJAKARTA: '31', BANGKABELITUNG: '19' };
+
+const validYmd = (y, m, d) => {
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return m >= 1 && m <= 12 && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+};
+
+/**
+ * Uraikan NIK (PP KK CC DDMMYY SSSS; tanggal lahir perempuan ditambah 40).
+ * Mengembalikan { province, birthDate, gender } atau null bila struktur NIK tidak sah.
+ */
+export function nikInfo(nik, today = new Date()) {
+  const m = /^(\d{2})\d{4}(\d{2})(\d{2})(\d{2})(\d{4})$/.exec(String(nik ?? ''));
+  if (!m || !PROVINCES[m[1]] || m[5] === '0000') return null;
+  const code = Number(m[2]), month = Number(m[3]);
+  const day = code > 40 ? code - 40 : code;
+  // Tahun dua digit: karyawan berumur minimal ±14 tahun, jadi 20xx yang terlalu muda berarti 19xx.
+  let year = 2000 + Number(m[4]);
+  if (year > today.getUTCFullYear() - 14) year -= 100;
+  if (!validYmd(year, month, day)) return null;
+  return { province: m[1], birthDate: `${year}-${pad(month)}-${pad(day)}`, gender: code > 40 ? 'P' : 'L' };
+}
+
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// [kunci, label tanpa spasi/tanda baca, toleransi salah baca huruf].
+const KTP_LABELS = [
+  ['nik', 'nik', 0], ['name', 'nama', 1], ['ttl', 'tempattgllahir', 3], ['gender', 'jeniskelamin', 3], ['street', 'alamat', 1],
+  ['rtrw', 'rtrw', 1], ['village', 'keldesa', 2], ['district', 'kecamatan', 2], ['religion', 'agama', 1], ['marital', 'statusperkawinan', 4],
+  ['job', 'pekerjaan', 2], ['citizenship', 'kewarganegaraan', 3], ['validUntil', 'berlakuhingga', 3],
+];
+
+/** Cocokkan awal baris dengan label meski huruf salah baca / tanda ":" hilang. Mengembalikan { d, rest } atau null. */
+function matchPrefix(line, label, tol) {
+  const at = [];
+  for (let i = 0; i < line.length && at.length < label.length + tol; i++) if (/[A-Za-z]/.test(line[i])) at.push(i);
+  const letters = at.map((i) => line[i].toLowerCase()).join('');
+  let best = null;
+  for (let m = Math.max(1, label.length - tol); m <= Math.min(letters.length, label.length + tol); m++) {
+    // Label pendek wajib berdiri sendiri agar nilai seperti "NIKMAT" atau "ALAMANDA" tidak dianggap label.
+    if (label.length <= 6 && /[A-Za-z]/.test(line[at[m - 1] + 1] ?? '')) continue;
+    const d = editDistance(letters.slice(0, m), label);
+    // Sisa huruf kecil = ekor label (nilai KTP selalu huruf besar).
+    if (d <= tol && (!best || d < best.d)) best = { d, rest: line.slice(at[m - 1] + 1).replace(/^[a-z]+/, '') };
+  }
+  return best;
+}
+
+function matchLabel(line) {
+  // Bila ada ":" di awal baris, label = huruf sebelum ":"; bila tidak (sering hilang/terbaca lain), cocokkan awalan.
+  const colon = line.search(/[:;]/);
+  let best = null;
+  if (colon > 0 && colon <= 30) {
+    const head = line.slice(0, colon).toLowerCase().replace(/[^a-z]/g, '');
+    for (const [key, label, tol] of KTP_LABELS) {
+      const d = editDistance(head, label);
+      if (d <= tol && (!best || d < best.d)) best = { key, d, value: line.slice(colon + 1) };
+    }
+    if (best) return best;
+  }
+  for (const [key, label, tol] of KTP_LABELS) {
+    const hit = matchPrefix(line, label, tol);
+    if (hit && (!best || hit.d < best.d)) best = { key, d: hit.d, value: hit.rest };
+  }
+  return best;
+}
+
+// Isi kolom: buang pemisah di depan, lalu potong pada celah lebar (teks kolom kanan: foto, gol. darah, tempat terbit).
+const cell = (v) => String(v ?? '').replace(/^[\s:;.,=\-–—_'"“”‘’`|~*]+/, '').split(/\s{3,}/)[0].trim();
+const cleanText = (v) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9 .,'/()-]/g, ' ').replace(/\s+/g, ' ').replace(/^[\s.,'/-]+|[\s,'/-]+$/g, '');
+// Nama orang/tempat tidak memuat angka: angka hasil salah baca dikembalikan ke huruf yang mirip.
+const LOOKALIKE_LETTER = { 0: 'O', 1: 'I', 2: 'Z', 4: 'A', 5: 'S', 6: 'G', 8: 'B' };
+const cleanWords = (v) => {
+  const s = cleanText(String(v ?? '').toUpperCase().replace(/\d/g, (d) => LOOKALIKE_LETTER[d] ?? ' ')).replace(/[^A-Z .,'-]/g, ' ').replace(/\s*-\s*/g, '-').replace(/\s+/g, ' ').replace(/^[\s.,'-]+|[\s,'-]+$/g, '');
+  return (s.match(/[A-Z]/g) ?? []).length >= 2 ? s : null;
+};
+const LOOKALIKE_DIGIT = { O: '0', o: '0', D: '0', Q: '0', U: '0', I: '1', l: '1', i: '1', L: '1', '|': '1', '!': '1', ']': '1', '[': '1', Z: '2', z: '2', S: '5', s: '5', B: '8', G: '6', b: '6', T: '7', '?': '7', A: '4' };
+const toDigits = (v) => [...String(v)].map((c) => LOOKALIKE_DIGIT[c] ?? c).join('');
+
+function nikCandidates(v, lenient) {
+  const s = lenient ? toDigits(String(v).replace(/\s/g, '')) : String(v).replace(/[\s.-]/g, '');
+  const out = [];
+  for (const run of s.match(/\d{16,}/g) ?? []) for (let k = 0; k + 16 <= run.length; k++) out.push(run.slice(k, k + 16));
+  return out;
+}
+
+function parseTtl(v) {
+  const s = String(v).toUpperCase();
+  const m = s.match(/(\d[\dOIL|]?)\s*[-./, ]+\s*([\dOIL|]{1,2})\s*[-./, ]+\s*([12][\dOILSB|]{3})(?![\d])/) ?? s.match(/(\d{2})(\d{2})((?:19|20)\d{2})/);
+  if (!m) return { place: cleanWords(s), date: null };
+  const [d, mo, y] = [m[1], m[2], m[3]].map((x) => Number(toDigits(x)));
+  const ok = validYmd(y, mo, d) && y >= 1900 && y <= new Date().getUTCFullYear();
+  return { place: cleanWords(s.slice(0, m.index)), date: ok ? `${y}-${pad(mo)}-${pad(d)}` : null };
+}
+
+function parseRtRw(v) {
+  const s = String(v).replace(/[Oo]/g, '0');
+  const m = s.match(/^\D*(\d{1,3})\s*[/\\|Il!]\s*(\d{1,3})\D*$/);
+  if (m) return `${m[1].padStart(3, '0')}/${m[2].padStart(3, '0')}`;
+  const d = s.replace(/\D/g, '');
+  if (d.length === 6) return `${d.slice(0, 3)}/${d.slice(3)}`;
+  if (d.length === 7 && d[3] === '1') return `${d.slice(0, 3)}/${d.slice(4)}`; // "/" terbaca "1"
+  return cleanText(s) || null;
+}
+
+function matchProvince(text) {
+  const s = letters(text);
+  if (s.length < 3) return null;
+  let best = null;
+  const names = [...Object.entries(PROVINCES).map(([code, n]) => [code, letters(n)]), ...Object.entries(PROVINCE_ALIASES).map(([n, code]) => [code, n])];
+  for (const [code, name] of names) {
+    const d = editDistance(s, name);
+    if (d <= Math.floor(name.length / 5) && (!best || d < best.d)) best = { code, d };
+  }
+  return best?.code ?? null;
+}
+
+/** Uraikan satu teks hasil OCR KTP menjadi nilai mentah per kolom. */
+function extractKtp(text) {
+  const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const found = [];
+  lines.forEach((line, index) => {
+    const hit = matchLabel(line);
+    if (hit) found.push({ ...hit, index, value: cell(hit.value) });
+  });
+  const isLabel = (i) => found.some((f) => f.index === i);
+  // Nilai kosong: ambil baris berikutnya; bila tata letak terbaca dua kolom (semua label lalu semua nilai),
+  // pasangkan label kosong dengan baris berawalan ":" sesuai urutan.
+  for (const f of found) {
+    const next = lines[f.index + 1];
+    if (!f.value && next && !isLabel(f.index + 1) && !/^[:;]/.test(next)) Object.assign(f, { value: cell(next), usedNext: true });
+  }
+  const orphans = lines.map((l, i) => (!isLabel(i) && i > (found[0]?.index ?? Infinity) && /^[:;]/.test(l) ? cell(l) : null)).filter((v) => v !== null);
+  found.filter((f) => !f.value).forEach((f, k) => { f.value = orphans[k] ?? ''; });
+  const get = (key) => found.find((f) => f.key === key);
+  const val = (key) => get(key)?.value ?? '';
+
+  // Alamat panjang berlanjut ke baris tanpa label sebelum RT/RW.
+  let street = cleanText(val('street'));
+  const st = get('street');
+  if (st) {
+    const next = found.find((f) => f.index > st.index)?.index ?? lines.length;
+    for (let j = st.index + (st.usedNext ? 2 : 1); j < Math.min(next, st.index + 3); j++) {
+      const more = cleanText(cell(lines[j]));
+      if (!/^[:;]/.test(lines[j]) && /[A-Z]{2}/.test(more) && !/^\d{2}[-.]\d{2}[-.]\d{4}$/.test(more)) street = `${street} ${more}`.trim();
     }
   }
-  const genderLine = after(/^jenis\s*kelamin/i) ?? '';
-  const status = (after(/^status\s*perkawinan/i) ?? '').toUpperCase();
+
+  // Kepala KTP: "PROVINSI ..." lalu baris kabupaten/kota.
+  let province = null, regency = null;
+  const pi = lines.findIndex((l) => matchPrefix(l, 'provinsi', 2));
+  if (pi >= 0) {
+    province = matchProvince(matchPrefix(lines[pi], 'provinsi', 2).rest);
+    const next = lines[pi + 1];
+    if (next && !isLabel(pi + 1)) regency = cleanWords(cell(next.replace(/^(\S\s+)+/, '')));
+  }
+
+  const ttl = parseTtl(val('ttl'));
+  const nikLine = get('nik');
+  const nikCands = nikLine ? nikCandidates(nikLine.value, true) : [];
+  if (!nikCands.length) for (const l of lines) nikCands.push(...nikCandidates(l, false));
+  const genderText = letters(val('gender'));
+  const maritalText = letters(val('marital'));
+  const blood = lines.join('\n').match(/D[A4]R[A4]H\s*[:;.=-]*\s*(AB|A|B|O|0)(?![A-Z0-9])/i)?.[1].toUpperCase().replace('0', 'O') ?? null;
   return {
-    nik: digits?.[0] ?? null,
-    name: after(/^nama/i)?.replace(/[^A-Za-z.,' ]/g, '').trim() || null,
-    birthPlace,
-    birthDate,
-    gender: /PEREMPUAN/i.test(genderLine) ? 'P' : /LAKI/i.test(genderLine) ? 'L' : null,
-    ktpAddress: [after(/^alamat/i), after(/^rt\s*\/?\s*rw/i) && 'RT/RW ' + after(/^rt\s*\/?\s*rw/i), after(/^kel\s*\/?\s*desa/i), after(/^kecamatan/i)]
-      .filter(Boolean)
-      .join(', ') || null,
-    maritalStatus: status.includes('BELUM') ? 'BELUM_MENIKAH' : status.includes('CERAI') ? 'CERAI' : status.includes('KAWIN') ? 'MENIKAH' : null,
+    labels: found.length,
+    nikCands,
+    name: cleanWords(val('name')),
+    birthPlace: ttl.place,
+    birthDate: ttl.date,
+    gender: /PEREM|EREMP|EMPUA|MPUAN|WANITA/.test(genderText) ? 'P' : /LAK|AKIL|KILA|PRIA/.test(genderText) ? 'L' : null,
+    maritalStatus: /BEL|ELUM|BLM|LUM/.test(maritalText) ? 'BELUM_MENIKAH' : /CER|ERAI|RAI/.test(maritalText) ? 'CERAI' : /KAW|AWIN|WIN/.test(maritalText) ? 'MENIKAH' : null,
+    bloodType: blood,
+    street: street || null,
+    rtrw: val('rtrw') ? parseRtRw(val('rtrw')) : null,
+    village: cleanWords(val('village')),
+    district: cleanWords(val('district')),
+    province,
+    regency,
+  };
+}
+
+// Perbaikan satu digit NIK yang strukturnya tidak sah, memakai provinsi di kepala KTP dan tanggal lahir/jenis kelamin.
+function nikRepairs(nik, province, birthDate, gender) {
+  const out = [];
+  const head = province && nik.slice(0, 2) !== province && editDistance(nik.slice(0, 2), province) === 1 ? province : nik.slice(0, 2);
+  let born = nik.slice(6, 12);
+  if (birthDate && gender) {
+    const [y, m, d] = birthDate.split('-');
+    const expected = pad(Number(d) + (gender === 'P' ? 40 : 0)) + m + y.slice(2);
+    if ([...expected].filter((c, i) => c !== born[i]).length === 1) born = expected;
+  }
+  const fixed = head + nik.slice(2, 6) + born + nik.slice(12);
+  if (fixed !== nik) out.push(fixed);
+  return out;
+}
+
+const dmy = (iso) => iso.split('-').reverse().join('-');
+
+/**
+ * Uraikan teks OCR KTP (satu teks atau beberapa hasil baca dari gambar yang sama) menjadi saran isian form.
+ * NIK dipilih dari kandidat yang strukturnya sah dan dicocokkan silang dengan tanggal lahir & jenis kelamin.
+ * Mengembalikan { fields, warnings, complete, labels }; fields berisi null untuk kolom yang tidak terbaca.
+ */
+export function parseKtp(texts, today = new Date()) {
+  const raws = [].concat(texts).map(extractKtp).sort((a, b) => b.labels - a.labels);
+  const pick = (key) => raws.find((r) => r[key])?.[key] ?? null;
+  let birthDate = pick('birthDate'), gender = pick('gender');
+  const province = pick('province');
+  const warnings = [];
+
+  const cands = [...new Set(raws.flatMap((r) => r.nikCands))];
+  const rank = (c, repaired) => {
+    const info = nikInfo(c, today);
+    if (!info) return null;
+    const score = (birthDate && info.birthDate.slice(2) === birthDate.slice(2) ? 4 : 0) + (gender && info.gender === gender ? 1 : 0) + (repaired ? 0 : 2);
+    return { nik: c, info, score, repaired };
+  };
+  let best = cands.map((c) => rank(c, false)).filter(Boolean).sort((a, b) => b.score - a.score)[0];
+  if (!best) best = cands.flatMap((c) => nikRepairs(c, province, birthDate, gender)).map((c) => rank(c, true)).filter(Boolean).sort((a, b) => b.score - a.score)[0];
+  const nik = best?.nik ?? cands[0] ?? null;
+  if (!nik) warnings.push('NIK tidak terbaca — ketik manual dari KTP.');
+  else if (!best) warnings.push('NIK terbaca tetapi kode wilayah/tanggalnya tidak sah — periksa setiap digit.');
+  else if (best.repaired) warnings.push('Satu digit NIK dikoreksi otomatis agar cocok dengan provinsi/tanggal lahir — cocokkan dengan KTP.');
+
+  let dateConflict = false;
+  if (best) {
+    if (!birthDate) {
+      birthDate = best.info.birthDate;
+      warnings.push('Tanggal lahir tidak terbaca; diisi dari NIK.');
+    } else if (best.info.birthDate.slice(2) !== birthDate.slice(2)) {
+      dateConflict = true;
+      warnings.push(`Tanggal lahir terbaca ${dmy(birthDate)}, tetapi NIK menunjukkan ${dmy(best.info.birthDate)} — salah satu keliru, cek KTP.`);
+    }
+    if (!gender) gender = best.info.gender;
+    else if (best.info.gender !== gender) warnings.push('Jenis kelamin tidak sesuai dengan NIK (tanggal pada NIK perempuan ditambah 40) — cek KTP.');
+  }
+
+  // "JL." sering terbaca "IL." / "J1.".
+  const street = pick('street')?.replace(/^(?:[IJ1|]L|J[1I|])\.?\s+/, 'JL. ') ?? null;
+  const rtrw = pick('rtrw'), village = pick('village'), district = pick('district'), regency = pick('regency');
+  const ktpAddress = street
+    ? [street, rtrw && `RT/RW ${rtrw}`, village && `KEL. ${village}`, district && `KEC. ${district}`, regency, province && PROVINCES[province]].filter(Boolean).join(', ')
+    : null;
+  // Tempat lahir umumnya sama dengan nama wilayah di KTP; satu-dua huruf yang salah baca disamakan.
+  let birthPlace = pick('birthPlace');
+  const places = [district, village, regency?.replace(/^(KABUPATEN|KOTA)\s+/, ''), ...Object.values(PROVINCES)].filter(Boolean);
+  if (birthPlace?.length >= 5 && !places.includes(birthPlace)) {
+    const near = places.find((p) => editDistance(p, birthPlace) <= Math.max(1, Math.floor(p.length / 6)));
+    if (near) birthPlace = near;
+  }
+  const fields = { nik, name: pick('name'), birthPlace, birthDate, gender, maritalStatus: pick('maritalStatus'), bloodType: pick('bloodType'), ktpAddress };
+  for (const [key, label] of [['name', 'Nama'], ['ktpAddress', 'Alamat']]) if (!fields[key]) warnings.push(`${label} tidak terbaca — isi manual.`);
+  return {
+    fields,
+    warnings,
+    complete: Boolean(best && !best.repaired && !dateConflict && fields.name && street && rtrw),
+    labels: Math.max(0, ...raws.map((r) => r.labels)),
   };
 }

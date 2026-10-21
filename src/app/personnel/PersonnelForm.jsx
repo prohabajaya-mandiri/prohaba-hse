@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { ScanLine } from 'lucide-react';
-import { FileInput, FormFields, compressImage, useSubmit } from '@/components/ui';
-import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, EMPLOYMENT_LABELS, EMPLOYMENT_TYPES, MARITAL, MARITAL_LABELS, parseKtpText, tenure } from '@/lib/domain/personnel';
+import { FileInput, FormFields, useSubmit } from '@/components/ui';
+import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, EMPLOYMENT_LABELS, EMPLOYMENT_TYPES, MARITAL, MARITAL_LABELS, tenure } from '@/lib/domain/personnel';
+import { KTP_FIELD_LABELS, scanKtp } from '@/lib/domain/ktp-ocr';
 
 export const EMPTY_PERSONNEL = {
   nik: '', nip: '', name: '', birthPlace: '', birthDate: '', gender: '', maritalStatus: '', education: '', major: '', phoneWa: '',
@@ -16,23 +17,26 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
   const { submit, busy } = useSubmit();
   const [values, setValues] = useState(initial);
   const [ktp, setKtp] = useState(null);
-  const [ocr, setOcr] = useState({ running: false, progress: 0, note: '' });
+  // File asli (belum dikompres) dipakai OCR agar huruf tetap tajam; yang diunggah tetap versi terkompres.
+  const [ktpOriginal, setKtpOriginal] = useState(null);
+  const [ocr, setOcr] = useState({ running: false, progress: 0, note: '', warnings: [] });
 
-  // OCR berjalan di browser (tesseract.js) sehingga foto KTP tidak dikirim ke layanan pihak ketiga.
   const runOcr = async () => {
     if (!ktp) return;
-    setOcr({ running: true, progress: 0, note: 'Memuat mesin OCR…' });
+    setOcr({ running: true, progress: 0, note: 'Memuat mesin OCR…', warnings: [] });
     try {
-      const { createWorker } = await import('tesseract.js');
-      const worker = await createWorker('ind', 1, { logger: (m) => m.status === 'recognizing text' && setOcr((o) => ({ ...o, progress: Math.round(m.progress * 100), note: 'Membaca KTP…' })) });
-      const { data } = await worker.recognize(await compressImage(ktp, 2000, 0.9));
-      await worker.terminate();
-      const parsed = parseKtpText(data.text);
-      const filled = Object.entries(parsed).filter(([, v]) => v);
+      const { fields, warnings } = await scanKtp(ktpOriginal ?? ktp, ({ attempt, progress }) =>
+        setOcr((o) => ({ ...o, progress, note: attempt > 1 ? `Membaca ulang KTP (percobaan ${attempt})…` : 'Membaca KTP…' })));
+      const filled = Object.entries(fields).filter(([, v]) => v);
       setValues((v) => ({ ...v, ...Object.fromEntries(filled), ocrVerified: false }));
-      setOcr({ running: false, progress: 100, note: `${filled.length} kolom terisi dari OCR. Periksa dan koreksi manual sebelum menyimpan.` });
+      setOcr({
+        running: false, progress: 100, warnings,
+        note: filled.length
+          ? `Terisi dari OCR: ${filled.map(([k]) => KTP_FIELD_LABELS[k]).join(', ')}. Periksa dan koreksi manual sebelum menyimpan.`
+          : 'Tidak ada data yang terbaca. Foto ulang KTP: mendatar, memenuhi bingkai, fokus, tanpa pantulan cahaya.',
+      });
     } catch {
-      setOcr({ running: false, progress: 0, note: 'OCR gagal. Isi data secara manual.' });
+      setOcr({ running: false, progress: 0, note: 'OCR gagal. Isi data secara manual.', warnings: [] });
     }
   };
 
@@ -103,7 +107,7 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     <form onSubmit={save} className="stack">
       <div className="card" style={{ padding: 16, background: 'var(--gray-50)' }}>
         <div className="form-grid">
-          <FileInput label="Foto / scan KTP" multiple={false} accept="image/*,.pdf" capture="environment" onChange={(f) => setKtp(f[0] ?? null)} />
+          <FileInput label="Foto / scan KTP" multiple={false} accept="image/*,.pdf" capture="environment" onChange={(f, raw) => { setKtp(f[0] ?? null); setKtpOriginal(raw?.[0] ?? null); }} />
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button type="button" className="btn btn-outline btn-sm" disabled={!ktp || ocr.running || ktp.type === 'application/pdf'} onClick={runOcr}>
@@ -111,6 +115,12 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
           </button>
           {ocr.note && <span className="muted">{ocr.note}</span>}
         </div>
+        <div className="form-hint">Agar terbaca akurat: foto KTP mendatar, memenuhi bingkai, fokus, tanpa pantulan cahaya.</div>
+        {ocr.warnings.length > 0 && (
+          <ul className="notice" style={{ margin: '10px 0 0', paddingLeft: 32 }}>
+            {ocr.warnings.map((w) => <li key={w}>{w}</li>)}
+          </ul>
+        )}
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, fontSize: 13 }}>
           <input type="checkbox" checked={values.ocrVerified} onChange={(e) => setValues({ ...values, ocrVerified: e.target.checked })} />
           Data sudah diverifikasi manual terhadap KTP asli

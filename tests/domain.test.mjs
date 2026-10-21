@@ -7,7 +7,9 @@ import { addWorkdays, cycleStart, nextLeaveDue, pickPolicy, rosterState } from '
 import { calcManhours, safeManhours, summarize } from '../src/lib/domain/performance.js';
 import { previousMonthKey, reportPeriod, sitesNotReported } from '../src/lib/domain/reports.js';
 import { DISCUSSED_SCENARIO, simulate, validateSteps } from '../src/lib/domain/hrd.js';
-import { mapImportRow, normalizeDate, normalizeImportRow, parseKtpText, tenure } from '../src/lib/domain/personnel.js';
+import { mapImportRow, nikInfo, normalizeDate, normalizeImportRow, parseKtp, tenure } from '../src/lib/domain/personnel.js';
+import { flattenKtp } from '../src/lib/domain/ktp-ocr.js';
+import ktpOcr from './fixtures/ktp-ocr.json' with { type: 'json' };
 import { nip } from '../src/lib/validation.js';
 
 const D = (s) => toDate(s);
@@ -123,14 +125,82 @@ test('simulasi skenario efisiensi yang pernah dibahas', () => {
 
 test('OCR KTP diurai menjadi saran field', () => {
   const text = `PROVINSI KALIMANTAN TIMUR\nNIK : 64O2O11203900001\nNama : BUDI SANTOSO\nTempat/Tgl Lahir : SAMARINDA, 12-03-1990\nJenis Kelamin : LAKI-LAKI\nAlamat : JL. MERDEKA NO. 5\nRT/RW : 003/004\nKel/Desa : SUNGAI PINANG\nKecamatan : SAMARINDA UTARA\nStatus Perkawinan : KAWIN`;
-  const r = parseKtpText(text);
+  const { fields: r, warnings } = parseKtp(text);
   assert.equal(r.nik, '6402011203900001');
   assert.equal(r.name, 'BUDI SANTOSO');
   assert.equal(r.birthPlace, 'SAMARINDA');
   assert.equal(r.birthDate, '1990-03-12');
   assert.equal(r.gender, 'L');
   assert.equal(r.maritalStatus, 'MENIKAH');
-  assert.ok(r.ktpAddress.includes('MERDEKA'));
+  assert.equal(r.ktpAddress, 'JL. MERDEKA NO. 5, RT/RW 003/004, KEL. SUNGAI PINANG, KEC. SAMARINDA UTARA, KALIMANTAN TIMUR');
+  assert.deepEqual(warnings, []);
+});
+
+test('NIK diurai: kode provinsi, tanggal lahir (+40 perempuan), jenis kelamin', () => {
+  const today = D('2026-10-21');
+  assert.deepEqual(nikInfo('6472015207950003', today), { province: '64', birthDate: '1995-07-12', gender: 'P' });
+  assert.deepEqual(nikInfo('6403051708080002', today), { province: '64', birthDate: '2008-08-17', gender: 'L' });
+  assert.equal(nikInfo('0403051708880002', today), null); // kode provinsi 04 tidak ada
+  assert.equal(nikInfo('6403053208880002', today), null); // tanggal 32
+  assert.equal(nikInfo('6403051708880000', today), null); // nomor urut 0000
+});
+
+// Teks di fixture adalah keluaran tesseract asli (ind, pipeline flattenKtp) dari foto KTP sintetis.
+const SITI = { nik: '6472015207950003', name: 'SITI NURHALIZA PUTRI', birthPlace: 'BALIKPAPAN', birthDate: '1995-07-12', gender: 'P', maritalStatus: 'BELUM_MENIKAH', bloodType: 'O',
+  ktpAddress: 'JL. JEND. SUDIRMAN GG. MAWAR NO. 17, RT/RW 005/012, KEL. KLANDASAN ILIR, KEC. BALIKPAPAN KOTA, KOTA BALIKPAPAN, KALIMANTAN TIMUR' };
+const RIZKY = { nik: '6403051708880002', name: 'MUHAMMAD RIZKY AL-FARUO', birthPlace: 'TENGGARONG', birthDate: '1988-08-17', gender: 'L', maritalStatus: 'MENIKAH', bloodType: 'B' };
+
+test('OCR KTP asli: label salah baca, nilai menempel, sampah kolom kanan', () => {
+  const [phone, clean, hard] = Object.values(ktpOcr);
+  const a = parseKtp(phone);
+  assert.deepEqual(a.fields, SITI);
+  assert.deepEqual(a.warnings, []);
+  assert.equal(a.complete, true);
+
+  // NIK "6403…" terbaca "0403…": dikoreksi dari provinsi di kepala KTP + tanggal lahir, dengan peringatan.
+  const b = parseKtp(clean);
+  assert.deepEqual({ ...b.fields, ktpAddress: undefined }, { ...RIZKY, ktpAddress: undefined });
+  assert.equal(b.fields.ktpAddress, 'JL. GUNUNG KAWI RT 12 KOMPLEK PERUMAHAN GRIYA PERMAI BLOK C NO. 8, RT/RW 012/003, KEL. LOA IPUH, KEC. TENGGARONG, KABUPATEN KUTAI KARTANEGARA, KALIMANTAN TIMUR');
+  assert.match(b.warnings.join(' '), /dikoreksi otomatis/);
+  // Tata letak dua kolom (semua label lalu semua nilai) tetap dipasangkan dengan benar.
+  assert.equal(parseKtp(clean[1]).fields.name, RIZKY.name);
+  assert.equal(parseKtp(clean[1]).fields.birthDate, RIZKY.birthDate);
+
+  // Foto buram: "YENGGARONG" disamakan dengan kecamatan, "IL." → "JL.".
+  const c = parseKtp(hard);
+  assert.deepEqual({ ...c.fields, ktpAddress: undefined }, { ...RIZKY, ktpAddress: undefined });
+  assert.match(c.fields.ktpAddress, /^JL\. GUNUNG/);
+});
+
+test('OCR KTP: tanggal lahir/jenis kelamin dicek silang dengan NIK', () => {
+  const base = 'NIK : 6472015207950003\nNama : SITI\nAlamat : JL. A\nRT/RW : 1/2';
+  const conflict = parseKtp(`${base}\nTempat/Tgl Lahir : BALIKPAPAN, 12-08-1995\nJenis Kelamin : LAKI-LAKI`);
+  assert.equal(conflict.fields.birthDate, '1995-08-12');
+  assert.equal(conflict.complete, false);
+  assert.equal(conflict.warnings.length, 2);
+  // Tidak terbaca → diisi dari NIK.
+  const filled = parseKtp(`${base}\nTempat/Tgl Lahir : BALIKPAPAN`);
+  assert.equal(filled.fields.birthDate, '1995-07-12');
+  assert.equal(filled.fields.gender, 'P');
+  assert.equal(filled.fields.ktpAddress, 'JL. A, RT/RW 001/002');
+  // Nilai tanpa NIK yang terbaca: peringatan, tidak menebak.
+  assert.equal(parseKtp('Nama : SITI').fields.nik, null);
+  assert.match(parseKtp('Nama : SITI').warnings[0], /NIK tidak terbaca/);
+});
+
+test('pra-proses OCR: pola latar berwarna dan bayangan hilang, teks tetap hitam', () => {
+  const w = 400, h = 200, px = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, shade = 1 - x / w / 2; // sisi kanan setengah lebih gelap
+    const text = y >= 90 && y < 100 && x % 10 < 4, pattern = (x + y) % 6 === 0;
+    const [r, g, b] = text ? [20, 20, 20] : pattern ? [110, 175, 215] : [190, 225, 245];
+    px.set([r * shade, g * shade, b * shade, 255], i);
+  }
+  const out = flattenKtp(px, w, h);
+  const at = (x, y) => out[y * w + x];
+  assert.ok(at(1, 95) < 40 && at(381, 95) < 40, 'teks gelap di kedua sisi');
+  assert.ok(at(6, 7) > 220 && at(385, 7) > 220, 'latar terang meski sisi kanan berbayang');
+  assert.ok(at(0, 0) > 180 && at(384, 0) > 180, 'garis pola biru menjadi terang');
 });
 
 test('header template import dipetakan ke field', () => {
