@@ -51,3 +51,8 @@ next-env.d.ts
 
 # Dokumen requirement internal (repo publik)
 *.docx
+
+# Salinan env yang diganti nama & arsipnya (berisi secret produksi; repo publik)
+_env*
+*.zip
+.gitignore.txt
