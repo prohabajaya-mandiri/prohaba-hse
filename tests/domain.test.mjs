@@ -8,6 +8,7 @@ import { calcManhours, safeManhours, summarize } from '../src/lib/domain/perform
 import { previousMonthKey, reportPeriod, sitesNotReported } from '../src/lib/domain/reports.js';
 import { DISCUSSED_SCENARIO, simulate, validateSteps } from '../src/lib/domain/hrd.js';
 import { mapImportRow, normalizeDate, normalizeImportRow, parseKtpText, tenure } from '../src/lib/domain/personnel.js';
+import { nip } from '../src/lib/validation.js';
 
 const D = (s) => toDate(s);
 const durations = { screening: 1, mcu: 1, waitResult: 3, feedbackMin: 3, feedbackMax: 5, followUp: 2, mobilization: 2 };
@@ -183,4 +184,20 @@ test('rekening tidak pernah wajib pada import; nilai rusak hanya jadi peringatan
   assert.deepEqual(errors, []);
   assert.equal(body.bankAccount, undefined);
   assert.match(warnings[0], /rekening tidak diimpor/);
+});
+
+test('NIP bebas format: disimpan apa adanya, hanya spasi di awal/akhir dibuang', () => {
+  assert.equal(nip('  ab_12 / x  '), 'ab_12 / x');
+  assert.equal(nip('NIP#2024 (lama)'), 'NIP#2024 (lama)');
+  assert.equal(nip(20230001), '20230001');
+  assert.equal(nip('   '), null);
+  assert.equal(nip(undefined), null);
+  assert.throws(() => nip('x'.repeat(101)), /maksimal 100/);
+});
+
+test('kolom NIP dan NIP Mandor dikenali pada import Excel', () => {
+  const { body } = normalizeImportRow(mapImportRow({ 'NIP': 20260401026, 'NIP Mandor': ' 2019120212 ' }));
+  assert.equal(body.nip, '20260401026');
+  assert.equal(body.foremanRef, '2019120212');
+  assert.equal(mapImportRow({ 'Kode Mandor': 'PJM-000002' }).foremanRef, 'PJM-000002');
 });

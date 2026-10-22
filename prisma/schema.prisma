@@ -172,7 +172,8 @@ model SiteResponsible {
 
 model Personnel {
   id               String    @id @default(cuid())
-  code             String    @unique // identitas internal tetap, mis. PJM-000123
+  code             String    @unique // identitas internal sistem (PJM-000123), tidak ditampilkan ke pengguna
+  nip              String?   @unique // Nomor Induk Pegawai, diisi HRD; kosong pada data lama sampai dilengkapi
   nikHash          String    @unique // HMAC NIK untuk deteksi duplikasi
   nikEnc           String
   nikLast4         String

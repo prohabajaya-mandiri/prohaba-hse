@@ -304,8 +304,8 @@ export function PersonnelPicker({ value, onChange, params = {}, required }) {
   const current = selected?.id === value ? selected : items.find((i) => i.id === value);
   return (
     <div style={{ position: 'relative' }}>
-      <input className="form-input" required={required && !value} placeholder="Cari nama / kode personel"
-        value={open ? term : current ? `${current.name} · ${current.code}` : term}
+      <input className="form-input" required={required && !value} placeholder="Cari nama / NIP personel"
+        value={open ? term : current ? current.name + (current.nip ? ` · ${current.nip}` : '') : term}
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
         onChange={(e) => { setTerm(e.target.value); setOpen(true); }} />
       {open && items.length > 0 && (
@@ -313,7 +313,7 @@ export function PersonnelPicker({ value, onChange, params = {}, required }) {
           {items.map((p) => (
             <button type="button" key={p.id} onMouseDown={() => { setSelected(p); onChange(p.id, p); setTerm(''); setOpen(false); }}
               style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: 'none', background: p.id === value ? 'var(--brand-50)' : 'white', cursor: 'pointer', fontSize: 14 }}>
-              <strong>{p.name}</strong> <span className="muted">· {p.code} · {p.position} · {p.siteName ?? '-'}</span>
+              <strong>{p.name}</strong> <span className="muted">{p.nip && `· NIP ${p.nip} `}· {p.position} · {p.siteName ?? '-'}</span>
             </button>
           ))}
         </div>

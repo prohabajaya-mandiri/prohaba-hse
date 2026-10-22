@@ -89,14 +89,14 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
           </Card>
           <Card title="Pekerjaan & kontak">
             <dl className="detail-grid">
-              {item('Kode internal', p.code)}
+              {item('NIP', p.nip ?? 'Belum diisi')}
               {item('Jabatan', p.position)}
               {item('Site saat ini', p.currentSite ? `${p.currentSite.code} — ${p.currentSite.name}` : null)}
               {item('Site awal', p.initialSite?.code)}
               {item('Tanggal mulai', formatDate(p.startDate))}
               {item('Masa kerja', p.tenure ? p.tenure.label + (p.isFormer ? ' (sampai penempatan terakhir)' : '') : null)}
               {item('Status kepegawaian', p.employmentType ? labelOf(p.employmentType) + (p.employmentType === 'PKWT' && p.contractEndDate ? ` · s/d ${formatDate(p.contractEndDate)}` : '') : 'Belum diisi')}
-              {item('Mandor', p.foreman ? `${p.foreman.name} (${p.foreman.code})` : null)}
+              {item('Mandor', p.foreman ? p.foreman.name + (p.foreman.nip ? ` (NIP ${p.foreman.nip})` : '') : null)}
               {item('No WA', p.phoneWa)}
               {item('Kontak darurat', [p.emergencyName, p.emergencyRelation, p.emergencyPhone].filter(Boolean).join(' · '))}
               {item('BPJS Kesehatan', p.bpjsKesehatan)}
@@ -112,7 +112,7 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
           </Card>
           {p.crew.length > 0 && (
             <Card title={`Anggota regu (${p.crew.length})`} padding={0}>
-              <DataTable rows={p.crew} columns={[{ key: 'name', label: 'Nama', render: (c) => <Link href={'/personnel/' + c.id}>{c.name}</Link> }, { key: 'code', label: 'Kode' }, { key: 'position', label: 'Jabatan' }]} />
+              <DataTable rows={p.crew} columns={[{ key: 'name', label: 'Nama', render: (c) => <Link href={'/personnel/' + c.id}>{c.name}</Link> }, { key: 'nip', label: 'NIP', render: (c) => c.nip ?? '-' }, { key: 'position', label: 'Jabatan' }]} />
             </Card>
           )}
         </div>
@@ -208,7 +208,7 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
         {editing && (
           <PersonnelForm editing={p.id} sites={sites} canMedical={p.access.medical} canBank={p.access.bank} canEmployment={canEmployment}
             initial={{
-              nik: '', nikMasked: p.nik, name: p.name, birthPlace: p.birthPlace ?? '', birthDate: iso(p.birthDate) ?? '', gender: p.gender ?? '',
+              nik: '', nikMasked: p.nik, nip: p.nip ?? '', name: p.name, birthPlace: p.birthPlace ?? '', birthDate: iso(p.birthDate) ?? '', gender: p.gender ?? '',
               maritalStatus: p.maritalStatus ?? '', education: p.education ?? '', major: p.major ?? '', phoneWa: p.phoneWa ?? '',
               emergencyName: p.emergencyName ?? '', emergencyPhone: p.emergencyPhone ?? '', emergencyRelation: p.emergencyRelation ?? '',
               ktpAddress: '', domicileAddress: p.domicileAddress ?? '', originRegion: p.originRegion ?? '', category: p.category, position: p.position,
