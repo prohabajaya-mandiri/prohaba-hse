@@ -1,7 +1,7 @@
 import { prisma } from '../prisma.js';
-import { canDecideMutation, siteFilter, siteScope } from '../access.js';
+import { canCorrectPlacement, canDecideMutation, siteFilter, siteScope } from '../access.js';
 import { audit, actorName } from '../audit.js';
-import { addDays, today } from '../dates.js';
+import { addDays, iso, today } from '../dates.js';
 import { nextNumber } from '../sequence.js';
 import { choice, date, ensure, id, InputError, object, text } from '../validation.js';
 import { requireSite, scopedPersonnel, siteExists } from './common.js';
@@ -128,6 +128,48 @@ export async function createPlacement(user, body) {
     await tx.personnel.update({ where: { id: person.id }, data: { currentSiteId: siteId, position: data.position, isFormer: false, workStatus: 'ACTIVE' } });
     await audit(tx, user, { action: 'CREATE', module: 'placements', recordId: row.id, siteId, after: { person: person.code, ...data } });
     return row;
+  });
+}
+
+/**
+ * Koreksi riwayat penempatan (tanggal mulai/akhir, catatan) oleh HO HSE, mis. tanggal mulai yang dulu terisi tanggal input.
+ * Penempatan aktif tidak diberi tanggal akhir di sini (gunakan endPlacement). Bila baris yang dikoreksi adalah penempatan
+ * pertama personel, tanggal mulai personel ikut disamakan agar masa kerja konsisten.
+ */
+export async function updatePlacement(user, placementId, body) {
+  ensure(canCorrectPlacement(user), 'Koreksi riwayat penempatan hanya oleh HO HSE.', 403);
+  object(body, ['startDate', 'endDate', 'notes', 'reason']);
+  const reason = text(body.reason, 'Alasan koreksi', 500);
+  return prisma.$transaction(async (tx) => {
+    const p = await tx.placement.findUnique({ where: { id: placementId }, include: { personnel: true } });
+    ensure(p, 'Penempatan tidak ditemukan.', 404);
+    const startDate = date(body.startDate, 'Tanggal mulai');
+    let endDate = null;
+    if (p.status === 'ENDED') {
+      endDate = date(body.endDate, 'Tanggal akhir');
+      ensure(endDate >= startDate, 'Tanggal akhir tidak boleh sebelum tanggal mulai.');
+    } else {
+      ensure(body.endDate === undefined || body.endDate === null || body.endDate === '', 'Penempatan aktif diakhiri melalui menu Akhiri penempatan, bukan koreksi.');
+    }
+    const notes = text(body.notes, 'Catatan', 500, true);
+    // Rentang penempatan seorang personel tidak boleh saling tumpang tindih (penempatan aktif = terbuka sampai sekarang).
+    const others = await tx.placement.findMany({ where: { personnelId: p.personnelId, id: { not: p.id } }, include: { site: { select: { code: true } } } });
+    const clash = others.find((o) => startDate <= (o.endDate ?? Infinity) && o.startDate <= (endDate ?? Infinity));
+    ensure(!clash, clash && `Tumpang tindih dengan penempatan ${clash.site.code} (${iso(clash.startDate)} s/d ${iso(clash.endDate) ?? 'sekarang'}). Koreksi baris itu lebih dulu.`, 409);
+
+    const first = [...others, { id: p.id, startDate }].sort((a, b) => a.startDate - b.startDate)[0];
+    const syncStart = first.id === p.id && p.personnel.startDate?.getTime() !== startDate.getTime();
+    if (syncStart) {
+      ensure(!p.personnel.contractEndDate || p.personnel.contractEndDate >= startDate, 'Tanggal mulai tidak boleh setelah akhir kontrak PKWT personel.');
+    }
+    await tx.placement.update({ where: { id: p.id }, data: { startDate, endDate: p.status === 'ENDED' ? endDate : null, notes } });
+    if (syncStart) await tx.personnel.update({ where: { id: p.personnelId }, data: { startDate } });
+    await audit(tx, user, {
+      action: 'UPDATE', module: 'placements', recordId: p.id, siteId: p.siteId, note: `Koreksi riwayat penempatan: ${reason}`,
+      before: { person: p.personnel.code, startDate: p.startDate, endDate: p.endDate, notes: p.notes, ...(syncStart ? { personnelStartDate: p.personnel.startDate } : {}) },
+      after: { person: p.personnel.code, startDate, endDate, notes, ...(syncStart ? { personnelStartDate: startDate } : {}) },
+    });
+    return { ok: true, personnelStartSynced: syncStart };
   });
 }
 

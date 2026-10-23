@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Edit, Eye, RefreshCw, ArrowLeftRight, FileText } from 'lucide-react';
-import { Badge, Card, DataTable, Modal, useSubmit } from '@/components/ui';
+import { Badge, Card, DataTable, FormFields, Modal, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
 import { apiFetch } from '@/lib/client-api';
 import { formatDate, iso } from '@/lib/dates';
@@ -14,10 +14,11 @@ import PersonnelForm from '../PersonnelForm';
 
 const TABS = [['profil', 'Profil'], ['placement', 'Penempatan'], ['mcu', 'MCU'], ['permit', 'Permit & SKS'], ['roster', 'Cuti & Kehadiran'], ['kompetensi', 'Kompetensi'], ['mobilisasi', 'Mobilisasi']];
 
-export default function PersonnelDetail({ person: p, sites, canEdit, canEmployment, canRequestMutation }) {
+export default function PersonnelDetail({ person: p, sites, canEdit, canEmployment, canRequestMutation, canCorrectPlacement }) {
   const [tab, setTab] = useState('profil');
   const [editing, setEditing] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [fix, setFix] = useState(null);
   const [status, setStatus] = useState({ workStatus: p.workStatus, note: '' });
   const [revealed, setRevealed] = useState({});
   const { submit, busy } = useSubmit();
@@ -36,6 +37,20 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
     e.preventDefault();
     if (await submit(`/api/personnel/${p.id}/status`, { body: status })) setStatusOpen(false);
   };
+
+  const openFix = (r) => setFix({ id: r.id, ended: r.status === 'ENDED', label: `${r.site.code} · ${r.position}`, startDate: iso(r.startDate), endDate: iso(r.endDate) ?? '', notes: r.notes ?? '', reason: '' });
+  const saveFix = async (e) => {
+    e.preventDefault();
+    const { id, ended, label, ...body } = fix;
+    if (!ended) delete body.endDate;
+    if (await submit(`/api/placements/${id}`, { method: 'PATCH', body })) setFix(null);
+  };
+  const fixFields = [
+    { name: 'startDate', label: 'Tanggal mulai', type: 'date', required: true },
+    { name: 'endDate', label: 'Tanggal akhir', type: 'date', required: true, hidden: (v) => !v.ended },
+    { name: 'notes', label: 'Catatan', span: true },
+    { name: 'reason', label: 'Alasan koreksi', type: 'textarea', required: true, span: true, rows: 2, placeholder: 'Mis. tanggal mulai dulu terisi tanggal input data' },
+  ];
 
   const item = (label, value) => (<div><dt>{label}</dt><dd>{value || '-'}</dd></div>);
   const now = new Date();
@@ -128,6 +143,7 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
               { key: 'end', label: 'Akhir', render: (r) => formatDate(r.endDate) },
               { key: 'status', label: 'Status', render: (r) => <Badge value={r.status} /> },
               { key: 'reason', label: 'Keterangan', render: (r) => [labelOf(r.endReason), r.notes].filter(Boolean).join(' · ') || '-' },
+              ...(canCorrectPlacement ? [{ key: 'fix', label: '', render: (r) => <button className="btn btn-ghost btn-sm" onClick={() => openFix(r)} title="Koreksi tanggal penempatan"><Edit size={14} /></button> }] : []),
             ]} />
           </Card>
           <Card title="Pengajuan mutasi" padding={0}>
@@ -218,6 +234,16 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
               bankAccount: '', bankAccountName: p.bankAccountName ?? '', foremanId: p.foremanId ?? '', ocrVerified: p.ocrVerified,
             }}
             onDone={() => setEditing(false)} />
+        )}
+      </Modal>
+
+      <Modal open={Boolean(fix)} onClose={() => setFix(null)} title="Koreksi riwayat penempatan" subtitle={fix ? `${fix.label} — perubahan tercatat di audit log. Koreksi pada penempatan pertama juga memperbarui tanggal mulai personel.` : ''}>
+        {fix && (
+          <form onSubmit={saveFix} className="stack">
+            <FormFields fields={fixFields} values={fix} setValues={setFix} />
+            {!fix.ended && <div className="notice">Penempatan masih aktif: tanggal akhir diisi saat penempatan diakhiri atau dimutasi.</div>}
+            <button className="btn btn-primary" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan koreksi'}</button>
+          </form>
         )}
       </Modal>
 

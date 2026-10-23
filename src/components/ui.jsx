@@ -247,9 +247,10 @@ export function FileInput({ label = 'Lampiran', multiple = true, accept = 'image
         <Paperclip size={15} /> Pilih file{multiple ? ' / foto' : ''}
         <input type="file" hidden multiple={multiple} accept={accept} capture={capture}
           onChange={async (e) => {
-            const files = await Promise.all([...e.target.files].map((f) => compressImage(f)));
+            const raw = [...e.target.files];
+            const files = await Promise.all(raw.map((f) => compressImage(f)));
             setNames(files.map((f) => f.name));
-            onChange(files);
+            onChange(files, raw);
           }} />
       </label>
       {names.length > 0 && <div className="form-hint">{names.join(', ')}</div>}
