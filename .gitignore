@@ -54,3 +54,8 @@ next-env.d.ts
 
 # Ekspor lokal berisi data pribadi (mis. daftar isi NIP dengan NIK lengkap)
 /exports
+
+# Salinan env yang diganti nama & arsipnya (berisi secret produksi; repo publik)
+_env*
+*.zip
+.gitignore.txt
