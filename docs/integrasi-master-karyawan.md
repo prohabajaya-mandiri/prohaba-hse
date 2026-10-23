@@ -43,7 +43,7 @@ Bila Vercel Deployment Protection aktif pada E-HSE produksi, pastikan domain pro
 | `GET /personnel/:id/ktp` | File KTP (diaudit) |
 | `POST /personnel/import` | Import Excel (`preview`/`commit`) |
 | `GET /personnel/export`, `GET /personnel/template` | Export & template |
-| `GET /personnel/changes?since&after&limit` / `?ids=` | Umpan perubahan untuk salinan lokal |
+| `GET /personnel/changes?since&after&limit` / `?ids=` | Umpan perubahan untuk salinan lokal, termasuk site aktif (`siteId`, `siteIsHo`) dan riwayat penempatan (`placements`) |
 | `POST /personnel/lookup` | Cocokkan NIK data lama |
 
 ## Data pegawai lama ERP
@@ -59,6 +59,30 @@ Riwayat penugasan/absensi/payroll ikut tersambung. Setelah tertaut, NIK/NPWP/rek
 Kolom lama (`department`, `employeeType`, `baseSalary`) dibiarkan untuk riwayat dan dapat dihapus pada migrasi
 berikutnya setelah semua data tertaut.
 
+## Satu master site & penugasan dari penempatan
+
+Sejak 2026-10-25 site hanya dikelola di E-HSE. Proyek ERP **ditautkan ke satu Site E-HSE** (menu Proyek → *Site E-HSE*,
+wajib untuk proyek baru); data kontrak, nilai dan BOQ tetap di ERP. Satu site boleh punya beberapa proyek ERP.
+
+ERP menyalin riwayat penempatan (`Placement`) ke tabel `EmployeePlacement` lewat umpan `/personnel/changes`, lalu
+menyesuaikan penugasan (`EmployeeProject`) — aturannya di `src/lib/assignment-plan.js` (prohaba-center):
+
+| Kejadian di E-HSE | Akibat di ERP |
+|---|---|
+| Personel ditempatkan di site yang punya **tepat satu** proyek ERP aktif | Penugasan otomatis dibuat (sumber *Otomatis*, mulai = tanggal penempatan atau mulai proyek yang lebih akhir). Tarif belum diisi: payroll proyek itu menunggu HRD melengkapi tarif. |
+| Site punya **lebih dari satu** proyek aktif | Tampil di Master Data → Penugasan & tarif → *Pilih proyek*; HRD memilih proyeknya. |
+| Site **tanpa** proyek ERP aktif | Tampil sebagai *Site tanpa proyek ERP aktif*. |
+| Penempatan berakhir (mutasi, demobilisasi, resign) | Penugasan di proyek site itu diakhiri pada tanggal akhir penempatan. ERP hanya memajukan tanggal selesai, tidak pernah memperpanjangnya. |
+| Kembali ke site yang sama | Periode penugasan baru (satu karyawan boleh punya beberapa periode di satu proyek, tidak tumpang tindih). |
+
+Penugasan yang diisi HRD diperiksa: proyek harus sudah bertaut site, dan karyawan harus ditempatkan di site proyek
+sepanjang periode penugasan. **Personel HO** (penempatan di site HO) boleh dialokasikan ke proyek mana pun.
+Penugasan lama yang tidak cocok dengan penempatan ditampilkan sebagai *Tidak sesuai penempatan* untuk diperbaiki.
+
+Penyesuaian berjalan setelah setiap sinkronisasi karyawan dan setelah tautan site/status proyek berubah. Salinan yang
+belum pernah menerima riwayat penempatan diisi otomatis pada sinkronisasi pertama setelah rilis. Perubahan otomatis
+tidak dicatat di audit log ERP (pelakunya sinkronisasi); jejak perubahan penempatan ada di audit log E-HSE.
+
 ## Berkas bersama
 
 `src/lib/integration-signature.js` dan `src/lib/hse/*` adalah salinan dari E-HSE. Jangan ubah di ERP:
@@ -70,3 +94,5 @@ ubah di E-HSE lalu jalankan `node scripts/check-hse-shared.mjs --write`. Uji uni
 1. E-HSE: deploy kode, set `INTEGRATION_CENTER_SECRET`.
 2. ERP: backup, `npm run db:migrate` (development) / migrasi produksi, set `HSE_API_URL` + `HSE_INTEGRATION_SECRET`, deploy.
 3. Buka Master Data → Karyawan sebagai HRD → **Sinkronkan**, lalu tautkan data pegawai lama.
+4. Proyek aktif: tautkan ke site E-HSE di menu Proyek, lalu HRD melengkapi tarif penugasan otomatis dan memilih proyek
+   untuk site yang punya lebih dari satu proyek (Master Data → Penugasan & tarif).

@@ -163,7 +163,8 @@ export async function updatePlacement(user, placementId, body) {
       ensure(!p.personnel.contractEndDate || p.personnel.contractEndDate >= startDate, 'Tanggal mulai tidak boleh setelah akhir kontrak PKWT personel.');
     }
     await tx.placement.update({ where: { id: p.id }, data: { startDate, endDate: p.status === 'ENDED' ? endDate : null, notes } });
-    if (syncStart) await tx.personnel.update({ where: { id: p.personnelId }, data: { startDate } });
+    // Selalu sentuh personel agar koreksi tanggal ikut umpan sinkronisasi ERP (/personnel/changes).
+    await tx.personnel.update({ where: { id: p.personnelId }, data: syncStart ? { startDate } : { updatedAt: new Date() } });
     await audit(tx, user, {
       action: 'UPDATE', module: 'placements', recordId: p.id, siteId: p.siteId, note: `Koreksi riwayat penempatan: ${reason}`,
       before: { person: p.personnel.code, startDate: p.startDate, endDate: p.endDate, notes: p.notes, ...(syncStart ? { personnelStartDate: p.personnel.startDate } : {}) },

@@ -465,14 +465,30 @@ export async function exportPersonnel(user, f) {
 
 // ─── Integrasi: umpan perubahan untuk salinan lokal aplikasi lain ───────────
 // Hanya field non-sensitif (tanpa NIK utuh, alamat KTP, rekening, NPWP, data medis).
+// Riwayat penempatan ikut dikirim: ERP menurunkan penugasan proyek dari penempatan site (proyek ERP ditautkan ke site).
+// Setiap perubahan penempatan juga memperbarui updatedAt personel agar terbawa umpan ini.
 const SYNC_SELECT = {
   id: true, code: true, nip: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true,
   employmentType: true, contractEndDate: true, startDate: true, phoneWa: true, bankName: true,
   bpjsKesehatan: true, bpjsKetenagakerjaan: true, updatedAt: true,
-  currentSite: { select: { code: true, name: true } },
+  currentSite: { select: { id: true, code: true, name: true, isHo: true } },
+  placements: {
+    orderBy: { startDate: 'asc' },
+    select: { id: true, siteId: true, position: true, startDate: true, endDate: true, status: true, site: { select: { code: true, isHo: true } } },
+  },
 };
 
-const syncRow = ({ currentSite, nikHash, ...p }) => { void nikHash; return { ...p, siteCode: currentSite?.code ?? null, siteName: currentSite?.name ?? null }; };
+const syncRow = ({ currentSite, placements, nikHash, ...p }) => {
+  void nikHash;
+  return {
+    ...p,
+    siteId: currentSite?.id ?? null,
+    siteCode: currentSite?.code ?? null,
+    siteName: currentSite?.name ?? null,
+    siteIsHo: currentSite?.isHo ?? false,
+    placements: placements.map(({ site, ...pl }) => ({ ...pl, siteCode: site.code, siteIsHo: site.isHo })),
+  };
+};
 
 /**
  * Perubahan personel berurutan (updatedAt, id) setelah kursor. Tanpa kursor = seluruh data.
