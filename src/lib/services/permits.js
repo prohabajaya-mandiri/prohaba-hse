@@ -86,6 +86,8 @@ export async function createPermit(user, body, files) {
       ensure(prev?.personnelId === person.id, 'Permit sebelumnya tidak sesuai personel.');
     }
     const row = await tx.permit.create({ data: { ...v, previousId, personnelId: person.id, siteId, createdBy: user.id } });
+    // Status MCU/permit ikut umpan sinkronisasi ERP (/personnel/changes), yang berkursor updatedAt personel.
+    await tx.personnel.update({ where: { id: person.id }, data: { updatedAt: new Date() } });
     await attachFiles(tx, user, files, { entityType: 'PERMIT', entityId: row.id, siteId });
     await audit(tx, user, { action: 'CREATE', module: 'permits', recordId: row.id, siteId, after: { person: person.code, ...v }, note: warnings.length ? 'Dikonfirmasi dengan peringatan: ' + warnings.join(' ') : null });
     return row;
@@ -102,6 +104,8 @@ export async function updatePermit(user, permitId, body, files) {
   const { v, warnings } = await parse(body);
   return prisma.$transaction(async (tx) => {
     const row = await tx.permit.update({ where: { id: permitId }, data: v });
+    // Status MCU/permit ikut umpan sinkronisasi ERP (/personnel/changes), yang berkursor updatedAt personel.
+    await tx.personnel.update({ where: { id: existing.personnelId }, data: { updatedAt: new Date() } });
     await attachFiles(tx, user, files, { entityType: 'PERMIT', entityId: row.id, siteId: existing.siteId });
     await audit(tx, user, { action: 'UPDATE', module: 'permits', recordId: permitId, siteId: existing.siteId, ...diff(existing, v), note: warnings.join(' ') || null });
     return row;
@@ -116,6 +120,8 @@ export async function revokePermit(user, permitId, body) {
   const reason = text(body.reason, 'Alasan', 500);
   return prisma.$transaction(async (tx) => {
     await tx.permit.update({ where: { id: permitId }, data: { revokedAt: new Date(), revokeReason: reason } });
+    // Status MCU/permit ikut umpan sinkronisasi ERP (/personnel/changes), yang berkursor updatedAt personel.
+    await tx.personnel.update({ where: { id: existing.personnelId }, data: { updatedAt: new Date() } });
     await audit(tx, user, { action: 'UPDATE', module: 'permits', recordId: permitId, siteId: existing.siteId, before: { revokedAt: null }, after: { revokedAt: new Date(), reason } });
     return { ok: true };
   });

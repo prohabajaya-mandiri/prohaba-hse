@@ -43,7 +43,7 @@ Bila Vercel Deployment Protection aktif pada E-HSE produksi, pastikan domain pro
 | `GET /personnel/:id/ktp` | File KTP (diaudit) |
 | `POST /personnel/import` | Import Excel (`preview`/`commit`) |
 | `GET /personnel/export`, `GET /personnel/template` | Export & template |
-| `GET /personnel/changes?since&after&limit` / `?ids=` | Umpan perubahan untuk salinan lokal, termasuk site aktif (`siteId`, `siteIsHo`) dan riwayat penempatan (`placements`) |
+| `GET /personnel/changes?since&after&limit` / `?ids=` | Umpan perubahan untuk salinan lokal, termasuk site aktif (`siteId`, `siteIsHo`), riwayat penempatan (`placements`), MCU terakhir (`mcu`: hasil & masa berlaku) dan permit (`permits`: jenis, site, tanggal, dicabut; tanpa nomor) |
 | `POST /personnel/lookup` | Cocokkan NIK data lama |
 
 ## Data pegawai lama ERP
@@ -82,6 +82,14 @@ Penugasan lama yang tidak cocok dengan penempatan ditampilkan sebagai *Tidak ses
 Penyesuaian berjalan setelah setiap sinkronisasi karyawan dan setelah tautan site/status proyek berubah. Salinan yang
 belum pernah menerima riwayat penempatan diisi otomatis pada sinkronisasi pertama setelah rilis. Perubahan otomatis
 tidak dicatat di audit log ERP (pelakunya sinkronisasi); jejak perubahan penempatan ada di audit log E-HSE.
+
+## MCU & permit untuk tanda HSE
+
+ERP menyalin hasil & masa berlaku MCU terakhir (tanpa catatan medis) dan permit (tanpa nomor) ke `Employee.mcuResult`,
+`mcuValidUntil` dan tabel `EmployeePermit`. Absensi barcode dan pengambilan BBM **tidak diblokir**, tetapi ditandai bila MCU
+UNFIT/kedaluwarsa atau (BBM alat berat/kendaraan) SIMPER/KIMPER tidak berlaku di site tersebut — lihat
+`docs/absensi-barcode.md` dan `docs/bbm-drum-site.md` di prohaba-center. Perubahan MCU dan permit di E-HSE memperbarui
+`updatedAt` personel sehingga ikut umpan sinkronisasi; status kedaluwarsa dihitung ERP pada tanggal kejadian.
 
 ## Berkas bersama
 
