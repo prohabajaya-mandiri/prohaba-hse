@@ -95,6 +95,8 @@ export async function createMcu(user, body, files) {
     await tx.mcuRecord.updateMany({ where: { personnelId: person.id, isLatest: true }, data: { isLatest: false } });
     const row = await tx.mcuRecord.create({ data: { ...v, parentId, notesEnc: encrypt(notes), personnelId: person.id, siteId, createdBy: user.id, isLatest: true } });
     await attachFiles(tx, user, files, { entityType: 'MCU', entityId: row.id, siteId, sensitivity: 'MEDICAL' });
+    // Status MCU/permit ikut umpan sinkronisasi ERP (/personnel/changes), yang berkursor updatedAt personel.
+    await tx.personnel.update({ where: { id: person.id }, data: { updatedAt: new Date() } });
     await audit(tx, user, { action: 'CREATE', module: 'mcu', recordId: row.id, siteId, after: { person: person.code, ...v, notesEnc: notes ? 'x' : null } });
     return row;
   }, { timeout: 20000 });
@@ -110,6 +112,8 @@ export async function updateMcu(user, mcuId, body, files) {
   return prisma.$transaction(async (tx) => {
     const data = { ...v, ...(notes !== undefined && canSeeSensitive(user, 'MEDICAL', existing.siteId) ? { notesEnc: encrypt(notes) } : {}) };
     const row = await tx.mcuRecord.update({ where: { id: mcuId }, data });
+    // Status MCU/permit ikut umpan sinkronisasi ERP (/personnel/changes), yang berkursor updatedAt personel.
+    await tx.personnel.update({ where: { id: existing.personnelId }, data: { updatedAt: new Date() } });
     await attachFiles(tx, user, files, { entityType: 'MCU', entityId: row.id, siteId: existing.siteId, sensitivity: 'MEDICAL' });
     const d = diff(existing, data);
     // HSE Site dapat memperbarui MCU tanpa approval HO; seluruh perubahan wajib tercatat.

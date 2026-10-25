@@ -466,7 +466,9 @@ export async function exportPersonnel(user, f) {
 // ─── Integrasi: umpan perubahan untuk salinan lokal aplikasi lain ───────────
 // Hanya field non-sensitif (tanpa NIK utuh, alamat KTP, rekening, NPWP, data medis).
 // Riwayat penempatan ikut dikirim: ERP menurunkan penugasan proyek dari penempatan site (proyek ERP ditautkan ke site).
-// Setiap perubahan penempatan juga memperbarui updatedAt personel agar terbawa umpan ini.
+// Hasil & masa berlaku MCU terakhir (tanpa catatan medis) dan permit (tanpa nomor) dipakai ERP untuk menandai
+// absensi/pengambilan BBM oleh personel MCU tidak berlaku atau SIMPER kedaluwarsa (tanda saja, tidak memblokir).
+// Setiap perubahan penempatan, MCU dan permit juga memperbarui updatedAt personel agar terbawa umpan ini.
 const SYNC_SELECT = {
   id: true, code: true, nip: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true,
   employmentType: true, contractEndDate: true, startDate: true, phoneWa: true, bankName: true,
@@ -476,9 +478,11 @@ const SYNC_SELECT = {
     orderBy: { startDate: 'asc' },
     select: { id: true, siteId: true, position: true, startDate: true, endDate: true, status: true, site: { select: { code: true, isHo: true } } },
   },
+  mcus: { where: { isLatest: true }, take: 1, select: { result: true, validUntil: true } },
+  permits: { select: { id: true, siteId: true, permitType: true, startDate: true, endDate: true, revokedAt: true } },
 };
 
-const syncRow = ({ currentSite, placements, nikHash, ...p }) => {
+const syncRow = ({ currentSite, placements, mcus, permits, nikHash, ...p }) => {
   void nikHash;
   return {
     ...p,
@@ -487,6 +491,8 @@ const syncRow = ({ currentSite, placements, nikHash, ...p }) => {
     siteName: currentSite?.name ?? null,
     siteIsHo: currentSite?.isHo ?? false,
     placements: placements.map(({ site, ...pl }) => ({ ...pl, siteCode: site.code, siteIsHo: site.isHo })),
+    mcu: mcus[0] ?? null,
+    permits,
   };
 };
 
