@@ -12,7 +12,8 @@ const OUTPUT_WIDTH = 1600; // cukup untuk OCR, ukuran file tetap kecil
 /*
  * Alur foto KTP (pola e-KYC):
  * - Satu tombol. Di HP langsung membuka kamera dengan bingkai KTP; di laptop membuka pemilih file.
- * - Di layar kamera ada tombol "Galeri" untuk foto yang sudah ada.
+ * - Di layar kamera ada tombol "Galeri" untuk foto yang sudah ada. Kamera tetap terbuka di belakang
+ *   pemilih foto: bila pemilih dibatalkan, pengguna kembali ke kamera (bukan ke form).
  * - Foto dari galeri/file (termasuk "Take Photo" bawaan iOS, yang tidak bisa dihilangkan dari
  *   menu sistem) selalu melewati langkah "Sesuaikan": digeser/di-zoom di bawah bingkai yang sama,
  *   sehingga hasil akhirnya selalu terpotong seukuran KTP.
@@ -76,11 +77,11 @@ export default function KtpCapture({ label = 'Foto KTP', required = false, accep
       <input ref={nativeCameraRef} type="file" hidden accept="image/*" capture="environment" onChange={fromInput} />
       {file && preview && <img className="ktp-thumb" src={preview} alt="Pratinjau foto KTP" />}
       {file && !preview && <div className="form-hint">✓ {file.name}</div>}
-      {!file && <div className="form-hint">Kamera akan terbuka dengan bingkai KTP. Foto yang sudah ada? Ketuk <strong>Galeri</strong> di layar kamera.</div>}
+      {!file && <div className="form-hint">Kamera akan terbuka dengan bingkai KTP. Foto yang sudah ada? Ketuk <strong>Galeri</strong> di layar kamera (di iPhone pilih <strong>Photo Library</strong>).</div>}
       {mode === 'camera' && (
         <KtpCamera
           onClose={close}
-          onGallery={() => { setMode(null); fileRef.current?.click(); }}
+          onGallery={() => fileRef.current?.click()}
           onFallback={() => { setMode(null); nativeCameraRef.current?.click(); }}
           onCapture={(shot) => { close(); pick(shot, shot); }}
         />
@@ -138,16 +139,33 @@ function KtpCamera({ onClose, onCapture, onFallback, onGallery }) {
 
   useEffect(() => {
     let cancelled = false;
-    navigator.mediaDevices
+    const start = () => navigator.mediaDevices
       .getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
       .then((stream) => {
         if (cancelled) return stream.getTracks().forEach((t) => t.stop());
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
       })
-      .catch(() => setError('Kamera tidak dapat dibuka. Izinkan akses kamera di browser, pilih foto dari galeri, atau gunakan kamera bawaan HP.'));
+      .catch(() => !cancelled && setError('Kamera tidak dapat dibuka. Izinkan akses kamera di browser, pilih foto dari galeri, atau gunakan kamera bawaan HP.'));
+    // Pemilih foto sistem (mis. "Take Photo" iOS) dapat menghentikan kamera halaman.
+    // Saat pengguna kembali, nyalakan ulang bila aliran berhenti, atau lanjutkan video yang terjeda.
+    const resume = () => {
+      if (cancelled || document.visibilityState === 'hidden') return;
+      const tracks = streamRef.current?.getTracks() ?? [];
+      if (tracks.length && tracks.every((t) => t.readyState === 'live')) videoRef.current?.play?.().catch(() => {});
+      else if (streamRef.current) {
+        tracks.forEach((t) => t.stop());
+        streamRef.current = null;
+        start();
+      }
+    };
+    start();
+    window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -194,7 +212,7 @@ function KtpCamera({ onClose, onCapture, onFallback, onGallery }) {
         </>
       ) : (
         <>
-          <KtpFrame frameRef={frameRef} hint="Posisikan KTP mendatar tepat di dalam bingkai" />
+          <KtpFrame frameRef={frameRef} hint="Posisikan KTP mendatar tepat di dalam bingkai, lalu ketuk tombol bulat" />
           <button type="button" className="ktp-cam-close" onClick={onClose} aria-label="Tutup kamera"><X size={22} /></button>
           <div className="ktp-camera-bar">
             <button type="button" className="ktp-cam-btn" onClick={onGallery}><ImageIcon size={20} /> Galeri</button>
