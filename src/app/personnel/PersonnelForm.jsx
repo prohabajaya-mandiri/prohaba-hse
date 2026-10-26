@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { ScanLine } from 'lucide-react';
-import { FileInput, FormFields, useSubmit } from '@/components/ui';
+import { FormFields, useSubmit } from '@/components/ui';
+import KtpCapture from '@/components/KtpCapture';
 import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, EMPLOYMENT_LABELS, EMPLOYMENT_TYPES, MARITAL, MARITAL_LABELS, tenure } from '@/lib/domain/personnel';
 import { KTP_FIELD_LABELS, scanKtp } from '@/lib/domain/ktp-ocr';
 
@@ -107,7 +108,7 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     <form onSubmit={save} className="stack">
       <div className="card" style={{ padding: 16, background: 'var(--gray-50)' }}>
         <div className="form-grid">
-          <FileInput label="Foto / scan KTP" multiple={false} accept="image/*,.pdf" capture="environment" onChange={(f, raw) => { setKtp(f[0] ?? null); setKtpOriginal(raw?.[0] ?? null); }} />
+          <KtpCapture label="Foto / scan KTP" accept="image/*,.pdf" file={ktp} onChange={(f, raw) => { setKtp(f); setKtpOriginal(raw ?? null); }} />
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button type="button" className="btn btn-outline btn-sm" disabled={!ktp || ocr.running || ktp.type === 'application/pdf'} onClick={runOcr}>

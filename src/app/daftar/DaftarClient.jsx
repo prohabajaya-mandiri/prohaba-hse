@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { CheckCircle2, Camera, Send, Upload } from 'lucide-react';
-import { compressImage } from '@/components/ui';
+import { CheckCircle2, Send } from 'lucide-react';
+import KtpCapture from '@/components/KtpCapture';
 import { formatDate } from '@/lib/dates';
 import { CATEGORIES, CATEGORY_LABELS, nikInfo } from '@/lib/domain/personnel';
 import { ageOn, arrivalIso, mcuIso } from '@/lib/domain/registration';
@@ -30,12 +30,6 @@ export default function DaftarClient({ sites }) {
     const value = e.target.value.replace(/\D/g, '').slice(0, 16);
     const info = nikInfo(value);
     setV((s) => ({ ...s, nik: value, birthDate: s.birthDate || (info?.birthDate ?? '') }));
-  };
-
-  const pickKtp = async (e) => {
-    const f = e.target.files[0];
-    e.target.value = '';
-    if (f) setKtp(await compressImage(f));
   };
 
   const submit = async (e) => {
@@ -146,21 +140,7 @@ export default function DaftarClient({ sites }) {
                 <label className="form-label required" htmlFor="r-address">Alamat sesuai KTP</label>
                 <textarea id="r-address" className="form-input" rows={3} value={v.ktpAddress} onChange={set('ktpAddress')} required maxLength={500} />
               </div>
-              <div className="form-group">
-                <label className="form-label required">Foto KTP</label>
-                {/* Dua pilihan: kamera langsung, atau foto/file yang sudah ada di galeri. */}
-                <div className="form-grid">
-                  <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
-                    <Camera size={16} aria-hidden /> Ambil foto
-                    <input type="file" hidden accept="image/*" capture="environment" onChange={pickKtp} />
-                  </label>
-                  <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
-                    <Upload size={16} aria-hidden /> Pilih dari galeri / file
-                    <input type="file" hidden accept="image/jpeg,image/png,image/webp" onChange={pickKtp} />
-                  </label>
-                </div>
-                <div className="form-hint">{ktp ? `✓ ${ktp.name} — pilih lagi untuk mengganti.` : 'Foto jelas, tidak buram, seluruh kartu terlihat. Format JPG/PNG.'}</div>
-              </div>
+              <KtpCapture required file={ktp} onChange={(f) => setKtp(f)} />
               <div className="section-title" style={{ marginBottom: 0 }}>Kontak darurat (keluarga)</div>
               <div className="form-group">
                 <label className="form-label required" htmlFor="r-ename">Nama</label>
