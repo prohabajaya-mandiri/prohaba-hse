@@ -42,6 +42,10 @@ export async function pendingApprovals(user) {
     if (indicators.length) items.push({ kind: 'INDICATOR', id: 'indicators', title: `${indicators.length} indikator HSE berstatus draft`, detail: 'Formula/target perlu disetujui HO.', link: '/performance?tab=indicators', since: null });
     if (settings.length) items.push({ kind: 'SETTING', id: 'settings', title: `${settings.length} parameter berstatus draft`, detail: 'Parameter Bab 7 perlu persetujuan sebelum dijadikan aturan produksi.', link: '/settings', since: null });
   }
+  if (['HO_HSE', 'HRD'].includes(user.role)) {
+    const regs = await prisma.registration.findMany({ where: { status: 'MENUNGGU' }, include: { site: { select: { code: true } } }, orderBy: { createdAt: 'asc' } });
+    regs.forEach((r) => items.push({ kind: 'REGISTRATION', id: r.id, title: `Pendaftaran ${r.number}: ${r.name} → ${r.site.code}`, detail: `${r.position} · tiba ${r.arrivalDate.toISOString().slice(0, 10)} · MCU ${r.mcuDate.toISOString().slice(0, 10)}`, link: '/registrations/' + r.id, since: r.createdAt }));
+  }
   if (['PJO', 'PM'].includes(user.role)) {
     const reports = await prisma.hseReport.findMany({ where: { status: 'SUBMITTED', ...siteIn }, include: { site: { select: { code: true } } }, orderBy: { submittedAt: 'asc' } });
     reports.forEach((r) => items.push({ kind: 'REPORT', id: r.id, title: `Periksa laporan ${r.type.toLowerCase()} ${r.site.code} ${r.periodKey}`, detail: `Dikirim ${r.creatorName}`, link: '/reports/' + r.id, since: r.submittedAt }));

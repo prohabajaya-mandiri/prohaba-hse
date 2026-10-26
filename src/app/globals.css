@@ -1228,6 +1228,14 @@ details.card[open] > summary::after { transform: rotate(-135deg) translateY(-3px
 .login-form .btn { min-height: 48px; font-size: 15px; margin-top: 4px; }
 .login-foot { margin-top: 26px; font-size: 13px; color: var(--gray-400); text-align: center; }
 
+/* Form pendaftaran pegawai baru (publik, dipakai dari HP). */
+.register-card { max-width: 560px; }
+.register-card .check-row { align-items: flex-start; font-size: 13px; line-height: 1.5; }
+.register-card .check-row input { margin-top: 3px; flex-shrink: 0; }
+@media (max-width: 480px) {
+  .register-card { padding: 28px 18px 22px; }
+}
+
 /* ─── Dokumen cetak (faktur, surat jalan) ───────────────────────────────── */
 .print-doc { display: none; }
 

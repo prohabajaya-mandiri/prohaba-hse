@@ -3,6 +3,8 @@ export const LABELS = {
   // status kerja
   ACTIVE: 'Active', CUTI: 'Cuti', SAKIT: 'Sakit', MCU: 'MCU', RESIGN: 'Resign', DIRUMAHKAN: 'Dirumahkan', MUTASI: 'Mutasi',
   ENDED: 'Berakhir',
+  // pendaftaran pegawai baru
+  MENUNGGU: 'Menunggu verifikasi', DISETUJUI: 'Disetujui', DITOLAK: 'Ditolak',
   // status kepegawaian
   PKWT: 'PKWT (Kontrak)', PKWTT: 'PKWTT (Tetap)',
   // kategori
@@ -51,7 +53,7 @@ export const labelOf = (v) => LABELS[v] ?? v;
 
 const green = 'badge-success', yellow = 'badge-warning', red = 'badge-danger', blue = 'badge-info', navy = 'badge-navy', orange = 'badge-orange', gray = 'badge-gray';
 export const STATUS_STYLES = {
-  PKWT: blue, PKWTT: green,
+  PKWT: blue, PKWTT: green, MENUNGGU: yellow, DISETUJUI: green, DITOLAK: red,
   ACTIVE: green, CUTI: blue, SAKIT: orange, MCU: navy, RESIGN: gray, DIRUMAHKAN: yellow, MUTASI: navy, ENDED: gray,
   FIT: green, FOLLOW_UP: yellow, UNFIT: red, PENDING: gray, PROSES: blue, BELUM_MCU: gray, FU_TERLAMBAT: red, MCU_KEDALUWARSA: red,
   AKTIF: green, AKAN_HABIS: yellow, KEDALUWARSA: red, DICABUT: gray, BELUM_BERLAKU: blue,

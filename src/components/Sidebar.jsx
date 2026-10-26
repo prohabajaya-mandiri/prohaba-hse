@@ -8,7 +8,7 @@ import { signOut } from 'next-auth/react';
 import {
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
-  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown,
+  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus,
 } from 'lucide-react';
 import { useDialog } from './DialogProvider';
 import { canAccess, ROLE_LABELS } from '@/lib/access';
@@ -27,6 +27,7 @@ const NAV_ITEMS = [
     section: 'Personel',
     items: [
       { href: '/personnel', label: 'Master Data Karyawan', icon: Users },
+      { href: '/registrations', label: 'Pendaftaran Baru', icon: UserPlus },
       { href: '/placements', label: 'Penempatan & Mutasi', icon: ArrowLeftRight },
       { href: '/roster', label: 'Roster & Cuti', icon: CalendarDays },
       { href: '/mobilization', label: 'Mobilisasi', icon: Plane },

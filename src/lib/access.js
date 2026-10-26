@@ -20,6 +20,8 @@ export const MODULES = {
   files: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD'] },
   sites: { read: ALL, write: ['HO_HSE'] },
   personnel: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD'] },
+  // Verifikasi pendaftaran mandiri pegawai baru (form publik /daftar).
+  registrations: { read: ['HO_HSE', 'HRD'], write: ['HO_HSE', 'HRD'] },
   // write = pengajuan mutasi/penempatan; pengesahan mutasi hanya HO_HSE (lihat canDecideMutation).
   placements: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD', 'PJO', 'PM'] },
   mcu: { read: ALL, write: ['HO_HSE', 'HSE_SITE'] },

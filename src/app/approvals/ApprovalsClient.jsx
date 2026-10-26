@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Card, DataTable } from '@/components/ui';
 import { formatDate } from '@/lib/dates';
 
-const KIND = { MUTATION: 'Mutasi', REPORT: 'Laporan', INDICATOR: 'Indikator', SETTING: 'Parameter', MY_REQUEST: 'Pengajuan saya' };
+const KIND = { REGISTRATION: 'Pendaftaran', MUTATION: 'Mutasi', REPORT: 'Laporan', INDICATOR: 'Indikator', SETTING: 'Parameter', MY_REQUEST: 'Pengajuan saya' };
 
 export default function ApprovalsClient({ data }) {
   return (
