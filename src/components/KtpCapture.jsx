@@ -77,7 +77,6 @@ export default function KtpCapture({ label = 'Foto KTP', required = false, accep
       <input ref={nativeCameraRef} type="file" hidden accept="image/*" capture="environment" onChange={fromInput} />
       {file && preview && <img className="ktp-thumb" src={preview} alt="Pratinjau foto KTP" />}
       {file && !preview && <div className="form-hint">✓ {file.name}</div>}
-      {!file && <div className="form-hint">Kamera akan terbuka dengan bingkai KTP. Foto yang sudah ada? Ketuk <strong>Galeri</strong> di layar kamera (di iPhone pilih <strong>Photo Library</strong>).</div>}
       {mode === 'camera' && (
         <KtpCamera
           onClose={close}
