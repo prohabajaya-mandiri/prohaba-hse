@@ -47,6 +47,22 @@ test('verifikasi pendaftaran hanya HO HSE & HRD', () => {
   assert.equal(canAccess('DIREKSI', '/api/registrations', 'GET'), false);
 });
 
+test('kamera KTP memotong tepat area bingkai (object-fit: cover)', async () => {
+  const { coverCrop } = await import('../src/lib/domain/camera-crop.js');
+  // Video 1920×1080 tampil di layar HP 375×700: diskalakan mengikuti tinggi, sisi kiri-kanan terpotong.
+  const view = { left: 0, top: 0, width: 375, height: 700 };
+  const scale = 700 / 1080;
+  const frame = { left: 20, top: 250, width: 335, height: 335 / (85.6 / 54) };
+  const r = coverCrop(view, frame, 1920, 1080);
+  const offX = (375 - 1920 * scale) / 2;
+  assert.ok(Math.abs(r.sx - (20 - offX) / scale) < 1e-6);
+  assert.ok(Math.abs(r.sy - 250 / scale) < 1e-6);
+  assert.ok(Math.abs(r.sw / r.sh - 85.6 / 54) < 1e-6, 'rasio hasil = rasio KTP');
+  // Margin tidak boleh keluar dari batas video.
+  const edge = coverCrop(view, { left: 0, top: 0, width: 375, height: 700 }, 1920, 1080, 0.1);
+  assert.ok(edge.sx >= 0 && edge.sy >= 0 && edge.sx + edge.sw <= 1920 && edge.sy + edge.sh <= 1080);
+});
+
 test('langkah Sesuaikan: posisi awal menutupi bingkai & hasil potong mengikuti geser/zoom', async () => {
   const { coverFit, frameCrop } = await import('../src/lib/domain/camera-crop.js');
   const frame = { left: 20, top: 200, width: 335, height: 335 / (85.6 / 54) };
