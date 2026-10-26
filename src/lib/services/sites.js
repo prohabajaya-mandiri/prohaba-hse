@@ -35,6 +35,8 @@ function parseSite(body) {
 export async function saveSite(user, id, body) {
   const data = parseSite(body);
   return prisma.$transaction(async (tx) => {
+    const dup = await tx.site.findUnique({ where: { code: data.code }, select: { id: true, name: true } });
+    ensure(!dup || dup.id === id, `Kode site ${data.code} sudah dipakai site ${dup?.name}.`, 409);
     if (!id) {
       const site = await tx.site.create({ data });
       await audit(tx, user, { action: 'CREATE', module: 'sites', recordId: site.id, siteId: site.id, after: data });
@@ -46,6 +48,34 @@ export async function saveSite(user, id, body) {
     const d = diff(before, data);
     if (d.changed) await audit(tx, user, { action: 'UPDATE', module: 'sites', recordId: id, siteId: id, ...d });
     return site;
+  });
+}
+
+// Data yang merujuk site. Site yang sudah dipakai tidak boleh dihapus (riwayat & audit tetap utuh);
+// cukup dinonaktifkan. Proyek & penanggung jawab adalah bagian dari master site, ikut terhapus.
+const SITE_USAGE = {
+  users: 'akses pengguna', personnel: 'personel (site saat ini)', initialStaff: 'personel (site awal)', placements: 'penempatan',
+  mutationsTo: 'mutasi', mcus: 'MCU', permits: 'permit', mobilizations: 'mobilisasi', leaves: 'cuti/izin', rosterPolicies: 'pola roster',
+  dailyPerf: 'kinerja harian', activities: 'aktivitas HSE', reports: 'laporan HSE', incidents: 'insiden', trainings: 'training', documents: 'dokumen HSE',
+};
+
+/** Hapus permanen hanya untuk site yang belum pernah dipakai (mis. salah input). */
+export async function deleteSite(user, id) {
+  return prisma.$transaction(async (tx) => {
+    const site = await tx.site.findUnique({
+      where: { id },
+      include: { _count: { select: Object.fromEntries(Object.keys(SITE_USAGE).map((k) => [k, true])) }, projects: true, responsibles: true },
+    });
+    ensure(site, 'Site tidak ditemukan.', 404);
+    const used = Object.entries(site._count).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${SITE_USAGE[k]}`);
+    ensure(!used.length, `Site ${site.code} sudah dipakai (${used.join(', ')}) sehingga tidak dapat dihapus. Perbaiki nama lewat Edit site, atau nonaktifkan site agar riwayat tetap utuh.`, 409);
+    await tx.project.deleteMany({ where: { siteId: id } });
+    await tx.siteResponsible.deleteMany({ where: { siteId: id } });
+    await tx.site.delete({ where: { id } });
+    const { _count, ...before } = site;
+    void _count;
+    await audit(tx, user, { action: 'DELETE', module: 'sites', recordId: id, before, note: `Hapus site ${site.code} (belum pernah dipakai)` });
+    return { id };
   });
 }
 
