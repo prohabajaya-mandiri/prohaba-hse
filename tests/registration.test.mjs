@@ -15,6 +15,10 @@ test('umur dihitung dari tanggal lahir', () => {
   assert.equal(ageOn('2000-10-27', new Date('2026-10-26T00:00:00Z')), 25);
   assert.equal(ageOn('2000-10-26', new Date('2026-10-26T00:00:00Z')), 26);
   assert.equal(ageOn('2030-01-01', new Date('2026-10-26T00:00:00Z')), null);
+  // Server memvalidasi tanggal lahir sebagai objek Date (hasil date()), bukan teks.
+  assert.equal(ageOn(new Date('2001-07-05T00:00:00Z'), new Date('2026-10-26T00:00:00Z')), 25);
+  assert.equal(ageOn(new Date('invalid'), new Date('2026-10-26T00:00:00Z')), null);
+  assert.equal(ageOn('bukan tanggal'), null);
 });
 
 test('nomor WA dinormalisasi ke format internasional', () => {

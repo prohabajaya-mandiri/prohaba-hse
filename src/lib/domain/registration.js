@@ -21,12 +21,18 @@ export function mcuIso(arrival) {
   return isoOf(new Date(String(arrival).slice(0, 10) + 'T00:00:00Z').getTime() + MCU_OFFSET_DAYS * DAY);
 }
 
-/** Umur (tahun penuh) pada tanggal `on`. */
+// Tanggal (objek Date dari server/DB atau teks YYYY-MM-DD dari form) → tengah malam UTC; null bila tidak valid.
+function dayOf(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(String(value).slice(0, 10) + 'T00:00:00Z');
+  if (!Number.isFinite(d.getTime())) return null;
+  return new Date(isoOf(d) + 'T00:00:00Z');
+}
+
+/** Umur (tahun penuh) pada tanggal `on`. `birthDate` boleh Date atau YYYY-MM-DD. */
 export function ageOn(birthDate, on = new Date()) {
-  if (!birthDate) return null;
-  const b = new Date(String(birthDate).slice(0, 10) + 'T00:00:00Z');
-  const t = new Date(isoOf(on) + 'T00:00:00Z');
-  if (!Number.isFinite(b.getTime()) || b > t) return null;
+  const b = dayOf(birthDate), t = dayOf(on);
+  if (!b || !t || b > t) return null;
   let age = t.getUTCFullYear() - b.getUTCFullYear();
   if (t.getUTCMonth() < b.getUTCMonth() || (t.getUTCMonth() === b.getUTCMonth() && t.getUTCDate() < b.getUTCDate())) age -= 1;
   return age;
