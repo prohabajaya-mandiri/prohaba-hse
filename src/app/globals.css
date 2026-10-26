@@ -1482,11 +1482,10 @@ th { letter-spacing: 0.04em; }
 }
 @media (max-width: 768px) { .hide-mobile { display: none !important; } }
 
-/* ─── Kamera & penyesuaian foto KTP ─────────────────────────────────────── */
+/* ─── Penyesuaian foto KTP di bawah bingkai ────────────────────────────── */
 .ktp-thumb { display: block; width: 100%; max-width: 320px; margin-top: 10px; border-radius: 8px; border: 1px solid var(--gray-200); }
 
 .ktp-camera { position: fixed; inset: 0; z-index: 1000; background: #000; color: #fff; display: flex; flex-direction: column; }
-.ktp-camera-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ktp-camera-overlay { position: absolute; inset: 0 0 112px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; pointer-events: none; }
 .ktp-frame {
   position: relative; width: min(90vw, 560px); max-height: 70%;
@@ -1509,13 +1508,6 @@ th { letter-spacing: 0.04em; }
 }
 .ktp-cam-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 15px; cursor: pointer; }
 .ktp-cam-btn.primary { background: #16a34a; }
-.ktp-shutter { width: 72px; height: 72px; border-radius: 50%; border: 5px solid #fff; background: rgba(255, 255, 255, 0.25); cursor: pointer; }
-.ktp-shutter:active { background: rgba(255, 255, 255, 0.6); }
-.ktp-camera-review { position: absolute; inset: 0 0 112px; z-index: 1; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; }
-.ktp-camera-review img { max-width: 100%; max-height: 75%; border-radius: 10px; }
-.ktp-camera-review p { margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.85); text-align: center; }
-.ktp-camera-error { margin: auto; max-width: 420px; padding: 24px; text-align: center; display: grid; gap: 16px; }
-.ktp-cam-close { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px; z-index: 3; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; cursor: pointer; }
 .ktp-cam-btn:disabled { opacity: 0.5; cursor: default; }
 .ktp-adjust-stage { position: absolute; inset: 0 0 168px; overflow: hidden; touch-action: none; cursor: grab; }
 .ktp-adjust-stage:active { cursor: grabbing; }
