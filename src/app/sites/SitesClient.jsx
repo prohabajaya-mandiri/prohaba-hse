@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Edit, Briefcase, UserCheck } from 'lucide-react';
+import { Plus, Edit, Briefcase, UserCheck, Trash2 } from 'lucide-react';
 import { Badge, Card, DataTable, FormFields, Modal, useSubmit } from '@/components/ui';
+import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 
@@ -10,6 +11,7 @@ const ROLE_NAMES = { PJO: 'PJO', PM: 'PM', HSE_SITE: 'HSE Site' };
 
 export default function SitesClient({ sites, canEdit }) {
   const { submit, busy } = useSubmit();
+  const { showConfirm } = useDialog();
   const [siteForm, setSiteForm] = useState(null);
   const [projectForm, setProjectForm] = useState(null);
   const [respForm, setRespForm] = useState(null);
@@ -22,6 +24,12 @@ export default function SitesClient({ sites, canEdit }) {
     e.preventDefault();
     const { id, ...body } = siteForm;
     if (await submit(id ? `/api/sites/${id}` : '/api/sites', { method: id ? 'PUT' : 'POST', body })) setSiteForm(null);
+  };
+  // Hanya field form yang dikirim; objek site dari daftar juga memuat proyek, penanggung jawab, dll.
+  const editSite = (s) => setSiteForm({ id: s.id, code: s.code, name: s.name, location: s.location ?? '', region: s.region, isHo: s.isHo, isActive: s.isActive });
+  const removeSite = async (s) => {
+    if (!(await showConfirm(`Hapus permanen site ${s.code} — ${s.name}? Hanya bisa untuk site yang belum pernah dipakai. Site yang sudah berisi data cukup dinonaktifkan.`, 'Hapus site'))) return;
+    if (await submit(`/api/sites/${s.id}`, { method: 'DELETE', success: `Site ${s.code} dihapus.` })) setDetailId(null);
   };
   const saveProject = async (e) => {
     e.preventDefault();
@@ -63,9 +71,10 @@ export default function SitesClient({ sites, canEdit }) {
           <div className="stack">
             {canEdit && (
               <div className="row-actions" style={{ justifyContent: 'flex-start' }}>
-                <button className="btn btn-outline btn-sm" onClick={() => setSiteForm({ ...detail })}><Edit size={15} /> Edit site</button>
+                <button className="btn btn-outline btn-sm" onClick={() => editSite(detail)}><Edit size={15} /> Edit site</button>
                 <button className="btn btn-outline btn-sm" onClick={() => setProjectForm({ siteId: detail.id, name: '', owner: '', contractNo: '', startDate: '', endDate: '', status: 'ACTIVE', notes: '' })}><Briefcase size={15} /> Tambah proyek</button>
                 <button className="btn btn-outline btn-sm" onClick={() => setRespForm({ siteId: detail.id, role: 'PJO', name: '', phone: '', startDate: todayIso() })}><UserCheck size={15} /> Ganti penanggung jawab</button>
+                <button className="btn btn-outline btn-sm text-red" disabled={busy || detail._count.placements > 0} title={detail._count.placements > 0 ? 'Site memiliki personel aktif — nonaktifkan saja' : 'Hanya untuk site yang belum pernah dipakai'} onClick={() => removeSite(detail)}><Trash2 size={15} /> Hapus site</button>
               </div>
             )}
             <Card title="Riwayat proyek" padding={0}>
@@ -104,6 +113,7 @@ export default function SitesClient({ sites, canEdit }) {
               { name: 'isHo', label: 'Head Office', type: 'checkbox' },
               { name: 'isActive', label: 'Site aktif', type: 'checkbox' },
             ]} />
+            {siteForm.id && <div className="notice" style={{ marginBottom: 12 }}>Perubahan nama/kode tercatat di audit log dan langsung berlaku di seluruh data site ini. Site yang tidak dipakai lagi cukup dinonaktifkan agar riwayatnya tetap utuh.</div>}
             <button className="btn btn-primary" disabled={busy}>Simpan</button>
           </form>
         )}
