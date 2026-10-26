@@ -11,7 +11,7 @@ export default async function PersonnelPage({ searchParams }) {
   const q = await query(searchParams);
   const [sites, data] = await Promise.all([scopedSites(user), listPersonnel(user, q, q)]);
   return (
-    <AppLayout title="Master Data Karyawan" subtitle="Data induk staff, manpower dan harian kantor — dipakai juga oleh ERP Center" user={user}>
+    <AppLayout title="Master Data Karyawan" subtitle="Data induk staff, harian kantor dan harian mandor — dipakai juga oleh ERP Center" user={user}>
       <PersonnelClient sites={sites} rows={data.rows} total={data.total} page={q.page} canEdit={canWrite(user.role, 'personnel')} canEmployment={canSetEmployment(user)} />
     </AppLayout>
   );

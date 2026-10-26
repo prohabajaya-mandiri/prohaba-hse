@@ -191,7 +191,7 @@ model Personnel {
   ktpAddressEnc    String
   domicileAddress  String?
   originRegion     String?
-  category         String // STAFF | MANPOWER | HARIAN_KANTOR
+  category         String // STAFF | HARIAN_KANTOR | MANPOWER (tampil: Harian Mandor)
   position         String
   initialSiteId    String?
   currentSiteId    String?

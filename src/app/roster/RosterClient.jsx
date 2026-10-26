@@ -63,7 +63,7 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
                 { key: 'ws', label: 'Status kerja', render: (r) => <Badge value={r.personnel.workStatus} /> },
               ]} />
           </div>
-          <div className="muted">Acuan: staff menikah 3 bulan onsite + 2 minggu cuti; belum menikah 4 bulan + 2 minggu; manpower mengikuti kebutuhan proyek (umumnya 5–6 bulan); aturan owner dapat berbeda (mis. 70 hari kerja + 2 minggu off). SAKIT tidak mereset siklus onsite.</div>
+          <div className="muted">Acuan: staff menikah 3 bulan onsite + 2 minggu cuti; belum menikah 4 bulan + 2 minggu; harian mandor mengikuti kebutuhan proyek (umumnya 5–6 bulan); aturan owner dapat berbeda (mis. 70 hari kerja + 2 minggu off). SAKIT tidak mereset siklus onsite.</div>
         </>
       )}
 

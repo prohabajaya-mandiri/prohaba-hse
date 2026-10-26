@@ -15,7 +15,7 @@ const FIT_COLORS = { FIT: '#086840', FOLLOW_UP: '#d4a73a', UNFIT: '#c2453d', PRO
 export default function DashboardClient({ sites, data }) {
   const statusData = WORK_STATUSES.map((s) => ({ name: labelOf(s), value: data.totals.statuses[s] ?? 0, key: s })).filter((x) => x.value);
   const fitData = Object.entries(data.fitness).map(([k, v]) => ({ name: labelOf(k), value: v, key: k }));
-  const siteChart = data.perSite.map((s) => ({ site: s.site.code, Staff: s.categories.STAFF ?? 0, Manpower: s.categories.MANPOWER ?? 0, 'Harian Kantor': s.categories.HARIAN_KANTOR ?? 0 }));
+  const siteChart = data.perSite.map((s) => ({ site: s.site.code, Staff: s.categories.STAFF ?? 0, 'Harian Mandor': s.categories.MANPOWER ?? 0, 'Harian Kantor': s.categories.HARIAN_KANTOR ?? 0 }));
 
   return (
     <div className="stack">
@@ -30,8 +30,8 @@ export default function DashboardClient({ sites, data }) {
       <div className="kpi-grid">
         <Kpi label="Total personel" value={fmtNum(data.totals.personnel)} icon={Users} tone="navy" href="/personnel" />
         <Kpi label="Staff" value={fmtNum(data.totals.categories.STAFF ?? 0)} icon={Building} tone="blue" href="/personnel?category=STAFF" />
-        <Kpi label="Manpower" value={fmtNum(data.totals.categories.MANPOWER ?? 0)} icon={HardHat} tone="orange" href="/personnel?category=MANPOWER" />
-        <Kpi label="Harian kantor" value={fmtNum(data.totals.categories.HARIAN_KANTOR ?? 0)} icon={Users} tone="green" href="/personnel?category=HARIAN_KANTOR" />
+        <Kpi label="Harian Kantor" value={fmtNum(data.totals.categories.HARIAN_KANTOR ?? 0)} icon={Users} tone="green" href="/personnel?category=HARIAN_KANTOR" />
+        <Kpi label="Harian Mandor" value={fmtNum(data.totals.categories.MANPOWER ?? 0)} icon={HardHat} tone="orange" href="/personnel?category=MANPOWER" />
       </div>
 
       <div className="kpi-grid">
@@ -88,8 +88,8 @@ export default function DashboardClient({ sites, data }) {
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="Staff" stackId="a" fill="#086840" />
-                <Bar dataKey="Manpower" stackId="a" fill="#5fa883" />
-                <Bar dataKey="Harian Kantor" stackId="a" fill="#b7d3c3" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Harian Kantor" stackId="a" fill="#b7d3c3" />
+                <Bar dataKey="Harian Mandor" stackId="a" fill="#5fa883" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
