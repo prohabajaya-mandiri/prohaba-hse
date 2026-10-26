@@ -807,6 +807,7 @@ model Registration {
   nikLast4          String
   birthDate         DateTime
   gender            String? // L | P, dari NIK
+  education         String? // SD | SMP | SMA/SMK | D1–D4 | S1–S3
   category          String // STAFF | HARIAN_KANTOR | MANPOWER
   position          String
   siteId            String
@@ -816,8 +817,8 @@ model Registration {
   emergencyPhone    String
   emergencyRelation String?
   ktpFileId         String? // FileObject KTP (terenkripsi), dipindah ke personel saat disetujui
-  arrivalDate       DateTime // tanggal tiba di Balikpapan (WITA) = tanggal pengisian
-  mcuDate           DateTime // rencana MCU, default H+1 dari tanggal tiba
+  startDate         DateTime  @map("arrivalDate") // tanggal mulai kerja (default hari pengisian); kolom lama dipakai ulang
+  mcuDate           DateTime // rencana MCU, default H+1 dari tanggal mulai kerja
   consentAt         DateTime // persetujuan pemrosesan data pribadi
   personnelId       String? // personel hasil persetujuan
   decidedById       String?

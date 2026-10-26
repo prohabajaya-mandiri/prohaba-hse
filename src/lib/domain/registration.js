@@ -1,24 +1,31 @@
 // Pendaftaran mandiri pegawai baru. Fungsi murni (aman dipakai client & server).
 import { nikInfo } from './personnel.js';
 
-// Pegawai baru tiba di Balikpapan (WITA). Tanggal tiba mengikuti kalender WITA,
-// bukan zona aplikasi (WIB), agar pengisian 23.00–24.00 WITA tidak tercatat sehari sebelumnya.
-export const ARRIVAL_TIMEZONE = 'Asia/Makassar';
 export const MCU_OFFSET_DAYS = 1;
 export const MIN_AGE = 18;
 export const REGISTRATION_STATUSES = ['MENUNGGU', 'DISETUJUI', 'DITOLAK'];
+export const EDUCATION_LEVELS = ['SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'];
+// Rentang tanggal mulai kerja yang wajar dari hari pengisian (hari).
+export const START_WINDOW = { pastDays: 60, futureDays: 90 };
 
 const DAY = 86400000;
 const isoOf = (d) => new Date(d).toISOString().slice(0, 10);
 
-/** Tanggal hari ini (YYYY-MM-DD) di Balikpapan. */
-export function arrivalIso(now = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: ARRIVAL_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+/** Tanggal hari ini (YYYY-MM-DD) menurut jam perangkat pengguna — default tanggal mulai kerja. */
+export function localTodayIso(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-/** Rencana MCU: H+1 dari tanggal tiba. */
-export function mcuIso(arrival) {
-  return isoOf(new Date(String(arrival).slice(0, 10) + 'T00:00:00Z').getTime() + MCU_OFFSET_DAYS * DAY);
+/** Rencana MCU: H+1 dari tanggal mulai kerja. */
+export function mcuIso(start) {
+  const d = new Date(String(start ?? '').slice(0, 10) + 'T00:00:00Z');
+  return Number.isFinite(d.getTime()) ? isoOf(d.getTime() + MCU_OFFSET_DAYS * DAY) : null;
+}
+
+/** Tanggal mulai kerja harus dalam rentang wajar dari `today` (Date, tengah malam UTC). */
+export function startDateInWindow(start, today) {
+  const diff = Math.round((new Date(start).getTime() - new Date(today).getTime()) / DAY);
+  return diff >= -START_WINDOW.pastDays && diff <= START_WINDOW.futureDays;
 }
 
 // Tanggal (objek Date dari server/DB atau teks YYYY-MM-DD dari form) → tengah malam UTC; null bila tidak valid.

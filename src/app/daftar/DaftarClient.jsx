@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import { CheckCircle2, Send } from 'lucide-react';
 import KtpCapture from '@/components/KtpCapture';
 import { formatDate } from '@/lib/dates';
 import { CATEGORIES, CATEGORY_LABELS, nikInfo } from '@/lib/domain/personnel';
-import { ageOn, arrivalIso, mcuIso } from '@/lib/domain/registration';
+import { ageOn, EDUCATION_LEVELS, localTodayIso, mcuIso } from '@/lib/domain/registration';
 
 const EMPTY = {
-  name: '', nik: '', birthDate: '', category: '', position: '', siteId: '', phoneWa: '', ktpAddress: '',
+  name: '', nik: '', birthDate: '', education: '', startDate: '', category: '', position: '', siteId: '', phoneWa: '', ktpAddress: '',
   emergencyName: '', emergencyPhone: '', emergencyRelation: '', consent: false, website: '',
 };
+
+const noopSubscribe = () => () => {};
 
 export default function DaftarClient({ sites }) {
   const [v, setV] = useState(EMPTY);
@@ -21,7 +23,11 @@ export default function DaftarClient({ sites }) {
   const [done, setDone] = useState(null);
   const set = (k) => (e) => setV((s) => ({ ...s, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
-  const arrival = arrivalIso();
+  // Default tanggal mulai kerja = hari ini menurut HP pegawai (bukan jam server). Baru diisi setelah
+  // hidrasi agar HTML server dan browser tidak berbeda.
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const today = hydrated ? localTodayIso() : '';
+  const start = v.startDate || today;
   const age = ageOn(v.birthDate);
   const nik = nikInfo(v.nik);
 
@@ -39,7 +45,7 @@ export default function DaftarClient({ sites }) {
     setBusy(true);
     try {
       const form = new FormData();
-      for (const [k, val] of Object.entries(v)) form.set(k, String(val));
+      for (const [k, val] of Object.entries({ ...v, startDate: start })) form.set(k, String(val));
       form.set('ktp', ktp);
       const res = await fetch('/api/public/registrations', { method: 'POST', body: form });
       const data = await res.json().catch(() => ({}));
@@ -73,7 +79,7 @@ export default function DaftarClient({ sites }) {
               <dl className="detail-grid">
                 <div><dt>Nama</dt><dd>{done.name}</dd></div>
                 <div><dt>Tujuan site</dt><dd>{done.site}</dd></div>
-                <div><dt>Tanggal tiba di Balikpapan</dt><dd>{formatDate(done.arrivalDate)}</dd></div>
+                <div><dt>Tanggal mulai kerja</dt><dd>{formatDate(done.startDate)}</dd></div>
                 <div><dt>Rencana MCU</dt><dd>{formatDate(done.mcuDate)}</dd></div>
               </dl>
             )}
@@ -97,12 +103,19 @@ export default function DaftarClient({ sites }) {
               <div className="form-grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
                 <div className="form-group">
                   <label className="form-label required" htmlFor="r-birth">Tanggal lahir</label>
-                  <input id="r-birth" type="date" className="form-input" value={v.birthDate} onChange={set('birthDate')} required max={arrival} />
+                  <input id="r-birth" type="date" className="form-input" value={v.birthDate} onChange={set('birthDate')} required max={today || undefined} />
                 </div>
                 <div className="form-group">
                   <label className="form-label" htmlFor="r-age">Umur</label>
                   <input id="r-age" className="form-input" value={age === null ? '' : `${age} tahun`} readOnly tabIndex={-1} />
                 </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label required" htmlFor="r-education">Pendidikan terakhir</label>
+                <select id="r-education" className="form-select" value={v.education} onChange={set('education')} required>
+                  <option value="">— Pilih —</option>
+                  {EDUCATION_LEVELS.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label className="form-label required" htmlFor="r-category">Kategori</label>
@@ -124,12 +137,12 @@ export default function DaftarClient({ sites }) {
               </div>
               <div className="form-grid">
                 <div className="form-group">
-                  <label className="form-label" htmlFor="r-arrival">Tanggal tiba di Balikpapan</label>
-                  <input id="r-arrival" className="form-input" value={formatDate(arrival)} readOnly tabIndex={-1} />
+                  <label className="form-label required" htmlFor="r-start">Tanggal mulai kerja</label>
+                  <input id="r-start" type="date" className="form-input" value={start} onChange={set('startDate')} required />
                 </div>
                 <div className="form-group">
                   <label className="form-label" htmlFor="r-mcu">Rencana MCU</label>
-                  <input id="r-mcu" className="form-input" value={formatDate(mcuIso(arrival))} readOnly tabIndex={-1} />
+                  <input id="r-mcu" className="form-input" value={start ? formatDate(mcuIso(start)) : ''} readOnly tabIndex={-1} />
                 </div>
               </div>
               <div className="form-group">

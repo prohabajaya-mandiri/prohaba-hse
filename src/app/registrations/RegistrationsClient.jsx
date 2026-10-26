@@ -23,7 +23,7 @@ export default function RegistrationsClient({ data, link, qr }) {
 
   return (
     <div className="stack">
-      <Card title="Bagikan form pendaftaran" actions={<span className="muted"><QrCode size={14} /> Tempel QR di mess/kantor Balikpapan</span>}>
+      <Card title="Bagikan form pendaftaran" actions={<span className="muted"><QrCode size={14} /> Tempel QR di mess / kantor site</span>}>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* SVG dibuat server dari link aplikasi sendiri. */}
           <div style={{ width: 200, height: 200, flexShrink: 0 }} dangerouslySetInnerHTML={{ __html: qr }} />
@@ -60,7 +60,7 @@ export default function RegistrationsClient({ data, link, qr }) {
             { key: 'category', label: 'Kategori', render: (r) => labelOf(r.category) },
             { key: 'position', label: 'Jabatan' },
             { key: 'site', label: 'Tujuan', render: (r) => r.site.code },
-            { key: 'arrival', label: 'Tiba', render: (r) => formatDate(r.arrivalDate) },
+            { key: 'start', label: 'Mulai kerja', render: (r) => formatDate(r.startDate) },
             { key: 'mcu', label: 'Rencana MCU', render: (r) => formatDate(r.mcuDate) },
             pending
               ? { key: 'since', label: 'Masuk', render: (r) => new Date(r.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) }
