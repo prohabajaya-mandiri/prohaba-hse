@@ -86,6 +86,12 @@ test('setiap API bisnis melewati pemeriksaan otorisasi', () => {
       assert.ok(source.includes('CRON_SECRET') && source.includes('timingSafeEqual'), file);
       continue;
     }
+    if (file.includes('/api/public/')) {
+      // Route publik tanpa sesi: wajib publicApi() (tolak lintas situs) dan pembatasan laju di service.
+      assert.ok(/=\s*publicApi\(/.test(source), file);
+      assert.ok(!/export (async )?function (GET|POST|PUT|DELETE)/.test(source), 'handler tanpa publicApi(): ' + file);
+      continue;
+    }
     if (file.includes('/integration/')) {
       // Route antar-aplikasi wajib memakai tanda tangan HMAC, bukan sesi.
       assert.ok(/=\s*integrationApi\(/.test(source), file);

@@ -99,7 +99,7 @@ export function parsePersonnel(body, existing = null, { user = null, errors = nu
   return { v, sensitive };
 }
 
-function encryptSensitive(sensitive) {
+export function encryptSensitive(sensitive) {
   const out = {};
   if (sensitive.nik !== undefined) Object.assign(out, { nikHash: lookupHash(sensitive.nik), nikEnc: encrypt(sensitive.nik), nikLast4: sensitive.nik.slice(-4) });
   if (sensitive.ktpAddress !== undefined) out.ktpAddressEnc = encrypt(sensitive.ktpAddress);

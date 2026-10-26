@@ -1,4 +1,5 @@
 import { authorizeApi } from './api-access.js';
+import { isSameOriginMutation } from './access.js';
 import { InputError } from './validation.js';
 import { errorResponse } from './http-errors.js';
 import { serialize } from './serialization.js';
@@ -17,6 +18,24 @@ export function api(handler) {
     }
   };
 }
+
+/**
+ * Route publik tanpa sesi (form pendaftaran). Tetap menolak kiriman lintas situs;
+ * pembatasan laju & validasi wajib dilakukan di service.
+ */
+export function publicApi(handler) {
+  return async (request, context) => {
+    try {
+      if (!isSameOriginMutation(request)) return Response.json({ error: 'Forbidden' }, { status: 403 });
+      const result = await handler(request, context);
+      return result instanceof Response ? result : Response.json(serialize(result ?? { ok: true }));
+    } catch (error) {
+      return errorResponse(error);
+    }
+  };
+}
+
+export const clientIp = (request) => request.headers.get('x-vercel-forwarded-for') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
 
 export async function json(request) {
   if (!request.headers.get('content-type')?.startsWith('application/json')) throw new InputError('Content-Type harus application/json.', 415);

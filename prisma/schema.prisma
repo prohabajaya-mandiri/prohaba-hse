@@ -133,6 +133,7 @@ model Site {
   trainings     TrainingSession[]
   documents     HseDocument[]
   mutationsTo   Mutation[]        @relation("MutationTarget")
+  registrations Registration[]
 }
 
 model Project {
@@ -792,4 +793,41 @@ model ApprovalLog {
   createdAt  DateTime @default(now())
 
   @@index([entityType, entityId, createdAt])
+}
+
+// ─── Pendaftaran mandiri pegawai baru (form publik /daftar) ─────────────────
+// Isian publik ditampung di sini dan baru menjadi Personel setelah disetujui HO HSE / HRD.
+model Registration {
+  id                String    @id @default(cuid())
+  number            String    @unique // REG-000001
+  status            String    @default("MENUNGGU") // MENUNGGU | DISETUJUI | DITOLAK
+  name              String
+  nikHash           String // HMAC NIK (sama dengan Personnel.nikHash) untuk deteksi duplikasi
+  nikEnc            String
+  nikLast4          String
+  birthDate         DateTime
+  gender            String? // L | P, dari NIK
+  category          String // STAFF | HARIAN_KANTOR | MANPOWER
+  position          String
+  siteId            String
+  phoneWa           String
+  ktpAddressEnc     String
+  emergencyName     String
+  emergencyPhone    String
+  emergencyRelation String?
+  ktpFileId         String? // FileObject KTP (terenkripsi), dipindah ke personel saat disetujui
+  arrivalDate       DateTime // tanggal tiba di Balikpapan (WITA) = tanggal pengisian
+  mcuDate           DateTime // rencana MCU, default H+1 dari tanggal tiba
+  consentAt         DateTime // persetujuan pemrosesan data pribadi
+  personnelId       String? // personel hasil persetujuan
+  decidedById       String?
+  decidedByName     String?
+  decidedAt         DateTime?
+  decisionNote      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  site              Site      @relation(fields: [siteId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([nikHash])
 }

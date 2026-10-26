@@ -5,6 +5,8 @@ import { canAccess } from '@/lib/access';
 export default auth((req) => {
   const pathname = req.nextUrl.pathname;
   if (pathname.startsWith('/api/')) return NextResponse.next();
+  // Form pendaftaran pegawai baru: publik, tanpa login.
+  if (pathname === '/daftar') return NextResponse.next();
   if (pathname === '/' || pathname === '/login') {
     return req.auth?.user ? NextResponse.redirect(new URL('/dashboard', req.url)) : NextResponse.next();
   }
