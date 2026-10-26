@@ -206,7 +206,7 @@ export default function PerformanceClient({ tab, sites, data, activities, daily,
               { name: 'notes', label: 'Catatan', type: 'textarea', span: true },
             ]} />
             {actForm.files?.length > 0 && <FileLinks files={actForm.files} />}
-            <div className="form-grid"><FileInput label="Foto dokumentasi" accept="image/*,.pdf" capture="environment" onChange={setFiles} /></div>
+            <div className="form-grid"><FileInput label="Foto dokumentasi" accept="image/*,.pdf" onChange={setFiles} /></div>
             <button className="btn btn-primary" disabled={busy}>Simpan</button>
           </form>
         )}

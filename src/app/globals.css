@@ -1482,17 +1482,7 @@ th { letter-spacing: 0.04em; }
 }
 @media (max-width: 768px) { .hide-mobile { display: none !important; } }
 
-/* ─── Pilihan sumber foto & kamera KTP ──────────────────────────────────── */
-.source-menu {
-  position: absolute; z-index: 30; left: 0; right: 0; margin-top: 6px;
-  display: grid; padding: 6px; background: var(--white);
-  border: 1px solid var(--gray-200); border-radius: var(--radius-lg, 12px); box-shadow: var(--shadow-md);
-}
-.source-menu button {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 12px;
-  border: 0; border-radius: 8px; background: none; font-size: 15px; color: var(--gray-800); text-align: left; cursor: pointer;
-}
-.source-menu button:hover, .source-menu button:focus-visible { background: var(--gray-50); }
+/* ─── Kamera & penyesuaian foto KTP ─────────────────────────────────────── */
 .ktp-thumb { display: block; width: 100%; max-width: 320px; margin-top: 10px; border-radius: 8px; border: 1px solid var(--gray-200); }
 
 .ktp-camera { position: fixed; inset: 0; z-index: 1000; background: #000; color: #fff; display: flex; flex-direction: column; }
@@ -1525,3 +1515,11 @@ th { letter-spacing: 0.04em; }
 .ktp-camera-review img { max-width: 100%; max-height: 75%; border-radius: 10px; }
 .ktp-camera-review p { margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.85); text-align: center; }
 .ktp-camera-error { margin: auto; max-width: 420px; padding: 24px; text-align: center; display: grid; gap: 16px; }
+.ktp-cam-close { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px; z-index: 3; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; cursor: pointer; }
+.ktp-cam-btn:disabled { opacity: 0.5; cursor: default; }
+.ktp-adjust-stage { position: absolute; inset: 0 0 168px; overflow: hidden; touch-action: none; cursor: grab; }
+.ktp-adjust-stage:active { cursor: grabbing; }
+.ktp-adjust-stage .ktp-camera-overlay { inset: 0; }
+.ktp-adjust-img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; user-select: none; -webkit-user-select: none; pointer-events: none; }
+.ktp-adjust-zoom { position: absolute; left: 0; right: 0; bottom: 112px; height: 56px; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 0 24px; background: rgba(0, 0, 0, 0.75); font-size: 13px; }
+.ktp-adjust-zoom input { flex: 1; accent-color: #4ade80; }

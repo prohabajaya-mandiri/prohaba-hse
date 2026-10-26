@@ -62,3 +62,22 @@ test('kamera KTP memotong tepat area bingkai (object-fit: cover)', async () => {
   const edge = coverCrop(view, { left: 0, top: 0, width: 375, height: 700 }, 1920, 1080, 0.1);
   assert.ok(edge.sx >= 0 && edge.sy >= 0 && edge.sx + edge.sw <= 1920 && edge.sy + edge.sh <= 1080);
 });
+
+test('langkah Sesuaikan: posisi awal menutupi bingkai & hasil potong mengikuti geser/zoom', async () => {
+  const { coverFit, frameCrop } = await import('../src/lib/domain/camera-crop.js');
+  const frame = { left: 20, top: 200, width: 335, height: 335 / (85.6 / 54) };
+  // Foto galeri tegak 3000×4000: diskalakan mengikuti lebar bingkai, berada di tengah.
+  const fit = coverFit(frame, 3000, 4000);
+  assert.ok(Math.abs(fit.scale - 335 / 3000) < 1e-9);
+  assert.ok(Math.abs(fit.imgLeft - 20) < 1e-9);
+  const c = frameCrop({ frame, ...fit, iw: 3000, ih: 4000 }, 1600);
+  assert.equal(c.outW, 1600);
+  assert.ok(Math.abs(c.outH - 1600 * 54 / 85.6) < 1);
+  assert.ok(Math.abs(c.sw - 3000) < 1e-6 && c.dx === 0 && Math.abs(c.dw - 1600) < 1e-6, 'lebar bingkai = lebar foto');
+  assert.ok(Math.abs(c.sy + c.sh / 2 - 2000) < 1e-6, 'potongan berada di tengah foto');
+  // Foto digeser ke kanan melewati tepi kiri bingkai: sisi kiri hasil kosong, sumber mulai dari x=0.
+  const shifted = frameCrop({ frame, imgLeft: 120, imgTop: fit.imgTop, scale: fit.scale, iw: 3000, ih: 4000 }, 1600);
+  assert.equal(shifted.sx, 0);
+  assert.ok(Math.abs(shifted.dx - 100 * (1600 / 335)) < 1e-6);
+  assert.ok(shifted.dx + shifted.dw <= 1600 + 1e-6);
+});

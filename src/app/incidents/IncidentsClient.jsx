@@ -166,7 +166,7 @@ export default function IncidentsClient({ sites, data, cfg, page, canEdit }) {
                 <div className="form-hint">Cari personel, atau <button type="button" className="btn btn-ghost btn-sm" onClick={() => setVictims([...victims, { personnelId: '', name: '', injury: '', bodyPart: '' }])}>tambah korban non-personel</button></div>
               </div>
             </div>
-            <div className="form-grid"><FileInput label="Foto kejadian" accept="image/*,.pdf" capture="environment" onChange={setFiles} /></div>
+            <div className="form-grid"><FileInput label="Foto kejadian" accept="image/*,.pdf" onChange={setFiles} /></div>
             <div className="modal-footer" style={{ padding: 0 }}><button className="btn btn-primary" disabled={busy}>Simpan</button></div>
           </form>
         )}
