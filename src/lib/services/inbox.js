@@ -44,7 +44,7 @@ export async function pendingApprovals(user) {
   }
   if (['HO_HSE', 'HRD'].includes(user.role)) {
     const regs = await prisma.registration.findMany({ where: { status: 'MENUNGGU' }, include: { site: { select: { code: true } } }, orderBy: { createdAt: 'asc' } });
-    regs.forEach((r) => items.push({ kind: 'REGISTRATION', id: r.id, title: `Pendaftaran ${r.number}: ${r.name} → ${r.site.code}`, detail: `${r.position} · tiba ${r.arrivalDate.toISOString().slice(0, 10)} · MCU ${r.mcuDate.toISOString().slice(0, 10)}`, link: '/registrations/' + r.id, since: r.createdAt }));
+    regs.forEach((r) => items.push({ kind: 'REGISTRATION', id: r.id, title: `Pendaftaran ${r.number}: ${r.name} → ${r.site.code}`, detail: `${r.position} · mulai ${r.startDate.toISOString().slice(0, 10)} · MCU ${r.mcuDate.toISOString().slice(0, 10)}`, link: '/registrations/' + r.id, since: r.createdAt }));
   }
   if (['PJO', 'PM'].includes(user.role)) {
     const reports = await prisma.hseReport.findMany({ where: { status: 'SUBMITTED', ...siteIn }, include: { site: { select: { code: true } } }, orderBy: { submittedAt: 'asc' } });

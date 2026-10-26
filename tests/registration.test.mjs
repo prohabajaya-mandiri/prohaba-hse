@@ -1,14 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ageOn, arrivalIso, mcuIso, registrationChecks, waNumber } from '../src/lib/domain/registration.js';
+import { ageOn, localTodayIso, mcuIso, registrationChecks, startDateInWindow, waNumber } from '../src/lib/domain/registration.js';
 import { canAccess } from '../src/lib/access.js';
 
-test('tanggal tiba memakai kalender WITA (Balikpapan), MCU H+1', () => {
-  // 23.30 WITA tanggal 26 = 22.30 WIB tanggal 26 = 15.30 UTC.
-  assert.equal(arrivalIso(new Date('2026-10-26T15:30:00Z')), '2026-10-26');
-  // 00.30 WITA tanggal 27 masih tanggal 26 di WIB — tetap tercatat 27 (WITA).
-  assert.equal(arrivalIso(new Date('2026-10-26T16:30:00Z')), '2026-10-27');
+test('tanggal mulai kerja: default hari ini (jam perangkat), MCU H+1, rentang wajar', () => {
+  assert.equal(localTodayIso(new Date(2026, 9, 26, 23, 30)), '2026-10-26');
   assert.equal(mcuIso('2026-10-31'), '2026-11-01');
+  assert.equal(mcuIso(''), null);
+  const today = new Date('2026-10-26T00:00:00Z');
+  assert.equal(startDateInWindow(new Date('2026-10-26T00:00:00Z'), today), true);
+  assert.equal(startDateInWindow(new Date('2026-08-27T00:00:00Z'), today), true); // 60 hari lalu
+  assert.equal(startDateInWindow(new Date('2026-08-26T00:00:00Z'), today), false);
+  assert.equal(startDateInWindow(new Date('2027-01-24T00:00:00Z'), today), true); // 90 hari ke depan
+  assert.equal(startDateInWindow(new Date('2027-01-25T00:00:00Z'), today), false);
 });
 
 test('umur dihitung dari tanggal lahir', () => {

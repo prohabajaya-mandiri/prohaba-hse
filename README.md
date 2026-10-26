@@ -25,7 +25,7 @@ Stack mengikuti ERP prohaba-center: Next.js 16 (App Router, JS), Auth.js v5, Pri
 | 16 | Notifikasi & approval | `/notifications`, `/approvals` |
 | 17 | Pendaftaran mandiri pegawai baru (form publik + QR, diverifikasi HO HSE/HRD → personel, penempatan & rencana MCU H+1) | `/daftar` (publik), `/registrations` |
 
-Form `/daftar` tidak memerlukan login: isian ditampung di tabel `Registration` (NIK & alamat KTP terenkripsi, foto KTP terenkripsi, dibatasi laju per IP) dan baru menjadi personel setelah disetujui. Tanggal tiba memakai kalender **WITA** (Balikpapan).
+Form `/daftar` tidak memerlukan login: isian ditampung di tabel `Registration` (NIK & alamat KTP terenkripsi, foto KTP terenkripsi, dibatasi laju per IP) dan baru menjadi personel setelah disetujui. Tanggal mulai kerja diisi pegawai (default hari pengisian menurut HP-nya); rencana MCU H+1.
 
 Master data karyawan **satu sumber**: modul 04 juga melayani ERP Center melalui `/api/integration/v1/*` (server-ke-server, HMAC, peran ERP dipetakan ke matriks akses E-HSE, audit atas nama pengguna ERP). Perlu `INTEGRATION_CENTER_SECRET`. Lihat `docs/integrasi-master-karyawan.md`.
 

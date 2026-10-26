@@ -8,6 +8,7 @@ import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 import { CATEGORIES, CATEGORY_LABELS } from '@/lib/domain/personnel';
+import { EDUCATION_LEVELS, mcuIso } from '@/lib/domain/registration';
 
 const ICON = { ok: [CheckCircle2, 'var(--green-600)'], warn: [AlertTriangle, 'var(--yellow-700)'], danger: [XCircle, 'var(--red-600)'] };
 
@@ -21,7 +22,7 @@ export default function RegistrationReview({ reg }) {
   const [result, setResult] = useState(null);
   const [v, setV] = useState({
     name: reg.name, category: reg.category, position: reg.position, siteId: reg.siteId, birthDate: iso(reg.birthDate),
-    phoneWa: reg.phoneWa, mcuDate: iso(reg.mcuDate), clinic: reg.defaultClinic, note: '',
+    education: reg.education ?? '', startDate: iso(reg.startDate), phoneWa: reg.phoneWa, mcuDate: iso(reg.mcuDate), clinic: reg.defaultClinic, note: '',
   });
   const pending = reg.status === 'MENUNGGU' && !result;
   const blocked = reg.existing && !reg.existing.isFormer;
@@ -83,10 +84,11 @@ export default function RegistrationReview({ reg }) {
             {item('NIK', reg.nik)}
             {item('Tanggal lahir · umur', `${formatDate(reg.birthDate)} · ${reg.age ?? '-'} tahun`)}
             {item('Jenis kelamin (dari NIK)', reg.gender === 'L' ? 'Laki-laki' : reg.gender === 'P' ? 'Perempuan' : null)}
+            {item('Pendidikan', reg.education)}
             {item('Kategori', CATEGORY_LABELS[reg.category])}
             {item('Jabatan', reg.position)}
             {item('Tujuan site', `${reg.site.code} — ${reg.site.name}`)}
-            {item('Tiba di Balikpapan', formatDate(reg.arrivalDate))}
+            {item('Tanggal mulai kerja', formatDate(reg.startDate))}
             {item('Rencana MCU', formatDate(reg.mcuDate))}
             {item('No WhatsApp', reg.phoneWa)}
             {item('Alamat KTP', reg.ktpAddress)}
@@ -108,15 +110,17 @@ export default function RegistrationReview({ reg }) {
       {pending && (
         <Card title="Keputusan">
           <form onSubmit={approve}>
-            <div className="muted" style={{ marginBottom: 12 }}>Koreksi isian bila perlu sebelum menyetujui. Tanggal mulai kerja = tanggal tiba ({formatDate(reg.arrivalDate)}).</div>
+            <div className="muted" style={{ marginBottom: 12 }}>Koreksi isian bila perlu sebelum menyetujui.</div>
             <FormFields values={v} setValues={setV} fields={[
               { name: 'name', label: 'Nama lengkap', required: true },
               { name: 'birthDate', label: 'Tanggal lahir', type: 'date', required: true },
+              { name: 'education', label: 'Pendidikan', type: 'select', options: EDUCATION_LEVELS.map((e) => [e, e]) },
               { name: 'category', label: 'Kategori', type: 'select', options: CATEGORIES.map((c) => [c, CATEGORY_LABELS[c]]), required: true, noEmpty: true },
               { name: 'position', label: 'Jabatan', required: true },
               { name: 'siteId', label: 'Site', type: 'select', options: reg.sites.map((s) => [s.id, `${s.code} — ${s.name}`]), required: true, noEmpty: true },
               { name: 'phoneWa', label: 'No WhatsApp', type: 'tel', required: true },
-              { name: 'mcuDate', label: 'Tanggal MCU', type: 'date', required: true, min: iso(reg.arrivalDate), hint: 'Default H+1 dari tanggal tiba; geser bila klinik tutup.' },
+              { name: 'startDate', label: 'Tanggal mulai kerja', type: 'date', required: true, hint: 'Dasar masa kerja.' },
+              { name: 'mcuDate', label: 'Tanggal MCU', type: 'date', required: true, min: v.startDate, hint: `Default H+1 dari tanggal mulai kerja (${formatDate(mcuIso(v.startDate))}); geser bila klinik tutup.` },
               { name: 'clinic', label: 'Klinik MCU', required: true, hint: 'Isian awal = klinik MCU Pre-Employment terakhir.' },
               { name: 'note', label: 'Catatan (opsional)', type: 'textarea', span: true },
             ]} />
