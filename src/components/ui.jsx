@@ -239,9 +239,19 @@ export async function compressImage(file, maxSide = 1600, quality = 0.8) {
 }
 
 // `capture` di HP langsung membuka kamera tanpa pilihan galeri/file. Karena itu bila
-// kamera diminta, tampilkan dua tombol: "Ambil foto" (kamera) dan "Pilih file" (galeri/file).
+// kamera diminta, satu tombol membuka pilihan: "Ambil foto" (kamera) atau "Pilih file" (galeri/file).
 export function FileInput({ label = 'Lampiran', multiple = true, accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx', onChange, capture }) {
   const [names, setNames] = useState([]);
+  const [menu, setMenu] = useState(false);
+  const wrapRef = useRef(null);
+  const cameraRef = useRef(null);
+  const fileRef = useRef(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e) => wrapRef.current && !wrapRef.current.contains(e.target) && setMenu(false);
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [menu]);
   const handle = async (e) => {
     const raw = [...e.target.files];
     e.target.value = ''; // file yang sama dapat dipilih ulang
@@ -251,20 +261,27 @@ export function FileInput({ label = 'Lampiran', multiple = true, accept = 'image
     onChange(files, raw);
   };
   return (
-    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+    <div className="form-group" ref={wrapRef} style={{ gridColumn: '1 / -1', position: 'relative' }}>
       <label className="form-label">{label}</label>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {capture && (
-          <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
-            <Camera size={15} /> Ambil foto
-            <input type="file" hidden accept="image/*" capture={capture} onChange={handle} />
-          </label>
-        )}
-        <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
+      {capture ? (
+        <div style={{ position: 'relative', width: 'fit-content', minWidth: 240 }}>
+          <button type="button" className="btn btn-outline btn-sm" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+            <Paperclip size={15} /> Tambah foto / file
+          </button>
+          {menu && (
+            <div className="source-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setMenu(false); cameraRef.current?.click(); }}><Camera size={17} /> Ambil foto dengan kamera</button>
+              <button type="button" role="menuitem" onClick={() => { setMenu(false); fileRef.current?.click(); }}><Paperclip size={17} /> Pilih dari galeri / file</button>
+            </div>
+          )}
+          <input ref={cameraRef} type="file" hidden accept="image/*" capture={capture} onChange={handle} />
+        </div>
+      ) : (
+        <button type="button" className="btn btn-outline btn-sm" style={{ width: 'fit-content' }} onClick={() => fileRef.current?.click()}>
           <Paperclip size={15} /> Pilih file{multiple ? ' / foto' : ''}
-          <input type="file" hidden multiple={multiple} accept={accept} onChange={handle} />
-        </label>
-      </div>
+        </button>
+      )}
+      <input ref={fileRef} type="file" hidden multiple={multiple} accept={accept} onChange={handle} />
       {names.length > 0 && <div className="form-hint">{names.join(', ')}</div>}
       <div className="form-hint">Maks. 4 MB per file. Foto otomatis dikompres.</div>
     </div>
