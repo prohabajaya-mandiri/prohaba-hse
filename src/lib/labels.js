@@ -6,7 +6,7 @@ export const LABELS = {
   // status kepegawaian
   PKWT: 'PKWT (Kontrak)', PKWTT: 'PKWTT (Tetap)',
   // kategori
-  STAFF: 'Staff', MANPOWER: 'Manpower', HARIAN_KANTOR: 'Harian Kantor',
+  STAFF: 'Staff', HARIAN_KANTOR: 'Harian Kantor', MANPOWER: 'Harian Mandor',
   // MCU
   PENDING: 'Menunggu', FIT: 'FIT', FOLLOW_UP: 'FOLLOW UP', UNFIT: 'UNFIT',
   PRE_EMPLOYMENT: 'Pre-Employment', ANNUAL: 'Annual', KHUSUS: 'Khusus',

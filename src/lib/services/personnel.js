@@ -5,7 +5,7 @@ import { audit, diff } from '../audit.js';
 import { decrypt, encrypt, lookupHash, maskAccount, maskNik } from '../crypto.js';
 import { daysBetween, iso, today } from '../dates.js';
 import { nextNumber } from '../sequence.js';
-import { BLOOD_TYPES, CATEGORIES, EMPLOYMENT_TYPES, IMPORT_COLUMNS, MARITAL, WORK_STATUSES, mapImportRow, normalizeImportRow, tenure } from '../domain/personnel.js';
+import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, normalizeCategory, EMPLOYMENT_TYPES, IMPORT_COLUMNS, MARITAL, WORK_STATUSES, mapImportRow, normalizeImportRow, tenure } from '../domain/personnel.js';
 import { fitness } from '../domain/mcu.js';
 import { getSetting } from '../settings.js';
 import { bool, choice, ensure, InputError, nik as parseNik, nip as parseNip, npwp as parseNpwp, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
@@ -49,7 +49,12 @@ export function parsePersonnel(body, existing = null, { user = null, errors = nu
     emergencyRelation: f(() => text(body.emergencyRelation, 'Hubungan kontak darurat', 60, true)),
     domicileAddress: f(() => text(body.domicileAddress, 'Alamat domisili', 500, true)),
     originRegion: f(() => text(body.originRegion, 'Asal daerah', 100, true)),
-    category: f(() => choice(body.category, CATEGORIES, 'Kategori')),
+    category: f(() => {
+      const c = normalizeCategory(body.category);
+      ensure(c, 'Kategori wajib diisi.');
+      ensure(CATEGORIES.includes(c), 'Kategori tidak valid (pilihan: ' + CATEGORIES.map((k) => CATEGORY_LABELS[k]).join(', ') + ').');
+      return c;
+    }),
     position: f(() => text(body.position, 'Jabatan', 100)),
     startDate: f(() => optionalDate(body.startDate, 'Tanggal mulai')),
     bpjsKesehatan: f(() => text(body.bpjsKesehatan, 'BPJS Kesehatan', 30, true)),
@@ -320,11 +325,11 @@ export function importTemplate() {
     ['Isian rekening yang tidak valid tidak menggagalkan baris: rekening dilewati dan diberi peringatan, lengkapi kemudian lewat Edit personel.'],
     ['Tanggal boleh YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, atau format tanggal Excel.'],
     ['Format kolom NIK, NIP, NPWP dan No Rekening sebagai Text agar digit tidak berubah (template ini sudah diatur).'],
-    ['Kategori: STAFF / MANPOWER / HARIAN_KANTOR. Jenis kelamin: L/P (Laki-laki/Perempuan). Status nikah: Menikah / Belum menikah / Cerai.'],
+    ['Kategori: Staff / Harian Kantor / Harian Mandor. Jenis kelamin: L/P (Laki-laki/Perempuan). Status nikah: Menikah / Belum menikah / Cerai.'],
     ['Status Kepegawaian: PKWT (kontrak) / PKWTT (tetap) — hanya diproses bila import dilakukan oleh HRD / HO HSE. Akhir Kontrak hanya untuk PKWT.'],
     ['NPWP 15 digit (format lama) atau 16 digit (NIK/NPWP baru); titik dan strip boleh disertakan.'],
     ['NIP opsional dan bebas format (disimpan apa adanya), tetapi tidak boleh sama dengan NIP personel lain.'],
-    ['Kode Site mengacu Master Site. NIP Mandor = NIP personel mandor (opsional, khusus manpower).'],
+    ['Kode Site mengacu Master Site. NIP Mandor = NIP personel mandor (opsional, khusus Harian Mandor).'],
     ['NIK yang sudah terdaftar tidak akan membuat profil baru.'],
   ]);
   info['!cols'] = [{ wch: 120 }];
@@ -450,7 +455,7 @@ export async function exportPersonnel(user, f) {
       NIP: p.nip, NIK: ktp ? decrypt(p.nikEnc) : maskNik(p.nikLast4), Nama: p.name, 'Tempat Lahir': p.birthPlace, 'Tanggal Lahir': iso(p.birthDate),
       'Jenis Kelamin': p.gender, 'Status Nikah': p.maritalStatus, Pendidikan: p.education, Jurusan: p.major, 'No WA': p.phoneWa,
       'Kontak Darurat': p.emergencyName, 'No Kontak Darurat': p.emergencyPhone, 'Alamat KTP': ktp ? decrypt(p.ktpAddressEnc) : '[dibatasi]',
-      'Alamat Domisili': p.domicileAddress, 'Asal Daerah': p.originRegion, Kategori: p.category, Jabatan: p.position, Site: p.currentSite?.code,
+      'Alamat Domisili': p.domicileAddress, 'Asal Daerah': p.originRegion, Kategori: CATEGORY_LABELS[p.category] ?? p.category, Jabatan: p.position, Site: p.currentSite?.code,
       'Tanggal Mulai': iso(p.startDate), 'Masa Kerja': tenure(p.startDate, tenureEnd(p, now))?.label ?? '',
       'Status Kepegawaian': p.employmentType, 'Akhir Kontrak': iso(p.contractEndDate), 'Status Kerja': p.workStatus,
       NPWP: p.npwpEnc ? (ktp ? decrypt(p.npwpEnc) : '[dibatasi]') : '', 'BPJS Kesehatan': p.bpjsKesehatan, 'BPJS Ketenagakerjaan': p.bpjsKetenagakerjaan,

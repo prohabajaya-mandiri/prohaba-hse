@@ -7,7 +7,7 @@ import { addWorkdays, cycleStart, nextLeaveDue, pickPolicy, rosterState } from '
 import { calcManhours, safeManhours, summarize } from '../src/lib/domain/performance.js';
 import { previousMonthKey, reportPeriod, sitesNotReported } from '../src/lib/domain/reports.js';
 import { DISCUSSED_SCENARIO, simulate, validateSteps } from '../src/lib/domain/hrd.js';
-import { mapImportRow, nikInfo, normalizeDate, normalizeImportRow, parseKtp, tenure } from '../src/lib/domain/personnel.js';
+import { mapImportRow, nikInfo, normalizeCategory, normalizeDate, normalizeImportRow, parseKtp, tenure } from '../src/lib/domain/personnel.js';
 import { flattenKtp } from '../src/lib/domain/ktp-ocr.js';
 import ktpOcr from './fixtures/ktp-ocr.json' with { type: 'json' };
 import { nip } from '../src/lib/validation.js';
@@ -270,4 +270,13 @@ test('kolom NIP dan NIP Mandor dikenali pada import Excel', () => {
   assert.equal(body.nip, '20260401026');
   assert.equal(body.foremanRef, '2019120212');
   assert.equal(mapImportRow({ 'Kode Mandor': 'PJM-000002' }).foremanRef, 'PJM-000002');
+});
+
+test('kategori menerima label Harian Mandor; kode MANPOWER tetap dipakai', () => {
+  assert.equal(normalizeCategory('Harian Mandor'), 'MANPOWER');
+  assert.equal(normalizeCategory('HARIAN_MANDOR'), 'MANPOWER');
+  assert.equal(normalizeCategory('MANPOWER'), 'MANPOWER');
+  assert.equal(normalizeCategory('Harian Kantor'), 'HARIAN_KANTOR');
+  assert.equal(normalizeCategory('staff'), 'STAFF');
+  assert.equal(normalizeImportRow(mapImportRow({ 'Kategori (Staff/Harian Kantor/Harian Mandor)': 'Harian Mandor' })).body.category, 'MANPOWER');
 });

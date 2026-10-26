@@ -38,7 +38,7 @@ const INDICATORS = [
 const POLICIES = [
   ['Staff menikah — 3 bulan + 2 minggu', 'STAFF', 'MENIKAH', 90, 14, false, true],
   ['Staff belum menikah — 4 bulan + 2 minggu', 'STAFF', 'BELUM_MENIKAH', 120, 14, false, true],
-  ['Manpower — 5 bulan + 2 minggu (kebutuhan proyek)', 'MANPOWER', null, 150, 14, false, true],
+  ['Harian Mandor — 5 bulan + 2 minggu (kebutuhan proyek)', 'MANPOWER', null, 150, 14, false, true],
   ['Contoh aturan owner — 70 hari kerja + 2 minggu off', 'MANPOWER', null, 70, 14, true, false],
 ];
 

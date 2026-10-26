@@ -1,5 +1,13 @@
-export const CATEGORIES = ['STAFF', 'MANPOWER', 'HARIAN_KANTOR'];
-export const CATEGORY_LABELS = { STAFF: 'Staff', MANPOWER: 'Manpower', HARIAN_KANTOR: 'Harian Kantor' };
+// Kode MANPOWER dipertahankan (dipakai data lama & API integrasi ERP Center); tampil sebagai "Harian Mandor".
+export const CATEGORIES = ['STAFF', 'HARIAN_KANTOR', 'MANPOWER'];
+export const CATEGORY_LABELS = { STAFF: 'Staff', HARIAN_KANTOR: 'Harian Kantor', MANPOWER: 'Harian Mandor' };
+/** Terima kode maupun label kategori (mis. "Harian Mandor" / HARIAN_MANDOR → MANPOWER). */
+export function normalizeCategory(v) {
+  if (v === undefined || v === null || v === '') return v;
+  const key = String(v).toUpperCase().replace(/[^A-Z]/g, '');
+  return CATEGORY_ALIASES[key] ?? String(v).toUpperCase();
+}
+const CATEGORY_ALIASES = { STAFF: 'STAFF', STAF: 'STAFF', HARIANKANTOR: 'HARIAN_KANTOR', HARIANMANDOR: 'MANPOWER', MANPOWER: 'MANPOWER' };
 export const WORK_STATUSES = ['ACTIVE', 'CUTI', 'SAKIT', 'MCU', 'RESIGN', 'DIRUMAHKAN', 'MUTASI'];
 export const MARITAL = ['MENIKAH', 'BELUM_MENIKAH', 'CERAI'];
 export const MARITAL_LABELS = { MENIKAH: 'Menikah', BELUM_MENIKAH: 'Belum menikah', CERAI: 'Cerai' };
@@ -48,7 +56,7 @@ export const IMPORT_COLUMNS = [
   ['ktpAddress', 'Alamat KTP', true, ['Alamat', 'Alamat Sesuai KTP']],
   ['domicileAddress', 'Alamat Domisili', false, ['Domisili']],
   ['originRegion', 'Asal Daerah'],
-  ['category', 'Kategori (STAFF/MANPOWER/HARIAN_KANTOR)', true],
+  ['category', 'Kategori (Staff/Harian Kantor/Harian Mandor)', true],
   ['position', 'Jabatan', true, ['Posisi']],
   ['siteCode', 'Kode Site', true, ['Site']],
   ['startDate', 'Tanggal Mulai (YYYY-MM-DD)', false, ['Tanggal Masuk', 'Tgl Masuk', 'Tanggal Bergabung', 'TMT', 'Tgl Mulai']],
@@ -116,7 +124,6 @@ export function normalizeDate(v) {
 
 const letters = (v) => String(v).toUpperCase().replace(/[^A-Z]/g, '');
 const GENDER = { L: 'L', LK: 'L', LAKI: 'L', LAKILAKI: 'L', PRIA: 'L', M: 'L', MALE: 'L', P: 'P', PR: 'P', PEREMPUAN: 'P', WANITA: 'P', W: 'P', F: 'P', FEMALE: 'P' };
-const CATEGORY = { STAFF: 'STAFF', STAF: 'STAFF', MANPOWER: 'MANPOWER', HARIANKANTOR: 'HARIAN_KANTOR', HARIAN: 'HARIAN_KANTOR' };
 const EMPLOYMENT = { PKWT: 'PKWT', KONTRAK: 'PKWT', PKWTT: 'PKWTT', TETAP: 'PKWTT', KARYAWANTETAP: 'PKWTT' };
 function marital(v) {
   const s = letters(v);
@@ -151,7 +158,7 @@ export function normalizeImportRow(row) {
   for (const k of ['birthDate', 'startDate', 'contractEndDate']) if (body[k]) body[k] = normalizeDate(row[k]);
   if (body.gender) body.gender = GENDER[letters(body.gender)] ?? body.gender;
   if (body.maritalStatus) body.maritalStatus = marital(body.maritalStatus);
-  if (body.category) body.category = CATEGORY[letters(body.category)] ?? body.category.toUpperCase();
+  if (body.category) body.category = normalizeCategory(body.category);
   if (body.employmentType) body.employmentType = EMPLOYMENT[letters(body.employmentType)] ?? body.employmentType.toUpperCase();
   if (body.bloodType) body.bloodType = body.bloodType.toUpperCase().replace(/RH|POS(ITIF)?|NEG(ATIF)?|[\s+\-]/g, '') || null;
   for (const k of ['phoneWa', 'emergencyPhone']) {

@@ -67,7 +67,7 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     { name: 'employmentType', label: 'Status kepegawaian', type: 'select', options: EMPLOYMENT_TYPES.map((t) => [t, EMPLOYMENT_LABELS[t]]), disabled: !canEmployment,
       hint: canEmployment ? 'PKWT = kontrak waktu tertentu, PKWTT = karyawan tetap.' : 'Hanya dapat diisi/diubah oleh HRD / HO HSE.' },
     { name: 'contractEndDate', label: 'Akhir kontrak (PKWT)', type: 'date', disabled: !canEmployment, min: values.startDate || undefined, hidden: (v) => v.employmentType !== 'PKWT' },
-    { name: 'foremanId', label: 'Mandor', type: 'personnel', hidden: (v) => v.category !== 'MANPOWER', hint: 'Opsional; manpower dapat ditautkan ke mandor.' },
+    { name: 'foremanId', label: 'Mandor', type: 'personnel', hidden: (v) => v.category !== 'MANPOWER', hint: 'Opsional; harian mandor dapat ditautkan ke mandornya.' },
     { section: 'Data pendukung' },
     { name: 'npwp', label: editing ? 'NPWP (isi hanya bila diubah)' : 'NPWP', inputMode: 'numeric', placeholder: editing ? initial.npwpMasked ?? '' : '', hint: '15 digit (format lama) atau 16 digit (NIK).' },
     { name: 'bpjsKesehatan', label: 'BPJS Kesehatan' },
