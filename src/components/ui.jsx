@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Paperclip, Search } from 'lucide-react';
+import { X, Paperclip, Search, Camera } from 'lucide-react';
 import { apiFetch } from '@/lib/client-api';
 import { useDialog } from './DialogProvider';
 import { STATUS_STYLES, labelOf } from '@/lib/labels';
@@ -238,21 +238,33 @@ export async function compressImage(file, maxSide = 1600, quality = 0.8) {
   return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
 }
 
+// `capture` di HP langsung membuka kamera tanpa pilihan galeri/file. Karena itu bila
+// kamera diminta, tampilkan dua tombol: "Ambil foto" (kamera) dan "Pilih file" (galeri/file).
 export function FileInput({ label = 'Lampiran', multiple = true, accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx', onChange, capture }) {
   const [names, setNames] = useState([]);
+  const handle = async (e) => {
+    const raw = [...e.target.files];
+    e.target.value = ''; // file yang sama dapat dipilih ulang
+    if (!raw.length) return;
+    const files = await Promise.all(raw.map((f) => compressImage(f)));
+    setNames(files.map((f) => f.name));
+    onChange(files, raw);
+  };
   return (
     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
       <label className="form-label">{label}</label>
-      <label className="btn btn-outline btn-sm" style={{ width: 'fit-content', cursor: 'pointer' }}>
-        <Paperclip size={15} /> Pilih file{multiple ? ' / foto' : ''}
-        <input type="file" hidden multiple={multiple} accept={accept} capture={capture}
-          onChange={async (e) => {
-            const raw = [...e.target.files];
-            const files = await Promise.all(raw.map((f) => compressImage(f)));
-            setNames(files.map((f) => f.name));
-            onChange(files, raw);
-          }} />
-      </label>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {capture && (
+          <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
+            <Camera size={15} /> Ambil foto
+            <input type="file" hidden accept="image/*" capture={capture} onChange={handle} />
+          </label>
+        )}
+        <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
+          <Paperclip size={15} /> Pilih file{multiple ? ' / foto' : ''}
+          <input type="file" hidden multiple={multiple} accept={accept} onChange={handle} />
+        </label>
+      </div>
       {names.length > 0 && <div className="form-hint">{names.join(', ')}</div>}
       <div className="form-hint">Maks. 4 MB per file. Foto otomatis dikompres.</div>
     </div>
