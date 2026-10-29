@@ -7,7 +7,8 @@ import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 
-const ROLE_NAMES = { PJO: 'PJO', PM: 'PM', HSE_SITE: 'HSE Site' };
+const ROLE_NAMES = { PJO: 'PJO', PM: 'PM', HSE_SITE: 'HSE Site', SAFETY_OFFICER: 'Safety Officer' };
+const TIMEZONES = [['Asia/Jakarta', 'WIB (Asia/Jakarta)'], ['Asia/Makassar', 'WITA (Asia/Makassar)'], ['Asia/Jayapura', 'WIT (Asia/Jayapura)']];
 
 export default function SitesClient({ sites, canEdit }) {
   const { submit, busy } = useSubmit();
@@ -26,7 +27,7 @@ export default function SitesClient({ sites, canEdit }) {
     if (await submit(id ? `/api/sites/${id}` : '/api/sites', { method: id ? 'PUT' : 'POST', body })) setSiteForm(null);
   };
   // Hanya field form yang dikirim; objek site dari daftar juga memuat proyek, penanggung jawab, dll.
-  const editSite = (s) => setSiteForm({ id: s.id, code: s.code, name: s.name, location: s.location ?? '', region: s.region, isHo: s.isHo, isActive: s.isActive });
+  const editSite = (s) => setSiteForm({ id: s.id, code: s.code, name: s.name, location: s.location ?? '', region: s.region, timezone: s.timezone ?? '', isHo: s.isHo, isActive: s.isActive });
   const removeSite = async (s) => {
     if (!(await showConfirm(`Hapus permanen site ${s.code} — ${s.name}? Hanya bisa untuk site yang belum pernah dipakai. Site yang sudah berisi data cukup dinonaktifkan.`, 'Hapus site'))) return;
     if (await submit(`/api/sites/${s.id}`, { method: 'DELETE', success: `Site ${s.code} dihapus.` })) setDetailId(null);
@@ -46,7 +47,7 @@ export default function SitesClient({ sites, canEdit }) {
     <div className="stack">
       <div className="toolbar">
         <div className="notice info" style={{ flex: 1 }}>Referensi awal site perlu diverifikasi ulang status aktifnya saat implementasi.</div>
-        {canEdit && <button className="btn btn-primary" onClick={() => setSiteForm({ code: '', name: '', location: '', region: 'TIMUR', isHo: false, isActive: true })}><Plus size={17} /> Tambah site</button>}
+        {canEdit && <button className="btn btn-primary" onClick={() => setSiteForm({ code: '', name: '', location: '', region: 'TIMUR', timezone: '', isHo: false, isActive: true })}><Plus size={17} /> Tambah site</button>}
       </div>
       <div className="card">
         <DataTable
@@ -73,7 +74,7 @@ export default function SitesClient({ sites, canEdit }) {
               <div className="row-actions" style={{ justifyContent: 'flex-start' }}>
                 <button className="btn btn-outline btn-sm" onClick={() => editSite(detail)}><Edit size={15} /> Edit site</button>
                 <button className="btn btn-outline btn-sm" onClick={() => setProjectForm({ siteId: detail.id, name: '', owner: '', contractNo: '', startDate: '', endDate: '', status: 'ACTIVE', notes: '' })}><Briefcase size={15} /> Tambah proyek</button>
-                <button className="btn btn-outline btn-sm" onClick={() => setRespForm({ siteId: detail.id, role: 'PJO', name: '', phone: '', startDate: todayIso() })}><UserCheck size={15} /> Ganti penanggung jawab</button>
+                <button className="btn btn-outline btn-sm" onClick={() => setRespForm({ siteId: detail.id, role: 'PJO', name: '', phone: '', email: '', competency: '', approvalNo: '', approvalDate: '', startDate: todayIso() })}><UserCheck size={15} /> Ganti penanggung jawab</button>
                 <button className="btn btn-outline btn-sm text-red" disabled={busy || detail._count.placements > 0} title={detail._count.placements > 0 ? 'Site memiliki personel aktif — nonaktifkan saja' : 'Hanya untuk site yang belum pernah dipakai'} onClick={() => removeSite(detail)}><Trash2 size={15} /> Hapus site</button>
               </div>
             )}
@@ -93,7 +94,8 @@ export default function SitesClient({ sites, canEdit }) {
                 columns={[
                   { key: 'role', label: 'Peran', render: (r) => ROLE_NAMES[r.role] },
                   { key: 'name', label: 'Nama' },
-                  { key: 'phone', label: 'Telepon' },
+                  { key: 'phone', label: 'Kontak', render: (r) => (<div>{r.phone ?? '-'}{r.email && <div className="muted">{r.email}</div>}</div>) },
+                  { key: 'pjo', label: 'Kompetensi / pengesahan', render: (r) => (r.role === 'PJO' && (r.competency || r.approvalNo) ? <div>{r.competency ?? '-'}<div className="muted">{r.approvalNo ?? ''}{r.approvalDate ? ` · ${formatDate(r.approvalDate)}` : ''}</div></div> : <span className="muted">-</span>) },
                   { key: 'start', label: 'Mulai', render: (r) => formatDate(r.startDate) },
                   { key: 'end', label: 'Selesai', render: (r) => (r.endDate ? formatDate(r.endDate) : <Badge value="AKTIF" />) },
                 ]} />
@@ -110,6 +112,7 @@ export default function SitesClient({ sites, canEdit }) {
               { name: 'name', label: 'Nama site', required: true },
               { name: 'location', label: 'Lokasi', span: true },
               { name: 'region', label: 'Wilayah', type: 'select', options: [['TIMUR', 'Timur'], ['BARAT', 'Barat'], ['HO', 'Head Office']], required: true, noEmpty: true },
+              { name: 'timezone', label: 'Zona waktu (tenggat CSMS)', type: 'select', options: TIMEZONES, hint: 'Kosong = WIB (zona aplikasi).' },
               { name: 'isHo', label: 'Head Office', type: 'checkbox' },
               { name: 'isActive', label: 'Site aktif', type: 'checkbox' },
             ]} />
@@ -143,6 +146,10 @@ export default function SitesClient({ sites, canEdit }) {
               { name: 'role', label: 'Peran', type: 'select', options: Object.entries(ROLE_NAMES), required: true, noEmpty: true },
               { name: 'name', label: 'Nama', required: true },
               { name: 'phone', label: 'Telepon' },
+              { name: 'email', label: 'Email' },
+              { name: 'competency', label: 'Kompetensi kepengawasan (POP/POM/POU)', hidden: (v) => v.role !== 'PJO' },
+              { name: 'approvalNo', label: 'Nomor surat pengesahan PJO', hidden: (v) => v.role !== 'PJO' },
+              { name: 'approvalDate', label: 'Tanggal pengesahan PJO', type: 'date', hidden: (v) => v.role !== 'PJO' },
               { name: 'startDate', label: 'Mulai bertugas', type: 'date', required: true },
             ]} />
             <button className="btn btn-primary" disabled={busy}>Simpan</button>

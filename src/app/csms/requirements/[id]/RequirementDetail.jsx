@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Save, Send, CheckCheck, Undo2, RotateCcw, Upload, Link2, FileText, Unlink, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Save, Send, CheckCheck, Undo2, RotateCcw, Upload, Link2, FileText, Unlink, AlertTriangle, ExternalLink, Database } from 'lucide-react';
 import { Badge, Card, DataTable, FileInput, FormFields, Modal, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
@@ -36,7 +36,7 @@ export default function RequirementDetail({ data }) {
   const [upload, setUpload] = useState(null);
   const [files, setFiles] = useState([]);
   const [picker, setPicker] = useState(null);
-  const today = todayIso();
+  const today = data.today ?? todayIso();
   const overdue = cur?.dueDate && !['VERIFIED', 'SUBMITTED', 'REVIEWED'].includes(status) && iso(cur.dueDate) < today;
   const go = (key) => key && router.push(`/csms/requirements/${r.id}?period=${encodeURIComponent(key)}`);
 
@@ -119,7 +119,7 @@ export default function RequirementDetail({ data }) {
               <StatusBadge value={status} />
               {cur?.version > 0 && <span className="muted">Pengajuan versi {cur.version}</span>}
               {data.period && data.periodKey !== 'AWAL' && <span className="muted">{formatDate(data.period.start)} – {formatDate(data.period.end)}</span>}
-              <span className="muted">Tenggat: {cur?.dueDate ? formatDate(cur.dueDate) : 'belum ditetapkan'}</span>
+              <span className="muted">Tenggat: {cur?.dueDate ? `${formatDate(cur.dueDate)} ${data.tz}` : 'belum ditetapkan'}</span>
               {overdue && <Badge value="OVERDUE" />}
               {cur?.verifiedAt && <span className="muted">Terverifikasi {formatDate(cur.verifiedAt)} oleh {cur.verifiedByName}</span>}
             </div>
@@ -131,8 +131,8 @@ export default function RequirementDetail({ data }) {
               {!cur?.evidence?.length ? <p className="muted">Belum ada bukti untuk periode ini.</p> : (
                 <DataTable rows={cur.evidence} columns={[
                   { key: 't', label: 'Bukti', render: (e) => (<div><strong>{e.title}</strong>{e.description && <div className="cell-sub">{e.description}</div>}</div>) },
-                  { key: 'k', label: 'Jenis', render: (e) => ({ FILE: 'File', DOCUMENT: 'Dokumen HSE', SOURCE: 'Data modul lain' }[e.kind]) },
-                  { key: 'f', label: 'Berkas', render: (e) => (e.file ? <a href={`/api/files/${e.file.id}`}>{e.file.fileName}</a> : e.document ? (<span><a href={e.document.fileId ? `/api/files/${e.document.fileId}` : '/documents'}>{e.document.number} rev {e.document.revision}</a>{e.changedSinceVerified && <div><Badge value="REVISION" label="Direvisi setelah verifikasi" /></div>}</span>) : '-') },
+                  { key: 'k', label: 'Jenis', render: (e) => (e.source ? e.source.label : { FILE: 'File', DOCUMENT: 'Dokumen HSE' }[e.kind]) },
+                  { key: 'f', label: 'Berkas', render: (e) => (e.source ? (e.source.link ? <a href={e.source.link}><ExternalLink size={13} /> Buka sumber</a> : '-') : e.file ? <a href={`/api/files/${e.file.id}`}>{e.file.fileName}</a> : e.document ? (<span><a href={e.document.fileId ? `/api/files/${e.document.fileId}` : '/documents'}>{e.document.number} rev {e.document.revision}</a>{e.changedSinceVerified && <div><Badge value="REVISION" label="Direvisi setelah verifikasi" /></div>}</span>) : '-') },
                   { key: 'v', label: 'Berlaku s/d', render: (e) => (e.validUntil ? <span className={iso(e.validUntil) < today ? 'text-red' : ''}>{formatDate(e.validUntil)}</span> : <span className="muted">-</span>) },
                   { key: 'by', label: 'Ditautkan', render: (e) => (<div>{e.linkedByName}<div className="muted">{formatDate(e.linkedAt)}</div></div>) },
                   { key: 'a', label: '', render: (e) => (editable ? <button className="btn btn-ghost btn-sm" title="Lepas" disabled={busy} onClick={() => unlink(e)}><Unlink size={14} /></button> : null) },
@@ -143,6 +143,7 @@ export default function RequirementDetail({ data }) {
                   <button className="btn btn-outline btn-sm" onClick={() => { setFiles([]); setUpload({ title: '', description: '', evidenceDate: today, validUntil: '' }); }}><Upload size={15} /> Unggah bukti</button>
                   <button className="btn btn-outline btn-sm" onClick={() => setPicker('evidence')}><Link2 size={15} /> Pakai bukti yang sudah ada</button>
                   <button className="btn btn-outline btn-sm" onClick={() => setPicker('document')}><FileText size={15} /> Tautkan Dokumen HSE</button>
+                  <button className={`btn btn-sm ${data.suggestions.length ? 'btn-primary' : 'btn-outline'}`} onClick={() => setPicker('source')}><Database size={15} /> Tautkan data modul</button>
                 </div>
               )}
             </div>
@@ -172,7 +173,7 @@ export default function RequirementDetail({ data }) {
           <DataTable rows={cur.submissions} columns={[
             { key: 'v', label: 'Versi', render: (s) => s.version },
             { key: 'by', label: 'Diajukan', render: (s) => (<div>{s.submittedByName}<div className="muted">{new Date(s.submittedAt).toLocaleString('id-ID')}</div></div>) },
-            { key: 'ev', label: 'Bukti saat diajukan', render: (s) => (<ul style={{ margin: 0, paddingLeft: 16 }}>{s.evidence.map((e) => <li key={e.evidenceId}>{e.title}{e.revision ? ` (rev ${e.revision})` : ''}</li>)}</ul>) },
+            { key: 'ev', label: 'Bukti saat diajukan', render: (s) => (<ul style={{ margin: 0, paddingLeft: 16 }}>{s.evidence.map((e) => <li key={e.evidenceId}>{e.title}{e.revision ? ` (rev ${e.revision})` : ''}{e.summary ? <div className="muted">{e.summary}</div> : null}</li>)}</ul>) },
             { key: 'rv', label: 'Pemeriksaan PJO/PM', render: (s) => (s.reviewedByName ? <div>{s.reviewedByName}<div className="muted">{s.reviewNote ?? '-'}</div></div> : <span className="muted">-</span>) },
             { key: 'dc', label: 'Keputusan HO', render: (s) => (s.decidedByName ? <div>{s.decidedByName}<div className="muted">{s.decisionNote ?? '-'}</div></div> : <span className="muted">-</span>) },
             { key: 'o', label: 'Hasil', render: (s) => <Badge value={s.outcome === 'PENDING' ? 'SUBMITTED' : s.outcome} label={OUTCOME[s.outcome]} /> },
@@ -206,7 +207,9 @@ export default function RequirementDetail({ data }) {
           </form>
         )}
       </Modal>
-      <Picker kind={picker} siteId={app.siteId} onClose={() => setPicker(null)} onPick={link} busy={busy} />
+      <Picker kind={picker === 'source' ? null : picker} siteId={app.siteId} onClose={() => setPicker(null)} onPick={link} busy={busy} />
+      {picker === 'source' && <SourcePicker open reqId={r.id} periodKey={data.periodKey} onClose={() => setPicker(null)} busy={busy}
+        onPick={async (key) => { if (await submit(`/api/csms/requirements/${r.id}/sources`, { body: { periodKey: data.periodKey, key } })) setPicker(null); }} />}
     </div>
   );
 }
@@ -259,6 +262,47 @@ function Picker({ kind, siteId, onClose, onPick, busy }) {
           ]} />
         )}
         <Link href="/documents" className="muted" style={{ fontSize: 13 }}><ExternalLink size={13} /> Dokumen belum ada? Tambahkan di menu Dokumen HSE.</Link>
+      </div>
+    </Modal>
+  );
+}
+
+/** Ringkasan data modul untuk periode butir (dipasang ulang tiap dibuka). Saran sumber tampil lebih dulu. */
+function SourcePicker({ open, reqId, periodKey, onClose, onPick, busy }) {
+  const [data, setData] = useState(null);
+  const [all, setAll] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    fetch(`/api/csms/requirements/${reqId}/sources?${new URLSearchParams({ period: periodKey })}`)
+      .then(async (r) => (r.ok ? r.json() : { error: (await r.json().catch(() => ({}))).error ?? 'Gagal memuat data.' }))
+      .then(setData).catch(() => setData({ error: 'Gagal memuat data.' }));
+  }, [open, reqId, periodKey]);
+  const groups = (data?.groups ?? []).filter((g) => all || g.suggested || !data.suggested.length).sort((a, b) => Number(b.suggested) - Number(a.suggested));
+  return (
+    <Modal open={open} onClose={onClose} title="Tautkan data modul" subtitle={data?.from ? `Data ${data.from} s/d ${data.to}. Ringkasan disimpan sebagai snapshot; tautan sumber mengikuti hak akses modulnya.` : 'Data dari modul E-HSE tanpa input ulang.'} size="modal-lg">
+      <div className="stack">
+        {!data ? <div className="loading-block">Memuat…</div> : data.error ? <div className="notice danger">{data.error}</div> : (
+          <>
+            {data.suggested.length > 0 && (
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13.5 }}>
+                <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> Tampilkan semua sumber (bukan hanya yang disarankan)
+              </label>
+            )}
+            {groups.map((g) => (
+              <div key={g.type}>
+                <div className="section-title" style={{ marginBottom: 6 }}>{g.label}{g.suggested && <span className="chip" style={{ marginLeft: 8 }}>Disarankan</span>}</div>
+                {g.options.length === 0 ? <p className="muted">Tidak ada data pada periode ini.</p> : (
+                  <DataTable rows={g.options} rowKey={(o) => o.key} columns={[
+                    { key: 't', label: 'Data', render: (o) => (<div><strong>{o.title}</strong>{o.suggested && g.options.length > 1 && <span className="chip" style={{ marginLeft: 6 }}>Disarankan</span>}<div className="cell-sub">{o.summary}</div></div>) },
+                    { key: 'l', label: '', render: (o) => <a className="btn btn-ghost btn-sm" href={o.link} target="_blank" rel="noreferrer">Lihat</a> },
+                    { key: 'a', label: '', render: (o) => <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => onPick(o.key)}>Tautkan</button> },
+                  ]} />
+                )}
+              </div>
+            ))}
+            <p className="muted" style={{ fontSize: 12.5 }}>Data modul menjadi bukti, bukan keputusan: butir tetap diajukan dan diverifikasi HO.</p>
+          </>
+        )}
       </div>
     </Modal>
   );

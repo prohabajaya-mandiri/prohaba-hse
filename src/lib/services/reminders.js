@@ -3,7 +3,10 @@ import { addDays, daysBetween, iso, today } from '../dates.js';
 import { cycleStart, nextLeaveDue, pickPolicy } from '../domain/roster.js';
 import { previousMonthKey, reportPeriod, sitesNotReported } from '../domain/reports.js';
 import { getSettings } from '../settings.js';
+import { SETTING_DEFAULTS } from '../settings-defaults.js';
 import { notifyRoles } from './notify.js';
+import { requirementReminders } from './csms.js';
+import { findingReminders } from './csms-findings.js';
 
 const HSE = ['HO_HSE', 'HSE_SITE'];
 const when = (left) => (left < 0 ? `lewat ${-left} hari` : left === 0 ? 'hari ini' : `${left} hari lagi`);
@@ -13,7 +16,7 @@ const when = (left) => (left < 0 ? `lewat ${-left} hari` : left === 0 ? 'hari in
  * Dijalankan oleh Vercel Cron (/api/cron/reminders) dan secara malas maksimal sekali per jam.
  */
 export async function runReminders(now = today()) {
-  const s = await getSettings(['reminder.thresholds', 'report.monthlyDeadlineDay']);
+  const s = await getSettings(['reminder.thresholds', 'report.monthlyDeadlineDay', 'csms.reminders']);
   const t = s['reminder.thresholds'];
   let created = 0;
   const push = async (roles, siteId, payload) => (created += await notifyRoles(prisma, roles, siteId, payload));
@@ -109,6 +112,11 @@ export async function runReminders(now = today()) {
       link: '/documents?expiry=' + (l < 0 ? 'expired' : 'soon'), severity: l < 0 ? 'DANGER' : 'WARNING', dedupeKey: `doc-${d.id}-${iso(d.validUntil)}-${l < 0 ? 'late' : 'due'}`, dueDate: d.validUntil,
     });
   }
+
+  // CSMS: tenggat butir, bukti kedaluwarsa, dan temuan (zona waktu site). Ambang dari parameter csms.reminders.
+  const csmsCfg = { ...SETTING_DEFAULTS['csms.reminders'].value, ...s['csms.reminders'] };
+  await requirementReminders(push, csmsCfg);
+  await findingReminders(push, csmsCfg);
 
   await prisma.setting.upsert({
     where: { key: 'system.lastReminderRun' },

@@ -162,3 +162,21 @@ export const csmsActions = (role, status, requireReview) =>
 
 // Standar CSMS (template, penerapan, persyaratan site, N/A) hanya dikelola HO HSE.
 export const canManageCsms = (user) => user?.role === 'HO_HSE';
+
+// ─── Temuan CSMS: Terbuka → Dalam proses → Diajukan untuk penutupan → Ditutup ──
+// Unggahan bukti tidak menutup temuan; penutupan & pembukaan kembali hanya verifikator HO.
+const FINDING_TRANSITIONS = {
+  START: { from: ['TERBUKA'], to: 'DALAM_PROSES', roles: ['HSE_SITE', 'HO_HSE'] },
+  SUBMIT_CLOSE: { from: ['TERBUKA', 'DALAM_PROSES'], to: 'DIAJUKAN_TUTUP', roles: ['HSE_SITE', 'HO_HSE'] },
+  RETURN: { from: ['DIAJUKAN_TUTUP'], to: 'DALAM_PROSES', roles: ['HO_HSE'], note: true },
+  CLOSE: { from: ['DIAJUKAN_TUTUP'], to: 'DITUTUP', roles: ['HO_HSE'] },
+  REOPEN: { from: ['DITUTUP'], to: 'DALAM_PROSES', roles: ['HO_HSE'], note: true },
+};
+
+export function findingTransition(role, action, status) {
+  const rule = Object.hasOwn(FINDING_TRANSITIONS, action) ? FINDING_TRANSITIONS[action] : null;
+  if (!rule || !rule.from.includes(status) || !rule.roles.includes(role)) return null;
+  return { action, to: rule.to, noteRequired: Boolean(rule.note) };
+}
+
+export const findingActions = (role, status) => Object.keys(FINDING_TRANSITIONS).filter((a) => findingTransition(role, a, status));

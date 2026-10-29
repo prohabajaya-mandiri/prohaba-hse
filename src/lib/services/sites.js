@@ -2,7 +2,8 @@ import { prisma } from '../prisma.js';
 import { siteScope } from '../access.js';
 import { audit, diff } from '../audit.js';
 import { addDays } from '../dates.js';
-import { bool, choice, date, ensure, object, optionalDate, optionalId, text } from '../validation.js';
+import { bool, choice, date, ensure, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
+import { SITE_TIMEZONES } from '../dates.js';
 import { requireSite } from './common.js';
 
 export async function listSites(user) {
@@ -19,7 +20,7 @@ export async function listSites(user) {
 }
 
 function parseSite(body) {
-  object(body, ['code', 'name', 'location', 'region', 'isHo', 'isActive']);
+  object(body, ['code', 'name', 'location', 'region', 'timezone', 'isHo', 'isActive']);
   const code = text(body.code, 'Kode site', 20).toUpperCase();
   ensure(/^[A-Z0-9-]+$/.test(code), 'Kode site hanya huruf, angka dan tanda minus.');
   return {
@@ -27,6 +28,7 @@ function parseSite(body) {
     name: text(body.name, 'Nama site', 120),
     location: text(body.location, 'Lokasi', 200, true),
     region: choice(body.region, ['TIMUR', 'BARAT', 'HO'], 'Wilayah'),
+    timezone: optionalChoice(body.timezone, Object.keys(SITE_TIMEZONES), 'Zona waktu'),
     isHo: bool(body.isHo),
     isActive: body.isActive === undefined ? true : bool(body.isActive),
   };
@@ -56,7 +58,7 @@ export async function saveSite(user, id, body) {
 const SITE_USAGE = {
   users: 'akses pengguna', personnel: 'personel (site saat ini)', initialStaff: 'personel (site awal)', placements: 'penempatan',
   mutationsTo: 'mutasi', mcus: 'MCU', permits: 'permit', mobilizations: 'mobilisasi', leaves: 'cuti/izin', rosterPolicies: 'pola roster',
-  dailyPerf: 'kinerja harian', activities: 'aktivitas HSE', reports: 'laporan HSE', incidents: 'insiden', trainings: 'training', documents: 'dokumen HSE', registrations: 'pendaftaran pegawai',
+  dailyPerf: 'kinerja harian', activities: 'aktivitas HSE', reports: 'laporan HSE', incidents: 'insiden', trainings: 'training', documents: 'dokumen HSE', registrations: 'pendaftaran pegawai', csmsApplications: 'penerapan CSMS', csmsFindings: 'temuan CSMS',
 };
 
 /** Hapus permanen hanya untuk site yang belum pernah dipakai (mis. salah input). */
@@ -109,10 +111,14 @@ export async function saveProject(user, siteId, body) {
 // Pergantian penanggung jawab menutup penanggung jawab lama sehingga riwayat tetap tersimpan.
 export async function assignResponsible(user, siteId, body) {
   requireSite(user, siteId);
-  object(body, ['role', 'name', 'phone', 'userId', 'startDate']);
-  const role = choice(body.role, ['PJO', 'PM', 'HSE_SITE'], 'Peran');
+  object(body, ['role', 'name', 'phone', 'email', 'competency', 'approvalNo', 'approvalDate', 'userId', 'startDate']);
+  const role = choice(body.role, ['PJO', 'PM', 'HSE_SITE', 'SAFETY_OFFICER'], 'Peran');
   const startDate = date(body.startDate, 'Tanggal mulai');
-  const data = { siteId, role, name: text(body.name, 'Nama', 120), phone: text(body.phone, 'Telepon', 30, true), userId: optionalId(body.userId), startDate };
+  const data = {
+    siteId, role, name: text(body.name, 'Nama', 120), phone: text(body.phone, 'Telepon', 30, true), email: text(body.email, 'Email', 150, true), userId: optionalId(body.userId), startDate,
+    // Data pengesahan PJO untuk administrasi owner (008B).
+    ...(role === 'PJO' ? { competency: text(body.competency, 'Kompetensi kepengawasan', 60, true), approvalNo: text(body.approvalNo, 'Nomor surat pengesahan', 100, true), approvalDate: optionalDate(body.approvalDate, 'Tanggal pengesahan') } : {}),
+  };
   return prisma.$transaction(async (tx) => {
     const current = await tx.siteResponsible.findMany({ where: { siteId, role, endDate: null } });
     for (const c of current) {

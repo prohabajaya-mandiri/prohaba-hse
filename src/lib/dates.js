@@ -6,6 +6,14 @@ export function todayIso(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 export const today = (now) => toDate(todayIso(now));
+
+// Zona waktu site untuk tenggat. Kosong = zona aplikasi.
+export const SITE_TIMEZONES = { 'Asia/Jakarta': 'WIB', 'Asia/Makassar': 'WITA', 'Asia/Jayapura': 'WIT' };
+export const tzLabel = (tz) => SITE_TIMEZONES[tz || TIMEZONE] ?? (tz || TIMEZONE);
+export function todayIn(tz, now = new Date()) {
+  const zone = Object.hasOwn(SITE_TIMEZONES, tz ?? '') ? tz : TIMEZONE;
+  return toDate(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now));
+}
 export const toDate = (iso) => new Date(iso + 'T00:00:00Z');
 export const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : null);
 export const addDays = (d, n) => new Date(new Date(d).getTime() + n * DAY);

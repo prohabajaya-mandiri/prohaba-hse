@@ -171,3 +171,38 @@ export function maxScoreCheck(items, sourceMax) {
   const total = items.reduce((s, i) => s + (i.maxScore ?? 0), 0);
   return { items: items.length, total, sourceMax: sourceMax ?? null, diff: sourceMax === null || sourceMax === undefined ? null : total - sourceMax };
 }
+
+// ─── Bukti dari data modul (tanpa input ulang) ──────────────────────────────
+// Jenis sumber: modul asal menentukan hak akses saat tautan dibuka.
+export const SOURCE_TYPES = {
+  ACTIVITY: { label: 'Aktivitas HSE (rekap periode)', module: '/performance' },
+  PERFORMANCE: { label: 'Statistik K3: manhours & kejadian', module: '/performance' },
+  REPORT: { label: 'Laporan HSE Site', module: '/reports' },
+  INCIDENT: { label: 'Insiden: investigasi & tindak lanjut', module: '/incidents' },
+  TRAINING: { label: 'Sesi training / sosialisasi & kehadiran', module: '/training' },
+  CERTIFICATE: { label: 'Sertifikat kompetensi personel site', module: '/training' },
+  COMPETENCY: { label: 'Matriks kompetensi per jabatan & kebutuhan', module: '/training' },
+  MCU: { label: 'Status MCU personel site (tanpa data medis)', module: '/mcu' },
+  FINDING: { label: 'Temuan CSMS yang sudah ditutup', module: '/csms' },
+};
+
+// Saran sumber per butir template berdasarkan isi persyaratan (kode internal transkripsi 008A).
+// Saran hanya mempermudah pemilihan; penilai/pemeriksa tetap menilai kecukupan bukti.
+const SUGGESTED = {
+  'AMM-VIB1-F-SHE-008A': {
+    'U01.03': ['TRAINING'], 'U02.02': ['TRAINING'], 'U02.04': ['TRAINING'], 'U04.02': ['TRAINING'], 'U05.03': ['TRAINING'],
+    'U03.03': ['COMPETENCY'], 'U03.04': ['CERTIFICATE'],
+    'U06.02': [['ACTIVITY', 'TBM'], ['ACTIVITY', 'SAFETY_TALK'], ['ACTIVITY', 'INDUCTION']],
+    'U06.03': [['ACTIVITY', 'INSPECTION'], ['ACTIVITY', 'PATROL']],
+    'U06.04': ['FINDING'], 'U06.05': ['PERFORMANCE'], 'U06.06': ['REPORT'],
+    'U07.02': ['INCIDENT'], 'U07.03': ['INCIDENT'], 'U12.02': ['MCU'],
+  },
+};
+
+/** Saran sumber untuk butir: [{ type, indicator? }]. Butir tanpa saran tetap boleh memakai sumber apa pun. */
+export function suggestedSources(sourceDocCode, internalCode) {
+  return (SUGGESTED[sourceDocCode]?.[internalCode] ?? []).map((x) => (Array.isArray(x) ? { type: x[0], indicator: x[1] } : { type: x }));
+}
+
+export const FINDING_SOURCES = ['ASSESSMENT', 'INSPEKSI', 'AUDIT', 'INSIDEN', 'PEMERIKSAAN_DOKUMEN'];
+export const FINDING_STATUSES = ['TERBUKA', 'DALAM_PROSES', 'DIAJUKAN_TUTUP', 'DITUTUP'];

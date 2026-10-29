@@ -10,12 +10,14 @@ import { formatDate, iso, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 import { PIC_ROLES } from '@/lib/domain/csms';
 import { Flags, Percent, RESP_LABELS, STATUS_OPTIONS, StatusBadge, freqLabel, picLabel } from './shared';
+import { FindingsRegister } from './Findings';
+import { AdministrationCard, CompanyProfileCard } from './Administration';
 
 export default function CsmsClient({ tab, user, sites, data, page }) {
-  if (tab === 'summary') return <Summary data={data} sites={sites} />;
+  if (tab === 'summary') return <Summary data={data} sites={sites} user={user} />;
   if (tab === 'checklist') return <Checklist data={data} page={page} />;
   if (tab === 'documents') return <MasterDocuments data={data} sites={sites} canManage={user.role === 'HO_HSE'} />;
-  if (tab === 'verify') return <VerifyQueue data={data} sites={sites} />;
+  if (tab === 'verify') return <VerifyQueue data={data} sites={sites} canCreate={['HO_HSE', 'HSE_SITE'].includes(user.role)} />;
   return <Setup data={data} sites={sites} />;
 }
 
@@ -23,7 +25,7 @@ const periodFilter = { name: 'period', label: 'Periode (bulan)', type: 'month', 
 const siteFilter = (sites) => ({ name: 'siteId', label: 'Site', type: 'select', allLabel: 'Semua site', options: sites.filter((s) => !s.isHo).map((s) => [s.id, s.code]) });
 
 // ─── Ringkasan ──────────────────────────────────────────────────────────────
-function Summary({ data, sites }) {
+function Summary({ data, sites, user }) {
   const t = data.totals;
   const single = data.perApp.length === 1 ? data.perApp[0] : null;
   return (
@@ -45,7 +47,7 @@ function Summary({ data, sites }) {
             <Kpi label="Terverifikasi" value={t.verified ?? 0} icon={CheckCircle2} tone="green" href="/csms?tab=checklist&status=VERIFIED" />
             <Kpi label="Bukti kedaluwarsa" value={t.expired ?? 0} icon={AlertTriangle} tone="red" hint={`${t.expiring ?? 0} mendekati habis (≤ ${data.expiringDays} hari)`} href="/csms?tab=checklist&status=EXPIRED" />
             <Kpi label="Tenggat terlewati" value={t.overdue ?? 0} icon={CalendarX} tone="red" href="/csms?tab=checklist&status=OVERDUE" />
-            <Kpi label="Temuan belum ditutup" value="—" icon={SearchIcon} tone="navy" hint="Register temuan menyusul (Tahap 2)" />
+            <Kpi label="Temuan belum ditutup" value={data.findingsOpen ?? 0} icon={SearchIcon} tone={data.findingsOpen ? 'orange' : 'navy'} href="/csms?tab=verify&fstatus=OPEN" />
           </div>
           <div className="grid-2">
             <Card title="(A) Kelengkapan terverifikasi">
@@ -88,6 +90,7 @@ function Summary({ data, sites }) {
           </Card>
         </>
       )}
+      <AdministrationCard admin={data.admin} user={user} />
     </div>
   );
 }
@@ -130,7 +133,7 @@ function Checklist({ data, page }) {
           { key: 'resp', label: 'Penanggung jawab', render: (r) => RESP_LABELS[r.responsibility] },
           { key: 'pic', label: 'PIC utama', render: picLabel },
           { key: 'freq', label: 'Frekuensi', render: (r) => (<div>{freqLabel(r.frequency)}{r.periods.length > 1 && <div className="muted">{r.periods.filter((p) => p.status === 'VERIFIED').length}/{r.periods.length} periode</div>}</div>) },
-          { key: 'due', label: 'Tenggat', render: (r) => (r.nextDue ? formatDate(r.nextDue) : <span className="muted">Belum ditetapkan</span>) },
+          { key: 'due', label: `Tenggat (${data.tz})`, render: (r) => (r.nextDue ? formatDate(r.nextDue) : <span className="muted">Belum ditetapkan</span>) },
           { key: 'ev', label: 'Bukti', num: true, render: (r) => r.evidenceCount },
           { key: 'st', label: 'Status', render: (r) => (r.status ? <><StatusBadge value={r.status} /><Flags flags={r.flags} /></> : <span className="muted">Tidak ada periode wajib</span>) },
           { key: 'note', label: 'Catatan pemeriksaan', render: (r) => r.reviewNote ?? <span className="muted">-</span> },
@@ -255,7 +258,7 @@ function MasterDocuments({ data, sites, canManage }) {
 }
 
 // ─── Verifikasi & tindak lanjut ─────────────────────────────────────────────
-function VerifyQueue({ data, sites }) {
+function VerifyQueue({ data, sites, canCreate }) {
   const router = useRouter();
   return (
     <div className="stack">
@@ -273,9 +276,7 @@ function VerifyQueue({ data, sites }) {
           { key: 'a', label: '', render: (r) => (r.actions.length ? <span className="btn btn-primary btn-sm">{r.actions.includes('VERIFY') ? 'Verifikasi' : 'Periksa'}</span> : null) },
         ]} />
       </Card>
-      <Card title="Temuan & tindak lanjut">
-        <p className="muted">Register temuan (sumber assessment, inspeksi, audit, insiden, pemeriksaan dokumen) dengan status Terbuka → Dalam proses → Diajukan untuk penutupan → Ditutup tersedia pada Tahap 2. Catatan pengembalian pengajuan sudah tercatat di riwayat tiap butir.</p>
-      </Card>
+      <FindingsRegister findings={data.findings} sites={sites} canCreate={canCreate} />
       <Card title="Riwayat keputusan terbaru" padding={0}>
         <DataTable rows={data.history} empty="Belum ada keputusan." columns={[
           { key: 'at', label: 'Waktu', render: (h) => new Date(h.createdAt).toLocaleString('id-ID') },
@@ -323,6 +324,7 @@ function Setup({ data, sites }) {
   return (
     <div className="stack">
       <div className="notice info">Lapis 1: template owner (terkunci setelah aktif). Lapis 2: penerapan per site — butir berlaku/N/A, frekuensi, tenggat, PIC, dan butir tambahan site diatur tanpa mengubah teks owner. Lapis 3: status & bukti per periode di Checklist.</div>
+      <CompanyProfileCard company={data.company} />
       <Card title="Template CSMS" actions={data.builtins.filter((b) => !b.loaded).map((b) => (
         <button key={b.code} className="btn btn-outline btn-sm" disabled={busy} onClick={() => submit('/api/csms/templates', { body: { builtin: b.code } })}><Plus size={15} /> Muat {b.code}</button>
       ))} padding={0}>
