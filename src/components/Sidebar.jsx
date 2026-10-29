@@ -8,7 +8,7 @@ import { signOut } from 'next-auth/react';
 import {
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
-  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus,
+  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus, ClipboardCheck,
 } from 'lucide-react';
 import { useDialog } from './DialogProvider';
 import { canAccess, ROLE_LABELS } from '@/lib/access';
@@ -48,6 +48,7 @@ const NAV_ITEMS = [
       { href: '/reports', label: 'Laporan HSE Site', icon: FileText },
       { href: '/incidents', label: 'Insiden', icon: Siren },
       { href: '/documents', label: 'Dokumen HSE', icon: FolderLock },
+      { href: '/csms', label: 'CSMS', icon: ClipboardCheck },
     ],
   },
   {
@@ -161,10 +162,10 @@ export default function Sidebar({ user, isOpen, setIsOpen }) {
               {visible.map((item) => {
                 const active = item.href === activeHref;
                 const Icon = item.icon;
-                const subs = tabsFor(item.href);
+                const subs = tabsFor(item.href, role);
                 const config = MODULE_TABS[item.href];
                 const open = subs.length > 0 && (expanded[item.href] ?? active);
-                const activeSub = active && config ? currentTab(item.href, searchParams.get(config.param)) : null;
+                const activeSub = active && config ? currentTab(item.href, searchParams.get(config.param), role) : null;
                 const subId = `nav-sub${item.href.replace(/\//g, '-')}`;
                 return (
                   <div key={item.href} className={`nav-group ${open ? 'open' : ''}`}>

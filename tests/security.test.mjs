@@ -58,6 +58,19 @@ test('alur laporan: HSE Site kirim → PJO/PM periksa → HO sahkan', () => {
   assert.equal(reportTransition('HO_HSE', 'RETURN_APPROVE', 'REVIEWED').to, 'REVISION');
 });
 
+test('dokumen HO terbatas & terpilih tidak terbuka ke semua site', async () => {
+  process.env.DATABASE_URL ??= 'postgresql://ci:ci@localhost:5432/ci';
+  const { canReadDocument } = await import('../src/lib/services/documents.js');
+  const hoDoc = { siteId: null, accessScope: 'DEFAULT' };
+  assert.equal(canReadDocument(hseTabang, hoDoc), true, 'perilaku lama dokumen HO tetap');
+  assert.equal(canReadDocument(hseTabang, { siteId: null, accessScope: 'HO_ONLY' }), false);
+  assert.equal(canReadDocument({ role: 'HRD' }, { siteId: null, accessScope: 'HO_ONLY' }), false);
+  assert.equal(canReadDocument(ho, { siteId: null, accessScope: 'HO_ONLY' }), true);
+  assert.equal(canReadDocument(hseTabang, { siteId: null, accessScope: 'LISTED' }, ['lht']), false);
+  assert.equal(canReadDocument(hseTabang, { siteId: null, accessScope: 'LISTED' }, ['tbg']), true);
+  assert.equal(canReadDocument(hseTabang, { siteId: 'lht', accessScope: 'DEFAULT' }), false);
+});
+
 test('mutasi lintas origin ditolak', () => {
   const req = (origin) => new Request('https://hse.example/api/personnel', { method: 'POST', headers: { origin } });
   assert.equal(isSameOriginMutation(req('https://attacker.example')), false);

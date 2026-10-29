@@ -8,12 +8,42 @@ import { choice, date, ensure, InputError, object, optionalDate, optionalId, tex
 
 export const DOC_CATEGORIES = ['HSE_PLAN', 'KPLH', 'SOP', 'IBPR', 'SMKP', 'AUDIT', 'STANDARISASI_MITRA', 'PRAKUALIFIKASI', 'SERTIFIKASI', 'COMPLIANCE_OWNER', 'LAINNYA'];
 
-// Dokumen HO (siteId null) terlihat oleh semua peran; dokumen site mengikuti cakupan site.
-function scopeWhere(user, siteId) {
+export const DOC_ACCESS_SCOPES = ['DEFAULT', 'LISTED', 'HO_ONLY'];
+// Dokumen terbatas (legalitas/data pribadi) hanya untuk HO HSE dan Direksi.
+const RESTRICTED_ROLES = ['HO_HSE', 'DIREKSI'];
+
+/**
+ * Dokumen HO (siteId null) ber-accessScope DEFAULT terlihat oleh semua peran (perilaku lama);
+ * LISTED hanya untuk site terpilih; HO_ONLY hanya HO HSE/Direksi. Dokumen site mengikuti cakupan site.
+ */
+export function visibleDocumentWhere(user) {
   const scope = siteScope(user);
-  if (siteId === 'HO') return { siteId: null };
-  if (siteId) return { siteId: scope === null || scope.includes(siteId) ? siteId : '__none__' };
-  return scope === null ? {} : { OR: [{ siteId: null }, { siteId: { in: scope } }] };
+  if (scope === null) return RESTRICTED_ROLES.includes(user.role) ? {} : { NOT: { siteId: null, accessScope: 'HO_ONLY' } };
+  return {
+    OR: [
+      { siteId: { in: scope } },
+      { siteId: null, accessScope: 'DEFAULT' },
+      { siteId: null, accessScope: 'LISTED', allowedSites: { some: { siteId: { in: scope } } } },
+    ],
+  };
+}
+
+/** Versi murni dari visibleDocumentWhere untuk satu dokumen (dipakai pemeriksaan unduhan file). */
+export function canReadDocument(user, doc, allowedSiteIds = []) {
+  const scope = siteScope(user);
+  if (doc.siteId) return scope === null || scope.includes(doc.siteId);
+  if (doc.accessScope === 'HO_ONLY') return RESTRICTED_ROLES.includes(user.role);
+  if (doc.accessScope === 'LISTED') return scope === null || allowedSiteIds.some((s) => scope.includes(s));
+  return true;
+}
+
+function scopeWhere(user, siteId) {
+  const visible = visibleDocumentWhere(user);
+  const scope = siteScope(user);
+  let filter = {};
+  if (siteId === 'HO') filter = { siteId: null };
+  else if (siteId) filter = { siteId: scope === null || scope.includes(siteId) ? siteId : '__none__' };
+  return { AND: [visible, filter] };
 }
 
 function canWriteDoc(user, siteId) {
@@ -33,7 +63,7 @@ export async function listDocuments(user, f, { skip = 0, take = 50 } = {}) {
   if (f.expiry === 'expired') where.validUntil = { lt: now };
   if (f.q) {
     const q = String(f.q).slice(0, 80);
-    where.AND = [{ OR: [{ title: { contains: q, mode: 'insensitive' } }, { number: { contains: q, mode: 'insensitive' } }, { ownerName: { contains: q, mode: 'insensitive' } }] }];
+    where.AND.push({ OR: [{ title: { contains: q, mode: 'insensitive' } }, { number: { contains: q, mode: 'insensitive' } }, { ownerName: { contains: q, mode: 'insensitive' } }] });
   }
   const [rows, total] = await Promise.all([
     prisma.hseDocument.findMany({ where, skip, take, orderBy: [{ category: 'asc' }, { number: 'asc' }], include: { site: { select: { code: true } }, versions: { orderBy: { createdAt: 'desc' } } } }),

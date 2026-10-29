@@ -45,6 +45,13 @@ export const LABELS = {
   TIMUR: 'Timur', BARAT: 'Barat', HO: 'Head Office', NONAKTIF: 'Nonaktif',
   // role
   HO_HSE: 'HO HSE', HSE_SITE: 'HSE Site', HRD: 'HRD HO', PJO: 'PJO', PM: 'Project Manager', DIREKSI: 'Direksi',
+  // CSMS
+  BELUM: 'Belum diisi', VERIFIED: 'Terverifikasi', RETIRED: 'Pensiun', APPLICABLE: 'Berlaku', NA: 'N/A', NA_PENDING: 'Usulan N/A',
+  OVERDUE: 'Tenggat terlewati', EVIDENCE_EXPIRED: 'Bukti kedaluwarsa', EVIDENCE_EXPIRING: 'Mendekati kedaluwarsa',
+  BERSAMA: 'Bersama', SITE: 'Site', TEMPLATE: 'Template', SITE_ADDITION: 'Tambahan site',
+  RETURNED: 'Dikembalikan', SUPERSEDED: 'Digantikan',
+  LOGISTIK: 'Logistik', OPERASIONAL: 'Operasional', MEKANIK: 'Mekanik', ADMIN_LEGAL: 'Administrasi/Legal', MANAJEMEN_PROYEK: 'Manajemen proyek',
+  DEFAULT: 'HO: semua site', LISTED: 'Site terpilih', HO_ONLY: 'Terbatas (HO)',
   // indikator
   ACTIVITY: 'Aktivitas', OBSERVATION: 'Observasi', INCIDENT: 'Kejadian',
 };
@@ -66,6 +73,9 @@ export const STATUS_STYLES = {
   LULUS: green, TIDAK_LULUS: red, VALID: green, MISSING: gray, EXPIRING: yellow, EXPIRED: red,
   HIJAU: green, KUNING: yellow, MERAH: red, LANJUT: green, DIBERHENTIKAN: red,
   BERLAKU: green, ARSIP: gray, NONAKTIF: gray,
+  BELUM: gray, VERIFIED: green, RETIRED: gray, APPLICABLE: green, NA: gray, NA_PENDING: yellow,
+  OVERDUE: red, EVIDENCE_EXPIRED: red, EVIDENCE_EXPIRING: yellow, RETURNED: orange, SUPERSEDED: gray, SITE_ADDITION: blue,
+  DEFAULT: gray, LISTED: blue, HO_ONLY: orange,
   SCREENING: gray, MENUNGGU_HASIL: blue, SUBMIT: blue, FEEDBACK: navy, SUBMIT_FU: yellow, MOBILISASI: navy,
 };
 
