@@ -110,9 +110,9 @@ export default function RequirementDetail({ data }) {
         </Card>
       )}
 
-      <Card title={`Pemenuhan periode ${data.periodKey ?? '-'}`} actions={<PeriodPicker r={r} value={data.periodKey} history={data.history} onChange={go} />}>
+      <Card title={`Periode ${data.periodKey ?? '-'}`} actions={<PeriodPicker r={r} value={data.periodKey} history={data.history} onChange={go} />}>
         {!data.periodKey ? (
-          <p className="muted">Pilih tanggal kejadian/perubahan untuk mencatat pemenuhan.</p>
+          <p className="muted">Pilih tanggal kejadian/perubahan untuk mencatat bukti.</p>
         ) : (
           <div className="stack">
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>

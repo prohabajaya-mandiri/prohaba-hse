@@ -1,4 +1,4 @@
-// Uji alur Pemenuhan CSMS terhadap server development (mengubah data hse_dev, bukan produksi).
+// Uji alur CSMS terhadap server development (mengubah data hse_dev, bukan produksi).
 // Pemakaian: node scripts/csms-workflow.mjs http://localhost:3001 <file-akun>
 // File akun berisi baris "email password" untuk akun uji HO_HSE, HSE_SITE (TBG), PJO (TBG) dan HRD,
 // dengan email berawalan uji.ho / uji.site / uji.pjo / uji.hrd. Jangan isi kredensial produksi.

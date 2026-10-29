@@ -1,4 +1,4 @@
-// Aturan murni modul Pemenuhan CSMS (tanpa database) agar dapat diuji.
+// Aturan murni modul CSMS (tanpa database) agar dapat diuji.
 import { addDays, iso, isoWeekKey, isoWeekRange, monthRange, toDate } from '../dates.js';
 
 export const FREQUENCIES = ['ONCE', 'ON_CHANGE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'EVENT', 'CUSTOM'];

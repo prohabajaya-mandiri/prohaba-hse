@@ -8,7 +8,7 @@ export const MODULE_TABS = {
     param: 'tab',
     items: [
       ['summary', 'Ringkasan CSMS'],
-      ['checklist', 'Checklist & Bukti Pemenuhan'],
+      ['checklist', 'Checklist & Bukti'],
       ['documents', 'Dokumen Induk HO'],
       ['verify', 'Verifikasi & Tindak Lanjut'],
       ['setup', 'Template & Penerapan', ['HO_HSE']],

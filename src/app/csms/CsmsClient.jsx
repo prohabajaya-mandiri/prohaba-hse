@@ -69,7 +69,7 @@ function Summary({ data, sites }) {
             ]} />
           </Card>
           {single && (
-            <Card title={`Pemenuhan per unsur — ${single.app.site.code}`} padding={0}>
+            <Card title={`Kelengkapan per unsur — ${single.app.site.code}`} padding={0}>
               <DataTable rows={single.byElement} rowKey={(e) => e.number} columns={[
                 { key: 'n', label: 'Unsur', render: (e) => `${e.number}. ${e.name}` },
                 { key: 'p', label: 'Kelengkapan', render: (e) => <Percent summary={e} /> },
@@ -322,7 +322,7 @@ function Setup({ data, sites }) {
 
   return (
     <div className="stack">
-      <div className="notice info">Lapis 1: template owner (terkunci setelah aktif). Lapis 2: penerapan per site — butir berlaku/N/A, frekuensi, tenggat, PIC, dan butir tambahan site diatur tanpa mengubah teks owner. Lapis 3: pemenuhan per periode di Checklist.</div>
+      <div className="notice info">Lapis 1: template owner (terkunci setelah aktif). Lapis 2: penerapan per site — butir berlaku/N/A, frekuensi, tenggat, PIC, dan butir tambahan site diatur tanpa mengubah teks owner. Lapis 3: status & bukti per periode di Checklist.</div>
       <Card title="Template CSMS" actions={data.builtins.filter((b) => !b.loaded).map((b) => (
         <button key={b.code} className="btn btn-outline btn-sm" disabled={busy} onClick={() => submit('/api/csms/templates', { body: { builtin: b.code } })}><Plus size={15} /> Muat {b.code}</button>
       ))} padding={0}>

@@ -626,7 +626,7 @@ async function snapshotEvidence(tx, fulfillmentId) {
   });
 }
 
-/** Simpan draft / ajukan / periksa / kembalikan / verifikasi / buka ulang satu pemenuhan periode. */
+/** Simpan draft / ajukan / periksa / kembalikan / verifikasi / buka ulang satu periode butir. */
 export async function transition(user, reqId, body) {
   object(body, ['periodKey', 'action', 'note']);
   const action = choice(body.action, ['SAVE', 'SUBMIT', 'REVISE', 'REVIEW', 'RETURN', 'VERIFY', 'REOPEN'], 'Aksi');
@@ -707,7 +707,7 @@ async function editableFulfillment(tx, user, reqId, periodKey) {
   return { req, ful };
 }
 
-/** Unggah file bukti baru (satu file = satu bukti) lalu tautkan ke pemenuhan periode. */
+/** Unggah file bukti baru (satu file = satu bukti) lalu tautkan ke periode butir. */
 export async function uploadEvidence(user, reqId, body, files) {
   object(body, ['periodKey', 'title', 'description', 'evidenceDate', 'validUntil']);
   const meta = parseEvidenceMeta(body);
@@ -760,7 +760,7 @@ export async function linkEvidence(user, reqId, body) {
 export async function unlinkEvidence(user, fulfillmentId, evidenceId) {
   return prisma.$transaction(async (tx) => {
     const ful = await tx.csmsFulfillment.findUnique({ where: { id: fulfillmentId } });
-    ensure(ful, 'Pemenuhan tidak ditemukan.', 404);
+    ensure(ful, 'Data periode tidak ditemukan.', 404);
     const req = await loadRequirement(tx, user, ful.requirementId);
     assertCanFill(user, req);
     ensure(EDITABLE.includes(ful.status), 'Bukti hanya dapat dilepas pada status Draft atau Perlu revisi.', 409);
@@ -851,7 +851,7 @@ export async function csmsPendingFor(user) {
   const verb = user.role === 'HO_HSE' ? 'menunggu verifikasi HO' : user.role === 'HSE_SITE' ? 'perlu revisi' : 'menunggu pemeriksaan PJO/PM';
   return rows.map((r) => ({
     kind: 'CSMS', id: 'csms-' + r.siteId, title: `${r._count} butir CSMS ${sites[r.siteId] ?? ''} ${verb}`,
-    detail: 'Pemenuhan CSMS (verifikasi internal PJM).', link: user.role === 'HSE_SITE' ? `/csms?tab=checklist&status=REVISION` : `/csms?tab=verify&siteId=${r.siteId}`, since: r._min.submittedAt,
+    detail: 'CSMS (verifikasi internal PJM).', link: user.role === 'HSE_SITE' ? `/csms?tab=checklist&status=REVISION` : `/csms?tab=verify&siteId=${r.siteId}`, since: r._min.submittedAt,
   }));
 }
 

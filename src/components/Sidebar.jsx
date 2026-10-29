@@ -48,7 +48,7 @@ const NAV_ITEMS = [
       { href: '/reports', label: 'Laporan HSE Site', icon: FileText },
       { href: '/incidents', label: 'Insiden', icon: Siren },
       { href: '/documents', label: 'Dokumen HSE', icon: FolderLock },
-      { href: '/csms', label: 'Pemenuhan CSMS', icon: ClipboardCheck },
+      { href: '/csms', label: 'CSMS', icon: ClipboardCheck },
     ],
   },
   {

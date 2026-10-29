@@ -4,7 +4,7 @@ import { currentTab, tabLabel } from '@/lib/module-tabs';
 import { builtinTemplates, checklist, listApplications, listTemplates, masterDocuments, overview, projectOptions, reviewQueue, templateItemOptions } from '@/lib/services/csms';
 import CsmsClient from './CsmsClient';
 
-export const metadata = { title: 'Pemenuhan CSMS' };
+export const metadata = { title: 'CSMS' };
 
 export default async function CsmsPage({ searchParams }) {
   const user = await requirePage('/csms');
@@ -20,7 +20,7 @@ export default async function CsmsPage({ searchParams }) {
             : Promise.all([listTemplates(), listApplications(user, { status: 'all' }), builtinTemplates(), projectOptions()]).then(([templates, apps, builtins, projects]) => ({ templates, apps, builtins, projects })),
   ]);
   return (
-    <AppLayout title="Pemenuhan CSMS" subtitle={tabLabel('/csms', tab)} user={user}>
+    <AppLayout title="CSMS" subtitle={tabLabel('/csms', tab)} user={user}>
       <CsmsClient tab={tab} user={user} sites={sites} data={data} page={q.page} />
     </AppLayout>
   );

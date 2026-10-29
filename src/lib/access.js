@@ -35,7 +35,7 @@ export const MODULES = {
   training: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD'] },
   hrd: { read: ['HRD', 'DIREKSI'], write: ['HRD', 'DIREKSI'] },
   documents: { read: ALL, write: ['HO_HSE', 'HSE_SITE'] },
-  // Pemenuhan CSMS: HRD hanya membaca butir yang PIC-nya HRD; PJO/PM menulis untuk pemeriksaan saja
+  // CSMS: HRD hanya membaca butir yang PIC-nya HRD; PJO/PM menulis untuk pemeriksaan saja
   // (aksi per peran dicek di csmsTransition dan service).
   csms: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI', 'HRD'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
   settings: { read: ['HO_HSE', 'DIREKSI', 'HRD'], write: ['HO_HSE'] },
@@ -137,7 +137,7 @@ export function reportTransition(role, action, status) {
   return rule;
 }
 
-// ─── Alur pemenuhan CSMS: Site menyiapkan → mengajukan → (PJO/PM bila diwajibkan) → verifikasi HO ──
+// ─── Alur CSMS: Site menyiapkan → mengajukan → (PJO/PM bila diwajibkan) → verifikasi HO ──
 // Verifikasi HO = verifikasi internal PJM, bukan persetujuan owner. BELUM = belum ada catatan.
 const CSMS_TRANSITIONS = {
   SAVE: { from: ['BELUM', 'DRAFT', 'REVISION'], to: 'DRAFT', roles: () => ['HSE_SITE', 'HO_HSE'] },

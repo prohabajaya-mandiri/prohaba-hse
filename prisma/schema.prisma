@@ -791,9 +791,9 @@ model HseDocumentCsmsItem {
   @@index([itemId])
 }
 
-// ─── 17. PEMENUHAN CSMS ──────────────────────────────────────────────────────
+// ─── 17. CSMS ───────────────────────────────────────────────────────────────
 // Lapis 1: template owner (terkunci per versi). Lapis 2: penerapan per site + persyaratan.
-// Lapis 3: pemenuhan per butir per periode, pengajuan berversi, dan bukti (banyak-ke-banyak).
+// Lapis 3: status per butir per periode, pengajuan berversi, dan bukti (banyak-ke-banyak).
 
 model CsmsTemplate {
   id               String    @id @default(cuid())
