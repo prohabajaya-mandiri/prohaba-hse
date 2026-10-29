@@ -221,5 +221,68 @@ for (const [who, c, path] of [['HO', ho, `/csms/findings/${fid}`], ['Site', site
   check((await c.get(path)).status === 200, `${who} ${path}`);
 }
 
+console.log('16. Assessment internal 0/1/2');
+check((await site.post('/api/csms/assessments', { applicationId: appT.id, periodLabel: 'x', assessmentDate: '2026-10-29', assessors: 'x' })).status === 403, 'HSE Site tidak dapat membuat assessment');
+const asm = await ho.post('/api/csms/assessments', { applicationId: appT.id, periodLabel: 'UJI Semester II 2026', assessmentDate: '2026-10-29', assessors: 'UJI Verifikator 1, UJI Verifikator 2' });
+check(asm.status === 200 && asm.data.number?.startsWith('ASM-2026-'), 'HO membuat draft assessment', asm);
+let ad = (await ho.get(`/api/csms/assessments/${asm.data.id}`)).data;
+check(ad.scores.length === 57 && ad.scores.every((x) => x.score === null), 'nilai awal kosong untuk 57 butir (tidak otomatis)', ad.scores.length);
+check(ad.totals.max <= 114 && ad.totals.unscored === ad.totals.applicable, `maksimum berlaku ${ad.totals.max} (N/A dikeluarkan)`);
+check((await ho.post(`/api/csms/assessments/${asm.data.id}`, { action: 'FINALIZE' })).status === 400, 'finalisasi ditolak bila ada butir belum dinilai');
+check((await site.put(`/api/csms/assessments/${asm.data.id}`, { scores: [] })).status === 403, 'HSE Site tidak dapat mengisi nilai');
+check((await ho.put(`/api/csms/assessments/${asm.data.id}`, { scores: [{ itemId: ad.scores[0].itemId, score: 3 }] })).status === 400, 'nilai di luar 0–2 ditolak');
+const scores = ad.scores.map((x, i) => ({ itemId: x.itemId, score: x.applicable ? (i % 5 === 0 ? 1 : 2) : null, note: i === 0 ? 'UJI: sosialisasi belum konsisten' : '' }));
+check((await ho.put(`/api/csms/assessments/${asm.data.id}`, { scores })).status === 200, 'HO mengisi nilai semua butir');
+const fin = await ho.post(`/api/csms/assessments/${asm.data.id}`, { action: 'FINALIZE' });
+check(fin.data?.status === 'FINAL' && fin.data.totalScore > 0, `assessment final ${fin.data?.totalScore}/${fin.data?.maxScore} (${fin.data?.percent}%)`, fin);
+check((await ho.put(`/api/csms/assessments/${asm.data.id}`, { scores: [{ itemId: ad.scores[0].itemId, score: 0 }] })).status === 409, 'assessment final terkunci');
+const before = JSON.stringify((await ho.get(`/api/csms/assessments/${asm.data.id}`)).data.scores.map((x) => [x.score, x.evidence]));
+const nextP = `2026-${String(Number(P.slice(5)) - 1).padStart(2, '0')}`;
+await site.upload(`/api/csms/requirements/${rAttend.id}/evidence`, { periodKey: nextP, title: 'UJI bukti baru setelah assessment final' });
+const after2 = JSON.stringify((await ho.get(`/api/csms/assessments/${asm.data.id}`)).data.scores.map((x) => [x.score, x.evidence]));
+check(before === after2, 'assessment final tidak berubah saat data sumber berubah');
+const fnA = await ho.post('/api/csms/findings', { siteId: TBG.id, source: 'ASSESSMENT', assessmentId: asm.data.id, requirementId: ad.scores[0].requirementId, description: 'UJI temuan assessment' });
+check(fnA.status === 200, 'temuan dicatat dari assessment', fnA);
+const rev = await ho.post(`/api/csms/assessments/${asm.data.id}`, { action: 'REVISE', reason: 'UJI koreksi nilai butir 1' });
+check(rev.data?.number?.endsWith('-R1') && rev.data.status === 'DRAFT', 'revisi berjejak dibuat sebagai draft', rev);
+check((await ho.post(`/api/csms/assessments/${asm.data.id}`, { action: 'REVISE', reason: 'lagi' })).status === 409, 'tidak boleh dua revisi draft sekaligus');
+const revD = (await ho.get(`/api/csms/assessments/${rev.data.id}`)).data;
+check(revD.scores.every((x) => x.score === scores.find((y) => y.itemId === x.itemId).score), 'revisi menyalin nilai versi sebelumnya');
+await ho.put(`/api/csms/assessments/${rev.data.id}`, { scores: [{ itemId: revD.scores[0].itemId, score: 2 }] });
+check((await ho.post(`/api/csms/assessments/${rev.data.id}`, { action: 'FINALIZE' })).data?.status === 'FINAL', 'revisi difinalkan');
+const orig = (await ho.get(`/api/csms/assessments/${asm.data.id}`)).data;
+check(orig.supersededAt && orig.status === 'FINAL' && orig.scores[0].score === 1, 'versi lama tetap tersimpan utuh & ditandai digantikan');
+const xl = await fetch(base + `/api/csms/export?kind=assessment&id=${asm.data.id}`, { headers: { cookie: ho.cookie() } });
+check(xl.status === 200 && xl.headers.get('content-type')?.includes('spreadsheet'), 'ekspor Excel assessment');
+check((await hrd.get(`/api/csms/assessments/${asm.data.id}`)).status === 403, 'HRD tidak membuka assessment');
+
+console.log('17. Izin kerja khusus');
+const wpNum = 'UJI-WP-' + Date.now();
+const wp = await site.post('/api/work-permits', { siteId: TBG.id, number: wpNum, permitType: 'Bekerja di Ketinggian', workType: 'UJI pemasangan atap workshop', location: 'Workshop TBG', responsibleName: 'UJI Pengawas', issuer: 'UJI Dept. HSE Owner', startAt: '2026-10-29T00:00:00.000Z', endAt: '2026-10-30T00:00:00.000Z' });
+check(wp.status === 200 && wp.data.status === 'TERCATAT', 'HSE Site mencatat izin kerja khusus', wp);
+check((await site.post('/api/work-permits', { siteId: TBG.id, number: wpNum, permitType: 'Bekerja di Ketinggian', workType: 'x', location: 'x', responsibleName: 'x', issuer: 'x', startAt: '2026-10-29T00:00:00.000Z', endAt: '2026-10-30T00:00:00.000Z' })).status === 409, 'nomor izin ganda ditolak');
+check((await site.post('/api/work-permits', { siteId: TBG.id, number: wpNum + 'b', permitType: 'Izin Karangan', workType: 'x', location: 'x', responsibleName: 'x', issuer: 'x', startAt: '2026-10-29T00:00:00.000Z', endAt: '2026-10-30T00:00:00.000Z' })).status === 400, 'jenis izin di luar daftar owner ditolak');
+check((await site.post(`/api/work-permits/${wp.data.id}`, { action: 'ACTIVATE' })).status === 400, 'tidak dapat direkam aktif tanpa salinan izin owner');
+const wf = new FormData(); wf.set('label', 'IZIN'); wf.append('files', new Blob(['%PDF-1.4\n% UJI izin\n%%EOF\n'], { type: 'application/pdf' }), 'izin.pdf');
+check((await fetch(base + `/api/work-permits/${wp.data.id}/files`, { method: 'POST', body: wf, headers: { cookie: site.cookie() } })).status === 200, 'HSE Site melampirkan salinan izin');
+check((await pjo.post(`/api/work-permits/${wp.data.id}`, { action: 'ACTIVATE' })).status === 403, 'PJO tidak mengubah register izin');
+check((await site.post(`/api/work-permits/${wp.data.id}`, { action: 'ACTIVATE' })).data?.status === 'AKTIF', 'izin direkam aktif');
+const rWp = req('U09.02');
+const srcWp = (await site.get(`/api/csms/requirements/${rWp.id}/sources?period=AWAL`)).data;
+check(srcWp.groups.find((g) => g.type === 'WORK_PERMIT')?.options.some((o) => o.title.startsWith(wpNum)), 'U09.02 dapat menautkan izin dari register (bukti unsur 9)');
+check((await site.post(`/api/work-permits/${wp.data.id}`, { action: 'CLOSE' })).status === 400, 'penutupan tanpa bukti/catatan ditolak');
+check((await site.post(`/api/work-permits/${wp.data.id}`, { action: 'CLOSE', note: 'UJI pekerjaan selesai, area aman' })).data?.status === 'DITUTUP', 'izin ditutup dengan catatan');
+check((await hrd.get('/api/work-permits')).status === 403, 'HRD tidak membuka register izin kerja');
+check((await site.get('/work-permits')).status === 200 && (await site.get('/permits')).status === 200, 'halaman Izin Kerja Khusus & Permit SKS personel terpisah');
+
+console.log('18. Ekspor Excel');
+for (const q of [`kind=checklist&applicationId=${appT.id}&period=${P}`, `kind=documents&applicationId=${appT.id}&period=${P}`, `kind=recap&period=${P}`, 'kind=findings', 'kind=admin']) {
+  const r = await fetch(base + '/api/csms/export?' + q, { headers: { cookie: ho.cookie() } });
+  check(r.status === 200 && r.headers.get('content-disposition')?.includes('.xlsx'), 'ekspor ' + q.split('&')[0]);
+}
+for (const [who, c, path] of [['HO', ho, '/csms?tab=assessment'], ['Site', site, '/csms?tab=assessment'], ['HO', ho, `/csms/assessments/${asm.data.id}`], ['Site', site, `/csms/assessments/${rev.data.id}`]]) {
+  check((await c.get(path)).status === 200, `${who} ${path}`);
+}
+
 console.log(failures ? `\n${failures} pemeriksaan gagal` : '\nSemua pemeriksaan lulus');
 process.exit(failures ? 1 : 0);

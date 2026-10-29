@@ -4,6 +4,7 @@ import { currentTab, tabLabel } from '@/lib/module-tabs';
 import { builtinTemplates, checklist, listApplications, listTemplates, masterDocuments, overview, projectOptions, reviewQueue, templateItemOptions } from '@/lib/services/csms';
 import { listFindings } from '@/lib/services/csms-findings';
 import { administrationRows, getCompanyProfile } from '@/lib/services/csms-profile';
+import { latestFinalBySite, listAssessments } from '@/lib/services/csms-assessment';
 import CsmsClient from './CsmsClient';
 
 export const metadata = { title: 'CSMS' };
@@ -15,9 +16,10 @@ export default async function CsmsPage({ searchParams }) {
   const isHo = user.role === 'HO_HSE';
   const [sites, data] = await Promise.all([
     scopedSites(user, { activeOnly: true }),
-    tab === 'summary' ? Promise.all([overview(user, q), administrationRows(user), listFindings(user, { fstatus: 'OPEN', siteId: q.siteId }, { take: 1 })]).then(([o, admin, f]) => ({ ...o, admin, findingsOpen: f.total }))
+    tab === 'summary' ? Promise.all([overview(user, q), administrationRows(user), listFindings(user, { fstatus: 'OPEN', siteId: q.siteId }, { take: 1 }), latestFinalBySite(user)]).then(([o, admin, f, finals]) => ({ ...o, admin, findingsOpen: f.total, finals }))
       : tab === 'checklist' ? checklist(user, q)
         : tab === 'documents' ? Promise.all([masterDocuments(user, q), isHo ? templateItemOptions() : []]).then(([docs, items]) => ({ ...docs, items }))
+          : tab === 'assessment' ? Promise.all([listAssessments(user, q), listApplications(user, {})]).then(([a, apps]) => ({ ...a, apps }))
           : tab === 'verify' ? Promise.all([reviewQueue(user, q), listFindings(user, q, { skip: 0, take: 100 })]).then(([queue, findings]) => ({ ...queue, findings }))
             : Promise.all([listTemplates(), listApplications(user, { status: 'all' }), builtinTemplates(), projectOptions(), getCompanyProfile()]).then(([templates, apps, builtins, projects, company]) => ({ templates, apps, builtins, projects, company })),
   ]);

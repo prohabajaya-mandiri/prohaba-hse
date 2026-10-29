@@ -139,6 +139,8 @@ model Site {
   documentAccess   HseDocumentSite[]
   csmsProfile      SiteCsmsProfile?
   csmsFindings     CsmsFinding[]
+  csmsAssessments  CsmsAssessment[]
+  workPermits      WorkPermit[]
 }
 
 model Project {
@@ -829,6 +831,7 @@ model CsmsTemplate {
   elements         CsmsElement[]
   items            CsmsItem[]
   applications     CsmsSiteApplication[]
+  assessments      CsmsAssessment[]
 
   @@unique([code, version])
 }
@@ -867,6 +870,7 @@ model CsmsItem {
   element          CsmsElement  @relation(fields: [elementId], references: [id], onDelete: Cascade)
   requirements     CsmsRequirement[]
   documents        HseDocumentCsmsItem[]
+  assessmentScores CsmsAssessmentScore[]
 
   @@unique([templateId, internalCode])
   @@index([elementId, sortOrder])
@@ -890,6 +894,7 @@ model CsmsSiteApplication {
   site            Site         @relation(fields: [siteId], references: [id])
   template        CsmsTemplate @relation(fields: [templateId], references: [id])
   requirements    CsmsRequirement[]
+  assessments     CsmsAssessment[]
 
   @@index([siteId, status])
   @@index([templateId])
@@ -1062,6 +1067,7 @@ model CsmsFinding {
   status           String    @default("TERBUKA") // TERBUKA | DALAM_PROSES | DIAJUKAN_TUTUP | DITUTUP
   incidentId       String? // temuan dari modul Insiden ditautkan, bukan disalin
   incidentActionId String?   @unique
+  assessmentId     String? // temuan hasil assessment internal
   verifierName     String?
   closedAt         DateTime?
   createdById      String
@@ -1075,6 +1081,7 @@ model CsmsFinding {
   @@index([siteId, status])
   @@index([status, dueDate])
   @@index([incidentId])
+  @@index([assessmentId])
 }
 
 model CsmsFindingHistory {
@@ -1089,6 +1096,93 @@ model CsmsFindingHistory {
   finding    CsmsFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
 
   @@index([findingId, createdAt])
+}
+
+// Assessment internal PJM (0/1/2) terpisah dari checklist. Final dikunci; koreksi lewat revisi berjejak.
+// Nilai, teks butir & bukti disalin ke skor saat final sehingga tidak berubah bila data sumber berubah.
+model CsmsAssessment {
+  id               String    @id @default(cuid())
+  number           String    @unique
+  siteId           String
+  applicationId    String
+  templateId       String
+  periodLabel      String
+  assessmentDate   DateTime
+  assessors        String
+  status           String    @default("DRAFT") // DRAFT | FINAL
+  revisionNo       Int       @default(0)
+  revisionOfId     String?
+  revisionReason   String?
+  supersededAt     DateTime? // diisi saat revisi berikutnya difinalkan
+  totalScore       Int?
+  maxScore         Int?
+  percent          Decimal?  @db.Decimal(6, 2)
+  riskLevel        String? // salinan tingkat risiko pekerjaan saat itu (bukan hasil assessment)
+  notes            String?
+  finalizedAt      DateTime?
+  finalizedByName  String?
+  createdById      String
+  createdByName    String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  site             Site                @relation(fields: [siteId], references: [id])
+  application      CsmsSiteApplication @relation(fields: [applicationId], references: [id])
+  template         CsmsTemplate        @relation(fields: [templateId], references: [id])
+  revisionOf       CsmsAssessment?     @relation("AssessmentRevision", fields: [revisionOfId], references: [id])
+  revisions        CsmsAssessment[]    @relation("AssessmentRevision")
+  scores           CsmsAssessmentScore[]
+
+  @@index([siteId, assessmentDate])
+  @@index([applicationId, status])
+}
+
+model CsmsAssessmentScore {
+  id           String         @id @default(cuid())
+  assessmentId String
+  itemId       String
+  itemCode     String // kode sumber / ID internal saat dinilai
+  itemText     String
+  elementNo    Int
+  maxScore     Int
+  applicable   Boolean        @default(true)
+  score        Int? // null = belum dinilai; tidak pernah diisi otomatis
+  note         String?
+  evidence     Json? // bukti yang dinilai (snapshot saat final)
+  assessment   CsmsAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  item         CsmsItem       @relation(fields: [itemId], references: [id])
+
+  @@unique([assessmentId, itemId])
+}
+
+// Register izin kerja khusus dari owner (bukan Permit & SKS personel). Aplikasi tidak menerbitkan izin;
+// status AKTIF hanya merekam izin sah yang diterbitkan owner (nomor, penerbit & salinan izin wajib).
+model WorkPermit {
+  id               String    @id @default(cuid())
+  siteId           String
+  projectId        String?
+  number           String // nomor izin dari owner
+  permitType       String // jenis izin (dikonfigurasi per owner)
+  workType         String // jenis pekerjaan
+  location         String
+  responsibleName  String
+  issuer           String // penerbit / otoritas owner
+  startAt          DateTime
+  endAt            DateTime
+  hiradcDocumentId String? // HIRADC/JSA di Dokumen HSE
+  jsaNote          String?
+  status           String    @default("TERCATAT") // TERCATAT | AKTIF | DITUTUP | DIBATALKAN (BERAKHIR = turunan waktu)
+  closedAt         DateTime?
+  closureNote      String?
+  cancelReason     String?
+  createdById      String
+  createdByName    String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  site             Site      @relation(fields: [siteId], references: [id])
+
+  @@unique([siteId, number])
+  @@index([siteId, startAt])
+  @@index([status, endAt])
 }
 
 // ─── 16. NOTIFIKASI & APPROVAL ───────────────────────────────────────────────

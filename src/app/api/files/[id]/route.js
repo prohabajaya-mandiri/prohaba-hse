@@ -8,6 +8,7 @@ import { InputError } from '@/lib/validation';
 import { canReadDocument } from '@/lib/services/documents';
 import { canReadEvidenceFile } from '@/lib/services/csms';
 import { canReadFindingFile } from '@/lib/services/csms-findings';
+import { canReadWorkPermitFile } from '@/lib/services/work-permits';
 
 // Selain sensitivitas & site, file mengikuti hak akses entitas asalnya (dokumen terbatas, bukti CSMS).
 async function entityAllows(user, row) {
@@ -17,6 +18,7 @@ async function entityAllows(user, row) {
   }
   if (row.entityType === 'CSMS_EVIDENCE') return canReadEvidenceFile(user, row);
   if (row.entityType === 'CSMS_FINDING') return canReadFindingFile(user, row);
+  if (row.entityType === 'WORK_PERMIT') return canReadWorkPermitFile(user, row);
   return true;
 }
 
@@ -41,7 +43,7 @@ export const DELETE = api(async (request, context, user) => {
   const { id } = await params(context);
   const row = await authorized(user, id);
   // File KTP dan versi dokumen terkontrol tidak boleh dihapus (riwayat wajib tersimpan).
-  if (row.sensitivity === 'KTP' || row.entityType === 'DOCUMENT' || row.entityType === 'CSMS_EVIDENCE' || row.entityType === 'CSMS_FINDING') throw new InputError('File ini tidak dapat dihapus.', 409);
+  if (row.sensitivity === 'KTP' || row.entityType === 'DOCUMENT' || row.entityType === 'CSMS_EVIDENCE' || row.entityType === 'CSMS_FINDING' || row.entityType === 'WORK_PERMIT') throw new InputError('File ini tidak dapat dihapus.', 409);
   if (row.uploadedBy !== user.id && user.role !== 'HO_HSE') throw new InputError('Hanya pengunggah atau HO HSE yang dapat menghapus.', 403);
   await prisma.$transaction(async (tx) => {
     await tx.fileObject.delete({ where: { id } });

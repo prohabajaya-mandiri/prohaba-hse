@@ -8,7 +8,7 @@ import { signOut } from 'next-auth/react';
 import {
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
-  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus, ClipboardCheck,
+  Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus, ClipboardCheck, FileCheck2,
 } from 'lucide-react';
 import { useDialog } from './DialogProvider';
 import { canAccess, ROLE_LABELS } from '@/lib/access';
@@ -49,6 +49,7 @@ const NAV_ITEMS = [
       { href: '/incidents', label: 'Insiden', icon: Siren },
       { href: '/documents', label: 'Dokumen HSE', icon: FolderLock },
       { href: '/csms', label: 'CSMS', icon: ClipboardCheck },
+      { href: '/work-permits', label: 'Izin Kerja Khusus', icon: FileCheck2 },
     ],
   },
   {

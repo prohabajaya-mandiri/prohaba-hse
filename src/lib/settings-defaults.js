@@ -36,13 +36,21 @@ export const SETTING_DEFAULTS = {
     label: 'Tenggat pelaporan insiden ke owner (jam)',
     value: { FATALITY: 1, LTI: 24, MTC: 24, FAC: 48, NEAR_MISS: 72 },
   },
+  'workPermit.types': {
+    label: 'Jenis izin kerja khusus (umum & per owner)',
+    value: {
+      default: ['Bekerja di Ketinggian', 'Pekerjaan Panas (Hot Work)', 'Ruang Terbatas', 'Isolasi Energi / LOTO', 'Penggalian', 'Pengangkatan Kritis'],
+      byOwner: {},
+    },
+  },
   'csms.reminders': {
     label: 'Ambang pengingat CSMS (hari)',
     value: { dueSoonDays: 7, evidenceExpiringDays: 30, findingDueSoonDays: 7, lateWindowDays: 60 },
   },
   'permit.types': {
     label: 'Jenis permit / SKS',
-    value: ['ID Card / Mine Permit', 'SIMPER', 'KIMPER', 'Izin Kerja Ketinggian', 'Izin Kerja Panas', 'SKS'],
+    // Izin kerja aktivitas (ketinggian, panas, dll.) dicatat di Izin Kerja Khusus, bukan permit personel.
+    value: ['ID Card / Mine Permit', 'SIMPER', 'KIMPER', 'SKS'],
   },
 };
 

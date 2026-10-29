@@ -141,6 +141,38 @@ test('saran bukti dari modul hanya untuk butir yang isinya sesuai; MCU tanpa dat
   assert.deepEqual(suggestedSources('AMM-VIB1-F-SHE-008A', 'U01.01'), [], 'kebijakan = dokumen, bukan data modul');
   assert.deepEqual(suggestedSources('OWNER-LAIN', 'U12.02'), []);
   const counted = template.elements.flatMap((e) => e.items).filter((i) => suggestedSources(template.sourceDocCode ?? 'AMM-VIB1-F-SHE-008A', i.id).length);
-  assert.equal(counted.length, 15, '15 butir 008A punya saran sumber modul');
+  assert.equal(counted.length, 16, '16 butir 008A punya saran sumber modul (termasuk U09.02 izin kerja)');
   assert.equal(SOURCE_TYPES.MCU.module, '/mcu');
+});
+
+test('assessment: tanpa nilai otomatis; maksimum mengikuti perlakuan N/A; persentase bukan kelulusan', async () => {
+  const { assessmentTotals, validScore } = await import('../src/lib/domain/csms.js');
+  const rows = [
+    { maxScore: 2, applicable: true, score: 2 },
+    { maxScore: 2, applicable: true, score: 1 },
+    { maxScore: 2, applicable: true, score: null },
+    { maxScore: 2, applicable: false, score: null },
+  ];
+  assert.deepEqual(assessmentTotals(rows, 'EXCLUDE_FROM_MAX'), { total: 3, max: 6, unscored: 1, applicable: 3, percent: 50 });
+  assert.equal(assessmentTotals(rows, 'SCORE_ZERO').max, 8, 'N/A tetap dihitung bernilai 0 bila aturan owner demikian');
+  assert.equal(assessmentTotals([], 'EXCLUDE_FROM_MAX').percent, null);
+  const full = template.elements.flatMap((e) => e.items).map((i) => ({ maxScore: i.maxScore, applicable: true, score: null }));
+  assert.deepEqual(assessmentTotals(full), { total: 0, max: 114, unscored: 57, applicable: 57, percent: 0 }, 'assessment baru: semua butir belum dinilai, tidak otomatis 2');
+  assert.equal(validScore(3, 2), false);
+  assert.equal(validScore(1.5, 2), false);
+  assert.equal(validScore(null, 2), true);
+});
+
+test('izin kerja khusus: aktif hanya merekam izin owner; berakhir dihitung dari waktu', async () => {
+  const { workPermitStatus, workPermitTransition } = await import('../src/lib/domain/work-permit.js');
+  const now = new Date('2026-10-29T10:00:00Z');
+  assert.equal(workPermitStatus({ status: 'AKTIF', endAt: '2026-10-29T09:00:00Z' }, now), 'BERAKHIR');
+  assert.equal(workPermitStatus({ status: 'AKTIF', endAt: '2026-10-29T12:00:00Z' }, now), 'AKTIF');
+  assert.equal(workPermitStatus({ status: 'DITUTUP', endAt: '2026-10-01T00:00:00Z' }, now), 'DITUTUP');
+  assert.equal(workPermitTransition('HSE_SITE', 'ACTIVATE', 'TERCATAT').to, 'AKTIF');
+  assert.equal(workPermitTransition('HSE_SITE', 'CLOSE', 'TERCATAT'), null, 'yang belum aktif tidak ditutup, dibatalkan');
+  assert.equal(workPermitTransition('PJO', 'ACTIVATE', 'TERCATAT'), null);
+  assert.equal(canAccess('HRD', '/work-permits'), false);
+  assert.equal(canAccess('PJO', '/api/work-permits', 'POST'), false);
+  assert.equal(canAccess('HSE_SITE', '/api/permits', 'GET'), true, 'Permit & SKS personel tetap modul terpisah');
 });

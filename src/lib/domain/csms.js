@@ -184,6 +184,7 @@ export const SOURCE_TYPES = {
   COMPETENCY: { label: 'Matriks kompetensi per jabatan & kebutuhan', module: '/training' },
   MCU: { label: 'Status MCU personel site (tanpa data medis)', module: '/mcu' },
   FINDING: { label: 'Temuan CSMS yang sudah ditutup', module: '/csms' },
+  WORK_PERMIT: { label: 'Izin kerja khusus dari owner', module: '/work-permits' },
 };
 
 // Saran sumber per butir template berdasarkan isi persyaratan (kode internal transkripsi 008A).
@@ -195,7 +196,7 @@ const SUGGESTED = {
     'U06.02': [['ACTIVITY', 'TBM'], ['ACTIVITY', 'SAFETY_TALK'], ['ACTIVITY', 'INDUCTION']],
     'U06.03': [['ACTIVITY', 'INSPECTION'], ['ACTIVITY', 'PATROL']],
     'U06.04': ['FINDING'], 'U06.05': ['PERFORMANCE'], 'U06.06': ['REPORT'],
-    'U07.02': ['INCIDENT'], 'U07.03': ['INCIDENT'], 'U12.02': ['MCU'],
+    'U07.02': ['INCIDENT'], 'U07.03': ['INCIDENT'], 'U12.02': ['MCU'], 'U09.02': ['WORK_PERMIT'],
   },
 };
 
@@ -206,3 +207,19 @@ export function suggestedSources(sourceDocCode, internalCode) {
 
 export const FINDING_SOURCES = ['ASSESSMENT', 'INSPEKSI', 'AUDIT', 'INSIDEN', 'PEMERIKSAAN_DOKUMEN'];
 export const FINDING_STATUSES = ['TERBUKA', 'DALAM_PROSES', 'DIAJUKAN_TUTUP', 'DITUTUP'];
+
+// ─── Assessment internal ─────────────────────────────────────────────────────
+/**
+ * Nilai = jumlah nilai aktual; maksimum mengikuti perlakuan N/A template (dikeluarkan dari maksimum,
+ * atau tetap dihitung bernilai 0). Persentase bukan keputusan kelulusan owner.
+ */
+export function assessmentTotals(scores, naPolicy = 'EXCLUDE_FROM_MAX') {
+  const applicable = scores.filter((s) => s.applicable);
+  const max = (naPolicy === 'SCORE_ZERO' ? scores : applicable).reduce((sum, s) => sum + s.maxScore, 0);
+  const total = applicable.reduce((sum, s) => sum + (s.score ?? 0), 0);
+  const unscored = applicable.filter((s) => s.score === null || s.score === undefined).length;
+  return { total, max, unscored, applicable: applicable.length, percent: max ? Math.round((total / max) * 10000) / 100 : null };
+}
+
+/** Nilai valid: bilangan bulat 0..maks butir (skala 0 = belum ada, 1 = tidak konsisten, 2 = konsisten). */
+export const validScore = (score, maxScore) => score === null || (Number.isInteger(score) && score >= 0 && score <= maxScore);
