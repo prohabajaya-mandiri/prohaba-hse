@@ -134,6 +134,8 @@ model Site {
   documents     HseDocument[]
   mutationsTo   Mutation[]        @relation("MutationTarget")
   registrations Registration[]
+  csmsApplications CsmsSiteApplication[]
+  documentAccess   HseDocumentSite[]
 }
 
 model Project {
@@ -738,11 +740,17 @@ model HseDocument {
   ownerName   String // penanggung jawab
   status      String    @default("BERLAKU") // DRAFT | BERLAKU | ARSIP
   revision    String    @default("0")
+  // Metadata dokumen induk CSMS (opsional; dokumen lama tetap berperilaku seperti semula).
+  effectiveDate DateTime?
+  approverName  String?
+  accessScope   String    @default("DEFAULT") // DEFAULT (HO = semua site) | LISTED (site terpilih) | HO_ONLY (terbatas)
   createdBy   String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   site        Site?     @relation(fields: [siteId], references: [id])
   versions    HseDocumentVersion[]
+  allowedSites HseDocumentSite[]
+  csmsItems    HseDocumentCsmsItem[]
 
   @@unique([number, siteId])
   @@index([category, status])
@@ -759,6 +767,247 @@ model HseDocumentVersion {
   document   HseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId, createdAt])
+}
+
+// Site yang boleh membuka dokumen HO ber-accessScope LISTED.
+model HseDocumentSite {
+  documentId String
+  siteId     String
+  document   HseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, siteId])
+  @@index([siteId])
+}
+
+// Butir CSMS yang dipenuhi/diacu oleh dokumen induk.
+model HseDocumentCsmsItem {
+  documentId String
+  itemId     String
+  document   HseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  item       CsmsItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, itemId])
+  @@index([itemId])
+}
+
+// ─── 17. PEMENUHAN CSMS ──────────────────────────────────────────────────────
+// Lapis 1: template owner (terkunci per versi). Lapis 2: penerapan per site + persyaratan.
+// Lapis 3: pemenuhan per butir per periode, pengajuan berversi, dan bukti (banyak-ke-banyak).
+
+model CsmsTemplate {
+  id               String    @id @default(cuid())
+  code             String // kode template aplikasi, mis. AMM-VIB1-008A
+  version          Int       @default(1)
+  name             String
+  ownerName        String // owner/pemberi kerja, mis. PT Antareja Mahada Makmur
+  sourceDocCode    String // kode dokumen sumber, mis. AMM-VIB1-F-SHE-008A
+  sourceDocName    String
+  sourceRevision   String?
+  sourceEffective  DateTime?
+  sourceMaxScore   Int? // nilai maksimum tertulis di sumber (dicocokkan dengan jumlah butir)
+  scoringGuide     String? // pedoman nilai 0/1/2 dari sumber
+  naPolicy         String    @default("EXCLUDE_FROM_MAX") // EXCLUDE_FROM_MAX | SCORE_ZERO
+  status           String    @default("DRAFT") // DRAFT | ACTIVE | RETIRED; ACTIVE tidak dapat diubah
+  copiedFromId     String?
+  notes            String?
+  createdBy        String
+  createdByName    String
+  activatedAt      DateTime?
+  activatedByName  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  copiedFrom       CsmsTemplate?  @relation("TemplateCopy", fields: [copiedFromId], references: [id])
+  copies           CsmsTemplate[] @relation("TemplateCopy")
+  elements         CsmsElement[]
+  items            CsmsItem[]
+  applications     CsmsSiteApplication[]
+
+  @@unique([code, version])
+}
+
+model CsmsElement {
+  id         String       @id @default(cuid())
+  templateId String
+  number     Int
+  name       String
+  hoScope    String? // tanggung jawab HO
+  siteScope  String? // tanggung jawab Site
+  template   CsmsTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  items      CsmsItem[]
+  requirements CsmsRequirement[]
+
+  @@unique([templateId, number])
+}
+
+model CsmsItem {
+  id               String       @id @default(cuid())
+  templateId       String
+  elementId        String
+  internalCode     String // ID internal unik per template, mis. U05.02
+  sourceCode       String? // kode persis seperti di sumber (boleh kosong/berulang)
+  refCode          String? // kode terdekat di atasnya untuk baris lanjutan
+  subHeader        String? // subjudul sumber (mis. "Perusahaan memiliki Program:")
+  sourceText       String // kutipan persis dari sumber
+  displayText      String? // teks tampilan yang dirapikan (disetujui HO)
+  maxScore         Int          @default(2)
+  responsibility   String       @default("BERSAMA") // HO | SITE | BERSAMA
+  defaultFrequency String       @default("ONCE")
+  evidenceGuide    String?
+  sourceRow        Int?
+  sortOrder        Int          @default(0)
+  template         CsmsTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  element          CsmsElement  @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  requirements     CsmsRequirement[]
+  documents        HseDocumentCsmsItem[]
+
+  @@unique([templateId, internalCode])
+  @@index([elementId, sortOrder])
+}
+
+model CsmsSiteApplication {
+  id              String    @id @default(cuid())
+  siteId          String
+  templateId      String
+  projectId       String? // proyek/owner pada Site & Proyek
+  ownerRegisterNo String? // Nomor register CMS dari owner (008B)
+  status          String    @default("ACTIVE") // ACTIVE | ENDED
+  requireReview   Boolean   @default(false) // tahap periksa PJO/PM sebelum verifikasi HO
+  startDate       DateTime
+  endDate         DateTime?
+  notes           String?
+  createdBy       String
+  createdByName   String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  site            Site         @relation(fields: [siteId], references: [id])
+  template        CsmsTemplate @relation(fields: [templateId], references: [id])
+  requirements    CsmsRequirement[]
+
+  @@index([siteId, status])
+  @@index([templateId])
+}
+
+model CsmsRequirement {
+  id               String    @id @default(cuid())
+  applicationId    String
+  itemId           String? // null = butir tambahan site (tidak ikut nilai assessment)
+  elementId        String
+  origin           String    @default("TEMPLATE") // TEMPLATE | SITE_ADDITION
+  code             String? // kode butir tambahan site, mis. S-01
+  text             String? // teks butir tambahan site
+  sourceRef        String? // acuan kontrak / surat owner (wajib untuk tambahan site)
+  applicability    String    @default("APPLICABLE") // APPLICABLE | NA_PENDING | NA
+  naReason         String?
+  naRequestedByName String?
+  naDecidedByName  String?
+  naDecidedAt      DateTime?
+  responsibility   String    @default("BERSAMA") // HO | SITE | BERSAMA
+  frequency        String    @default("ONCE") // ONCE | ON_CHANGE | DAILY | WEEKLY | MONTHLY | YEARLY | EVENT | CUSTOM
+  dueDays          Int? // tenggat = akhir periode + n hari; null = belum ditetapkan
+  dueDate          DateTime? // tenggat untuk frekuensi sekali/awal proyek
+  schedule         Json? // CUSTOM: daftar tanggal jatuh tempo (YYYY-MM-DD)
+  picRole          String? // HO_HSE | HSE_SITE | HRD | PJO | PM | LOGISTIK | OPERASIONAL | MEKANIK | ADMIN_LEGAL
+  picUserId        String?
+  picName          String?
+  supportRoles     String? // bagian pendukung (teks, dipisah koma)
+  evidenceGuide    String? // petunjuk bukti khusus site (menimpa petunjuk template)
+  ownerReference   String? // acuan owner khusus site
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  application      CsmsSiteApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  item             CsmsItem?           @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  element          CsmsElement         @relation(fields: [elementId], references: [id])
+  fulfillments     CsmsFulfillment[]
+
+  @@unique([applicationId, itemId])
+  @@index([applicationId, elementId])
+}
+
+model CsmsFulfillment {
+  id             String    @id @default(cuid())
+  requirementId  String
+  siteId         String // salinan dari penerapan untuk pembatasan cakupan
+  periodKey      String // AWAL | 2026-10-16 | 2026-W42 | 2026-10 | 2026 | tanggal kejadian/jadwal
+  periodStart    DateTime
+  periodEnd      DateTime
+  dueDate        DateTime?
+  status         String    @default("DRAFT") // DRAFT | SUBMITTED | REVIEWED | REVISION | VERIFIED (Belum diisi = belum ada baris)
+  version        Int       @default(0) // nomor pengajuan terakhir
+  note           String? // catatan pengisi
+  reviewNote     String? // catatan pemeriksaan terakhir
+  lastActorName  String?
+  submittedAt    DateTime?
+  verifiedAt     DateTime?
+  verifiedByName String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  requirement    CsmsRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  submissions    CsmsSubmission[]
+  evidenceLinks  CsmsEvidenceLink[]
+
+  @@unique([requirementId, periodKey])
+  @@index([siteId, status])
+  @@index([status, dueDate])
+}
+
+// Setiap pengajuan disimpan utuh (snapshot bukti) sehingga revisi tidak menghapus riwayat.
+model CsmsSubmission {
+  id              String    @id @default(cuid())
+  fulfillmentId   String
+  version         Int
+  note            String?
+  evidence        Json // snapshot bukti saat diajukan
+  submittedById   String
+  submittedByName String
+  submittedAt     DateTime  @default(now())
+  outcome         String    @default("PENDING") // PENDING | REVIEWED | RETURNED | VERIFIED | SUPERSEDED
+  reviewedByName  String?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  decidedByName   String?
+  decidedAt       DateTime?
+  decisionNote    String?
+  fulfillment     CsmsFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+
+  @@unique([fulfillmentId, version])
+  @@index([outcome, submittedAt])
+}
+
+model CsmsEvidence {
+  id            String    @id @default(cuid())
+  siteId        String? // null = bukti HO
+  kind          String // FILE | DOCUMENT | SOURCE
+  fileId        String?   @unique
+  documentId    String? // dokumen induk/Dokumen HSE (tanpa unggah ulang)
+  sourceType    String? // TRAINING_SESSION | CERTIFICATE | ACTIVITY | REPORT | INCIDENT | WORK_PERMIT (Tahap 2)
+  sourceId      String?
+  title         String
+  description   String?
+  evidenceDate  DateTime?
+  validUntil    DateTime?
+  createdById   String
+  createdByName String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  links         CsmsEvidenceLink[]
+
+  @@index([siteId, createdAt])
+  @@index([documentId])
+  @@index([sourceType, sourceId])
+}
+
+model CsmsEvidenceLink {
+  evidenceId    String
+  fulfillmentId String
+  linkedByName  String
+  linkedAt      DateTime  @default(now())
+  evidence      CsmsEvidence    @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  fulfillment   CsmsFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+
+  @@id([evidenceId, fulfillmentId])
+  @@index([fulfillmentId])
 }
 
 // ─── 16. NOTIFIKASI & APPROVAL ───────────────────────────────────────────────

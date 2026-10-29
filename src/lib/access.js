@@ -35,6 +35,9 @@ export const MODULES = {
   training: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD'] },
   hrd: { read: ['HRD', 'DIREKSI'], write: ['HRD', 'DIREKSI'] },
   documents: { read: ALL, write: ['HO_HSE', 'HSE_SITE'] },
+  // Pemenuhan CSMS: HRD hanya membaca butir yang PIC-nya HRD; PJO/PM menulis untuk pemeriksaan saja
+  // (aksi per peran dicek di csmsTransition dan service).
+  csms: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI', 'HRD'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
   settings: { read: ['HO_HSE', 'DIREKSI', 'HRD'], write: ['HO_HSE'] },
   users: { read: ['HO_HSE'], write: ['HO_HSE'] },
   'audit-log': { read: ['HO_HSE', 'DIREKSI'] },
@@ -133,3 +136,29 @@ export function reportTransition(role, action, status) {
   if (!rule || !rule.roles.includes(role) || !rule.from.includes(status)) return null;
   return rule;
 }
+
+// ─── Alur pemenuhan CSMS: Site menyiapkan → mengajukan → (PJO/PM bila diwajibkan) → verifikasi HO ──
+// Verifikasi HO = verifikasi internal PJM, bukan persetujuan owner. BELUM = belum ada catatan.
+const CSMS_TRANSITIONS = {
+  SAVE: { from: ['BELUM', 'DRAFT', 'REVISION'], to: 'DRAFT', roles: () => ['HSE_SITE', 'HO_HSE'] },
+  SUBMIT: { from: ['BELUM', 'DRAFT', 'REVISION'], to: 'SUBMITTED', roles: () => ['HSE_SITE', 'HO_HSE'] },
+  // Bukti terverifikasi yang diubah wajib diperiksa ulang: kembali ke Draft, riwayat tetap.
+  REVISE: { from: ['VERIFIED'], to: 'DRAFT', roles: () => ['HSE_SITE', 'HO_HSE'] },
+  REVIEW: { from: ['SUBMITTED'], to: 'REVIEWED', roles: (review) => (review ? ['PJO', 'PM'] : []) },
+  RETURN: { from: ['SUBMITTED', 'REVIEWED'], to: 'REVISION', note: true, roles: (review, status) => (status === 'REVIEWED' || !review ? ['HO_HSE'] : ['PJO', 'PM']) },
+  VERIFY: { from: ['SUBMITTED', 'REVIEWED'], to: 'VERIFIED', roles: (review, status) => (status === 'REVIEWED' || !review ? ['HO_HSE'] : []) },
+  REOPEN: { from: ['VERIFIED'], to: 'REVISION', note: true, roles: () => ['HO_HSE'] },
+};
+
+export function csmsTransition(role, action, status, requireReview = false) {
+  const rule = Object.hasOwn(CSMS_TRANSITIONS, action) ? CSMS_TRANSITIONS[action] : null;
+  if (!rule || !rule.from.includes(status) || !rule.roles(Boolean(requireReview), status).includes(role)) return null;
+  return { action, to: rule.to, noteRequired: Boolean(rule.note) };
+}
+
+/** Aksi yang tersedia untuk peran pada status tertentu (untuk tombol utama sesuai langkah berikutnya). */
+export const csmsActions = (role, status, requireReview) =>
+  Object.keys(CSMS_TRANSITIONS).filter((a) => csmsTransition(role, a, status, requireReview));
+
+// Standar CSMS (template, penerapan, persyaratan site, N/A) hanya dikelola HO HSE.
+export const canManageCsms = (user) => user?.role === 'HO_HSE';

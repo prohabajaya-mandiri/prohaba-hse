@@ -2,7 +2,18 @@
 // halaman modulnya, dipilih lewat ?tab= sehingga bisa dibuka langsung dan
 // tetap terpilih saat halaman dimuat ulang. Aman dipakai di client.
 
+// Item sub-menu: [kunci, label, peran?]; peran (opsional) membatasi sub-menu yang tampil di sidebar.
 export const MODULE_TABS = {
+  '/csms': {
+    param: 'tab',
+    items: [
+      ['summary', 'Ringkasan CSMS'],
+      ['checklist', 'Checklist & Bukti Pemenuhan'],
+      ['documents', 'Dokumen Induk HO'],
+      ['verify', 'Verifikasi & Tindak Lanjut'],
+      ['setup', 'Template & Penerapan', ['HO_HSE']],
+    ],
+  },
   '/roster': {
     param: 'tab',
     items: [
@@ -31,13 +42,14 @@ export const MODULE_TABS = {
   },
 };
 
-export function tabsFor(path) {
-  return MODULE_TABS[path]?.items ?? [];
+export function tabsFor(path, role) {
+  const items = MODULE_TABS[path]?.items ?? [];
+  return role ? items.filter(([, , roles]) => !roles || roles.includes(role)) : items;
 }
 
 /** Kunci sub-menu yang valid dari nilai query; jatuh ke sub-menu pertama. */
-export function currentTab(path, value) {
-  const items = tabsFor(path);
+export function currentTab(path, value, role) {
+  const items = tabsFor(path, role);
   return items.some(([key]) => key === value) ? value : items[0]?.[0];
 }
 

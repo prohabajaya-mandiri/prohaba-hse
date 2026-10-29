@@ -1,6 +1,7 @@
 import { prisma } from '../prisma.js';
 import { siteScope } from '../access.js';
 import { ensure, object } from '../validation.js';
+import { csmsPendingFor } from './csms.js';
 
 export async function listNotifications(user, f = {}, { skip = 0, take = 50 } = {}) {
   const where = { userId: user.id, ...(f.unread === '1' ? { readAt: null } : {}), ...(f.type ? { type: String(f.type) } : {}) };
@@ -54,6 +55,7 @@ export async function pendingApprovals(user) {
     const reports = await prisma.hseReport.findMany({ where: { status: 'REVISION', ...siteIn }, include: { site: { select: { code: true } } } });
     reports.forEach((r) => items.push({ kind: 'REPORT', id: r.id, title: `Revisi laporan ${r.type.toLowerCase()} ${r.site.code} ${r.periodKey}`, detail: r.approveNote ?? r.reviewNote ?? '', link: '/reports/' + r.id, since: r.updatedAt }));
   }
+  items.push(...(await csmsPendingFor(user)));
   const mine = await prisma.mutation.findMany({ where: { requestedBy: user.id, status: 'PENDING' }, include: { personnel: { select: { name: true } }, toSite: { select: { code: true } } } });
   mine.forEach((m) => items.push({ kind: 'MY_REQUEST', id: m.id, title: `Pengajuan Anda: mutasi ${m.number}`, detail: `${m.personnel.name} → ${m.toSite.code} menunggu HO`, link: '/placements', since: m.createdAt }));
   const history = await prisma.approvalLog.findMany({ where: ['HO_HSE', 'DIREKSI'].includes(user.role) ? {} : { actorId: user.id }, orderBy: { createdAt: 'desc' }, take: 50 });
