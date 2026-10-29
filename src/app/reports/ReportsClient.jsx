@@ -4,14 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, AlertTriangle } from 'lucide-react';
 import { Badge, Card, DataTable, FilterBar, FormFields, Modal, Pager, useSubmit } from '@/components/ui';
-import { formatDate, isoWeekKey, todayIso } from '@/lib/dates';
+import { formatDate, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 
-const defaultKey = (type) => {
-  const t = todayIso();
-  if (type === 'HARIAN') return t;
-  if (type === 'MINGGUAN') return isoWeekKey(new Date(t));
-  const d = new Date(t);
+// Laporan baru hanya bulanan; default bulan lalu.
+const defaultKey = () => {
+  const d = new Date(todayIso());
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
 };
 
@@ -22,10 +20,7 @@ export default function ReportsClient({ user, sites, data, page }) {
   const canCreate = ['HSE_SITE', 'HO_HSE'].includes(user.role);
   const queueLabel = ['PJO', 'PM'].includes(user.role) ? 'Perlu diperiksa' : user.role === 'HO_HSE' ? 'Perlu disahkan' : 'Draft & revisi';
 
-  const setValues = (u) => setForm((prev) => {
-    const next = typeof u === 'function' ? u(prev) : u;
-    return next.type !== prev.type ? { ...next, periodKey: defaultKey(next.type) } : next;
-  });
+  const setValues = (u) => setForm((prev) => (typeof u === 'function' ? u(prev) : u));
 
   return (
     <div className="stack">
@@ -49,7 +44,7 @@ export default function ReportsClient({ user, sites, data, page }) {
         { name: 'status', label: 'Status', type: 'select', options: ['DRAFT', 'SUBMITTED', 'REVIEWED', 'REVISION', 'APPROVED'] },
         { name: 'period', label: 'Cek bulan', type: 'month' },
       ]}>
-        {canCreate && <button className="btn btn-primary" onClick={() => setForm({ siteId: sites.filter((s) => !s.isHo).length === 1 ? sites.find((s) => !s.isHo).id : '', type: 'BULANAN', periodKey: defaultKey('BULANAN') })}><Plus size={16} /> Buat laporan</button>}
+        {canCreate && <button className="btn btn-primary" onClick={() => setForm({ siteId: sites.filter((s) => !s.isHo).length === 1 ? sites.find((s) => !s.isHo).id : '', type: 'BULANAN', periodKey: defaultKey() })}><Plus size={16} /> Buat laporan</button>}
       </FilterBar>
 
       <div className="card">
@@ -71,8 +66,8 @@ export default function ReportsClient({ user, sites, data, page }) {
           <form onSubmit={async (e) => { e.preventDefault(); const r = await submit('/api/reports', { body: form }); if (r?.id) router.push('/reports/' + r.id); }}>
             <FormFields values={form} setValues={setValues} fields={[
               { name: 'siteId', label: 'Site', type: 'select', options: sites.filter((s) => !s.isHo && s.isActive).map((s) => [s.id, `${s.code} — ${s.name}`]), required: true },
-              { name: 'type', label: 'Jenis', type: 'select', options: ['HARIAN', 'MINGGUAN', 'BULANAN'], required: true, noEmpty: true },
-              { name: 'periodKey', label: 'Periode', type: form.type === 'HARIAN' ? 'date' : form.type === 'MINGGUAN' ? 'week' : 'month', required: true, hint: 'Harian: tanggal · Mingguan: minggu ISO · Bulanan: bulan.' },
+              { name: 'type', label: 'Jenis', type: 'select', options: ['BULANAN'], required: true, noEmpty: true },
+              { name: 'periodKey', label: 'Periode', type: 'month', required: true, hint: 'Bulan laporan.' },
             ]} />
             <button className="btn btn-primary" disabled={busy}>Buat draft</button>
           </form>

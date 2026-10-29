@@ -3,7 +3,7 @@ import { prisma } from '../prisma.js';
 import { reportTransition, siteFilter, siteScope } from '../access.js';
 import { actorName, audit } from '../audit.js';
 import { addDays, iso, today } from '../dates.js';
-import { previousMonthKey, reportPeriod, REPORT_TYPES, sitesNotReported } from '../domain/reports.js';
+import { CREATABLE_REPORT_TYPES, previousMonthKey, reportPeriod, REPORT_TYPES, sitesNotReported } from '../domain/reports.js';
 import { safeManhours, summarize } from '../domain/performance.js';
 import { getSetting } from '../settings.js';
 import { choice, ensure, InputError, object, text } from '../validation.js';
@@ -72,10 +72,10 @@ export async function createReport(user, body) {
   object(body, ['siteId', 'type', 'periodKey']);
   ensure(user.role === 'HSE_SITE' || user.role === 'HO_HSE', 'Laporan dibuat oleh HSE Site.', 403);
   const siteId = requireSite(user, body.siteId);
-  const type = choice(body.type, REPORT_TYPES, 'Jenis laporan');
+  const type = choice(body.type, CREATABLE_REPORT_TYPES, 'Jenis laporan');
   const deadline = await getSetting('report.monthlyDeadlineDay');
   const p = reportPeriod(type, String(body.periodKey ?? ''), deadline);
-  ensure(p, 'Periode tidak valid (harian YYYY-MM-DD, mingguan YYYY-Www, bulanan YYYY-MM).');
+  ensure(p, 'Periode tidak valid (bulanan YYYY-MM).');
   ensure(p.start <= today(), 'Periode belum dimulai.');
   return prisma.$transaction(async (tx) => {
     const row = await tx.hseReport.create({

@@ -1,6 +1,8 @@
 import { iso, isoWeekKey, isoWeekRange, monthRange, toDate } from '../dates.js';
 
 export const REPORT_TYPES = ['HARIAN', 'MINGGUAN', 'BULANAN'];
+// Laporan baru hanya bulanan; harian/mingguan lama tetap bisa dibuka & difilter.
+export const CREATABLE_REPORT_TYPES = ['BULANAN'];
 export const REPORT_STATUS_LABELS = {
   DRAFT: 'Draft',
   SUBMITTED: 'Dikirim',
