@@ -56,6 +56,7 @@ export const LABELS = {
   ASSESSMENT: 'Assessment', INSPEKSI: 'Inspeksi', INSIDEN: 'Insiden', PEMERIKSAAN_DOKUMEN: 'Pemeriksaan dokumen',
   RENDAH: 'Rendah', SEDANG: 'Sedang', TINGGI: 'Tinggi', INTI: 'Inti', NON_INTI: 'Non inti', LOKAL: 'Lokal', NASIONAL: 'Nasional',
   SAFETY_OFFICER: 'Safety Officer',
+  ALAT_BERAT: 'Alat berat', KENDARAAN: 'Kendaraan', GENSET: 'Genset', ALAT_KECIL: 'Alat kecil',
   TERCATAT: 'Tercatat', BERAKHIR: 'Berakhir', DIBATALKAN: 'Dibatalkan', FINAL: 'Final',
   // indikator
   ACTIVITY: 'Aktivitas', OBSERVATION: 'Observasi', INCIDENT: 'Kejadian',

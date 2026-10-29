@@ -9,12 +9,32 @@ import { summarize } from '../domain/performance.js';
 import { labelOf } from '../labels.js';
 import { ensure, InputError } from '../validation.js';
 import { sourceData } from './performance.js';
+import { centerFetch, centerPublicUrl } from '../center-client.js';
 
 const fmt = (n) => new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(Number(n ?? 0));
 const range = (start, end) => `${iso(start)} s/d ${iso(end)}`;
 const qs = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v)).toString();
 
+const DUE_LABELS = { TERLAMBAT: 'servis terlambat', MENDEKATI: 'servis ≤14 hari', TERJADWAL: 'terjadwal (tanggal)', TERJADWAL_METER: 'terjadwal (HM/KM)', TANPA_JADWAL: 'tanpa jadwal' };
+
 const BUILDERS = {
+  // Data alat & pemeliharaan dicatat di ERP Center (Logistik → Perawatan & servis); E-HSE hanya membaca.
+  async EQUIPMENT({ siteId, start, end, user }) {
+    const from = end.getTime() - start.getTime() > 399 * 86400000 ? addDays(end, -399) : start;
+    const data = await centerFetch(user, '/equipment', { hseSiteId: siteId, from: iso(from), to: iso(end) });
+    if (!data?.units?.length) return [];
+    const s = data.summary;
+    const due = Object.entries(s.byDue).map(([k, v]) => `${DUE_LABELS[k] ?? k} ${v}`).join(', ');
+    return [{
+      key: 'EQUIPMENT:RECAP', title: `Daftar alat & status pemeliharaan (ERP) ${range(from, end)}`,
+      summary: `${s.units} unit (${Object.entries(s.byType).map(([k, v]) => `${labelOf(k)} ${v}`).join(', ')}); ${due}; ${s.servicesInPeriod} catatan servis dalam periode`,
+      link: centerPublicUrl() ? `${centerPublicUrl()}/logistik?tab=maintenance` : null,
+      snapshot: {
+        from: iso(from), to: iso(end), source: 'ERP Center', projects: data.projects.map((p) => p.code), definition: data.definition, summary: s,
+        units: data.units.map((u) => ({ code: u.code, name: u.name, type: u.type, due: u.service.due, nextServiceDate: iso(u.service.nextServiceDate), nextServiceMeter: u.service.nextServiceMeter, lastServiceDate: iso(u.service.lastServiceDate), servicesInPeriod: u.service.servicesInPeriod })),
+      },
+    }];
+  },
   async ACTIVITY({ siteId, start, end }) {
     const [rows, indicators] = await Promise.all([
       prisma.hseActivity.groupBy({ by: ['indicatorCode'], where: { siteId, date: { gte: start, lte: end } }, _sum: { count: true, participants: true }, _count: true }),
@@ -166,7 +186,13 @@ export async function buildSourceOptions(user, { siteId, start, end, types }) {
   const out = [];
   for (const type of types) {
     if (!Object.hasOwn(BUILDERS, type) || !canAccess(user.role, SOURCE_TYPES[type].module)) continue;
-    out.push({ type, label: SOURCE_TYPES[type].label, options: await BUILDERS[type]({ siteId, start, end, now }) });
+    try {
+      out.push({ type, label: SOURCE_TYPES[type].label, options: await BUILDERS[type]({ siteId, start, end, now, user }) });
+    } catch (error) {
+      // Sumber dari aplikasi lain (ERP) bisa belum dikonfigurasi atau tidak terjangkau: tampilkan alasannya, sumber lain tetap jalan.
+      if (!(error instanceof InputError)) throw error;
+      out.push({ type, label: SOURCE_TYPES[type].label, options: [], note: error.message });
+    }
   }
   return out;
 }

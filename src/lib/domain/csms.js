@@ -185,6 +185,7 @@ export const SOURCE_TYPES = {
   MCU: { label: 'Status MCU personel site (tanpa data medis)', module: '/mcu' },
   FINDING: { label: 'Temuan CSMS yang sudah ditutup', module: '/csms' },
   WORK_PERMIT: { label: 'Izin kerja khusus dari owner', module: '/work-permits' },
+  EQUIPMENT: { label: 'Alat/unit & pemeliharaan (ERP Center)', module: '/csms' },
 };
 
 // Saran sumber per butir template berdasarkan isi persyaratan (kode internal transkripsi 008A).
@@ -197,6 +198,7 @@ const SUGGESTED = {
     'U06.03': [['ACTIVITY', 'INSPECTION'], ['ACTIVITY', 'PATROL']],
     'U06.04': ['FINDING'], 'U06.05': ['PERFORMANCE'], 'U06.06': ['REPORT'],
     'U07.02': ['INCIDENT'], 'U07.03': ['INCIDENT'], 'U12.02': ['MCU'], 'U09.02': ['WORK_PERMIT'],
+    'U14.02': ['EQUIPMENT'], 'U14.06': ['EQUIPMENT'],
   },
 };
 

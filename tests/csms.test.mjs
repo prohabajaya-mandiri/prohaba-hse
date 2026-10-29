@@ -141,7 +141,7 @@ test('saran bukti dari modul hanya untuk butir yang isinya sesuai; MCU tanpa dat
   assert.deepEqual(suggestedSources('AMM-VIB1-F-SHE-008A', 'U01.01'), [], 'kebijakan = dokumen, bukan data modul');
   assert.deepEqual(suggestedSources('OWNER-LAIN', 'U12.02'), []);
   const counted = template.elements.flatMap((e) => e.items).filter((i) => suggestedSources(template.sourceDocCode ?? 'AMM-VIB1-F-SHE-008A', i.id).length);
-  assert.equal(counted.length, 16, '16 butir 008A punya saran sumber modul (termasuk U09.02 izin kerja)');
+  assert.equal(counted.length, 18, '18 butir 008A punya saran sumber modul (termasuk izin kerja & alat ERP)');
   assert.equal(SOURCE_TYPES.MCU.module, '/mcu');
 });
 

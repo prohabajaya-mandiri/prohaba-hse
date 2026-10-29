@@ -291,7 +291,7 @@ function SourcePicker({ open, reqId, periodKey, onClose, onPick, busy }) {
             {groups.map((g) => (
               <div key={g.type}>
                 <div className="section-title" style={{ marginBottom: 6 }}>{g.label}{g.suggested && <span className="chip" style={{ marginLeft: 8 }}>Disarankan</span>}</div>
-                {g.options.length === 0 ? <p className="muted">Tidak ada data pada periode ini.</p> : (
+                {g.note ? <p className="muted">{g.note}</p> : g.options.length === 0 ? <p className="muted">Tidak ada data pada periode ini.</p> : (
                   <DataTable rows={g.options} rowKey={(o) => o.key} columns={[
                     { key: 't', label: 'Data', render: (o) => (<div><strong>{o.title}</strong>{o.suggested && g.options.length > 1 && <span className="chip" style={{ marginLeft: 6 }}>Disarankan</span>}<div className="cell-sub">{o.summary}</div></div>) },
                     { key: 'l', label: '', render: (o) => <a className="btn btn-ghost btn-sm" href={o.link} target="_blank" rel="noreferrer">Lihat</a> },
