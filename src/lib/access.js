@@ -38,6 +38,8 @@ export const MODULES = {
   // CSMS: HRD hanya membaca butir yang PIC-nya HRD; PJO/PM menulis untuk pemeriksaan saja
   // (aksi per peran dicek di csmsTransition dan service).
   csms: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI', 'HRD'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
+  // Izin kerja khusus dari owner (aktivitas), terpisah dari Permit & SKS personel.
+  'work-permits': { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE'] },
   settings: { read: ['HO_HSE', 'DIREKSI', 'HRD'], write: ['HO_HSE'] },
   users: { read: ['HO_HSE'], write: ['HO_HSE'] },
   'audit-log': { read: ['HO_HSE', 'DIREKSI'] },

@@ -11,6 +11,7 @@ export const MODULE_TABS = {
       ['checklist', 'Checklist & Bukti'],
       ['documents', 'Dokumen Induk HO'],
       ['verify', 'Verifikasi & Tindak Lanjut'],
+      ['assessment', 'Assessment Internal', ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI']],
       ['setup', 'Template & Penerapan', ['HO_HSE']],
     ],
   },

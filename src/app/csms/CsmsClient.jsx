@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Clock, AlertTriangle, CheckCircle2, FileWarning, CalendarX, Undo2, Search as SearchIcon, Plus, Copy, CheckCheck, Trash2, Download, History, Settings2, ExternalLink } from 'lucide-react';
+import { ClipboardList, Clock, AlertTriangle, CheckCircle2, FileWarning, CalendarX, Undo2, Search as SearchIcon, Plus, Copy, CheckCheck, Trash2, Download, History, Settings2, ExternalLink, Printer } from 'lucide-react';
 import { Badge, Card, DataTable, FilterBar, FormFields, Kpi, Modal, Pager, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
@@ -12,11 +12,13 @@ import { PIC_ROLES } from '@/lib/domain/csms';
 import { Flags, Percent, RESP_LABELS, STATUS_OPTIONS, StatusBadge, freqLabel, picLabel } from './shared';
 import { FindingsRegister } from './Findings';
 import { AdministrationCard, CompanyProfileCard } from './Administration';
+import { AssessmentList } from './Assessments';
 
 export default function CsmsClient({ tab, user, sites, data, page }) {
   if (tab === 'summary') return <Summary data={data} sites={sites} user={user} />;
   if (tab === 'checklist') return <Checklist data={data} page={page} />;
   if (tab === 'documents') return <MasterDocuments data={data} sites={sites} canManage={user.role === 'HO_HSE'} />;
+  if (tab === 'assessment') return <AssessmentList data={data} canCreate={user.role === 'HO_HSE'} />;
   if (tab === 'verify') return <VerifyQueue data={data} sites={sites} canCreate={['HO_HSE', 'HSE_SITE'].includes(user.role)} />;
   return <Setup data={data} sites={sites} />;
 }
@@ -30,7 +32,10 @@ function Summary({ data, sites, user }) {
   const single = data.perApp.length === 1 ? data.perApp[0] : null;
   return (
     <div className="stack">
-      <FilterBar filters={[siteFilter(sites), periodFilter]} />
+      <FilterBar filters={[siteFilter(sites), periodFilter]}>
+        <a className="btn btn-outline" href={`/api/csms/export?kind=recap&period=${data.month}`}><Download size={16} /> Rekap Excel</a>
+        <a className="btn btn-outline" href="/api/csms/export?kind=admin"><Download size={16} /> 008B Excel</a>
+      </FilterBar>
       <div className="notice info">
         <strong>Kelengkapan terverifikasi</strong> = butir berlaku yang terverifikasi HO ÷ butir berlaku. Angka ini bukan nilai assessment dan bukan keputusan kelulusan owner.
         Verifikasi HO adalah verifikasi internal PJM.
@@ -53,8 +58,15 @@ function Summary({ data, sites, user }) {
             <Card title="(A) Kelengkapan terverifikasi">
               <Percent summary={data.completeness} big />
             </Card>
-            <Card title="(B) Nilai assessment internal">
-              <p className="muted">Belum ada assessment. Assessment bernilai 0/1/2 dicatat terpisah dari checklist dan diisi penilai berdasarkan bukti (Tahap 3).</p>
+            <Card title="(B) Nilai assessment internal (final terakhir)" padding={data.finals.length ? 0 : 20}>
+              {data.finals.length ? (
+                <DataTable rows={data.finals} columns={[
+                  { key: 's', label: 'Site', render: (a) => a.site.code },
+                  { key: 'n', label: 'Assessment', render: (a) => (<Link href={`/csms/assessments/${a.id}`}>{a.number}<div className="muted">{a.periodLabel} · {a.template.code} v{a.template.version}</div></Link>) },
+                  { key: 'd', label: 'Tanggal', render: (a) => formatDate(a.assessmentDate) },
+                  { key: 'v', label: 'Nilai', render: (a) => (<div><strong>{Number(a.percent).toLocaleString('id-ID')}%</strong><div className="muted">{a.totalScore}/{a.maxScore}</div></div>) },
+                ]} />
+              ) : <p className="muted">Belum ada assessment final. Assessment 0/1/2 dicatat di sub-menu Assessment Internal dan dinilai penilai berdasarkan bukti.</p>}
             </Card>
           </div>
           <Card title="Rekap per site" padding={0}>
@@ -118,7 +130,11 @@ function Checklist({ data, page }) {
         { name: 'status', label: 'Status', type: 'select', options: [...STATUS_OPTIONS, ['OVERDUE', 'Tenggat terlewati'], ['EXPIRED', 'Bukti kedaluwarsa']] },
         { name: 'pic', label: 'PIC', type: 'select', options: PIC_ROLES.map((r) => [r, labelOf(r)]) },
         { type: 'search', label: 'Cari', placeholder: 'Kode / persyaratan' },
-      ]} />
+      ]}>
+        <a className="btn btn-outline" href={`/api/csms/export?kind=checklist&applicationId=${a.id}&period=${data.month}`}><Download size={16} /> Excel</a>
+        <a className="btn btn-outline" href={`/api/csms/export?kind=documents&applicationId=${a.id}&period=${data.month}`}><Download size={16} /> Kekurangan</a>
+        <button className="btn btn-outline" onClick={() => window.print()}><Printer size={16} /> PDF</button>
+      </FilterBar>
       <div className="card" style={{ padding: 16, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
         <div><div className="muted">Site</div><strong>{a.site.code} — {a.site.name}</strong></div>
         <div><div className="muted">Template</div><strong>{a.template.code} v{a.template.version}</strong><div className="muted">{a.project?.owner ?? a.template.ownerName}</div></div>
@@ -262,7 +278,9 @@ function VerifyQueue({ data, sites, canCreate }) {
   const router = useRouter();
   return (
     <div className="stack">
-      <FilterBar filters={[siteFilter(sites), { name: 'mine', label: 'Antrean', type: 'select', allLabel: 'Perlu tindakan saya', options: [['0', 'Semua pengajuan menunggu']] }]} />
+      <FilterBar filters={[siteFilter(sites), { name: 'mine', label: 'Antrean', type: 'select', allLabel: 'Perlu tindakan saya', options: [['0', 'Semua pengajuan menunggu']] }]}>
+        <a className="btn btn-outline" href="/api/csms/export?kind=findings"><Download size={16} /> Temuan Excel</a>
+      </FilterBar>
       <Card title={`Antrean pemeriksaan (${data.items.length}${data.all !== data.items.length ? ` dari ${data.all}` : ''})`} padding={0}>
         <DataTable rows={data.items} empty="Tidak ada pengajuan yang menunggu tindakan Anda." onRowClick={(r) => router.push(`/csms/requirements/${r.requirementId}?period=${encodeURIComponent(r.periodKey)}`)} columns={[
           { key: 'site', label: 'Site', render: (r) => r.site },

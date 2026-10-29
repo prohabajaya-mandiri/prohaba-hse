@@ -75,11 +75,13 @@ function parseFinding(body) {
     dueDate: optionalDate(body.dueDate, 'Tenggat'),
     incidentId: optionalId(body.incidentId, 'Insiden'),
     incidentActionId: optionalId(body.incidentActionId, 'Tindakan insiden'),
+    assessmentId: optionalId(body.assessmentId, 'Assessment'),
   };
 }
-const FIELDS = ['siteId', 'source', 'requirementId', 'description', 'picRole', 'picName', 'dueDate', 'incidentId', 'incidentActionId'];
+const FIELDS = ['siteId', 'source', 'requirementId', 'description', 'picRole', 'picName', 'dueDate', 'incidentId', 'incidentActionId', 'assessmentId'];
 
 async function checkLinks(tx, siteId, v, findingId = null) {
+  if (v.assessmentId) ensure(await tx.csmsAssessment.findFirst({ where: { id: v.assessmentId, siteId } }), 'Assessment bukan milik site ini.');
   if (v.requirementId) {
     ensure(await tx.csmsRequirement.findFirst({ where: { id: v.requirementId, application: { siteId } } }), 'Butir CSMS bukan milik site ini.');
   }

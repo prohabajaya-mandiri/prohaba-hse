@@ -1523,3 +1523,7 @@ th { letter-spacing: 0.04em; }
 .ktp-adjust-img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; user-select: none; -webkit-user-select: none; pointer-events: none; }
 .ktp-adjust-zoom { position: absolute; left: 0; right: 0; bottom: 112px; height: 56px; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 0 24px; background: rgba(0, 0, 0, 0.75); font-size: 13px; }
 .ktp-adjust-zoom input { flex: 1; accent-color: #4ade80; }
+
+/* Kop cetak (PDF via browser) — hanya tampil saat dicetak. */
+.print-only { display: none; }
+@media print { .print-only { display: block; } }

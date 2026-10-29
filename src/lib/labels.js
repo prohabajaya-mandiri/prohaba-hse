@@ -56,6 +56,7 @@ export const LABELS = {
   ASSESSMENT: 'Assessment', INSPEKSI: 'Inspeksi', INSIDEN: 'Insiden', PEMERIKSAAN_DOKUMEN: 'Pemeriksaan dokumen',
   RENDAH: 'Rendah', SEDANG: 'Sedang', TINGGI: 'Tinggi', INTI: 'Inti', NON_INTI: 'Non inti', LOKAL: 'Lokal', NASIONAL: 'Nasional',
   SAFETY_OFFICER: 'Safety Officer',
+  TERCATAT: 'Tercatat', BERAKHIR: 'Berakhir', DIBATALKAN: 'Dibatalkan', FINAL: 'Final',
   // indikator
   ACTIVITY: 'Aktivitas', OBSERVATION: 'Observasi', INCIDENT: 'Kejadian',
 };
@@ -80,6 +81,7 @@ export const STATUS_STYLES = {
   BELUM: gray, VERIFIED: green, RETIRED: gray, APPLICABLE: green, NA: gray, NA_PENDING: yellow,
   OVERDUE: red, EVIDENCE_EXPIRED: red, EVIDENCE_EXPIRING: yellow, RETURNED: orange, SUPERSEDED: gray, SITE_ADDITION: blue,
   DEFAULT: gray, LISTED: blue, HO_ONLY: orange,
+  TERCATAT: gray, BERAKHIR: orange, DIBATALKAN: gray, FINAL: green,
   TERBUKA: red, DALAM_PROSES: yellow, DIAJUKAN_TUTUP: blue, DITUTUP: green, RENDAH: green, SEDANG: yellow, TINGGI: red,
   SCREENING: gray, MENUNGGU_HASIL: blue, SUBMIT: blue, FEEDBACK: navy, SUBMIT_FU: yellow, MOBILISASI: navy,
 };

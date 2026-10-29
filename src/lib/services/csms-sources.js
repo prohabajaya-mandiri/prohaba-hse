@@ -129,6 +129,20 @@ const BUILDERS = {
       link: `/mcu?${qs({ siteId })}`, snapshot: { asOf: iso(now), personnel: people.length, counts },
     }];
   },
+  async WORK_PERMIT({ siteId, start, end }) {
+    const rows = await prisma.workPermit.findMany({ where: { siteId, startAt: { lte: addDays(end, 1) }, endAt: { gte: start }, status: { not: 'DIBATALKAN' } }, orderBy: { startAt: 'asc' }, select: { id: true, number: true, permitType: true, status: true, startAt: true, endAt: true, closedAt: true } });
+    if (!rows.length) return [];
+    const byType = {};
+    for (const r of rows) byType[r.permitType] = (byType[r.permitType] ?? 0) + 1;
+    return [{
+      key: 'WORK_PERMIT:RECAP', title: `Izin kerja khusus ${range(start, end)}`,
+      summary: `${rows.length} izin (${Object.entries(byType).map(([k, v]) => `${k} ${v}`).join(', ')}); ditutup ${rows.filter((r) => r.status === 'DITUTUP').length}`,
+      link: `/work-permits?${qs({ siteId })}`, snapshot: { from: iso(start), to: iso(end), permits: rows.map((r) => ({ number: r.number, type: r.permitType, status: r.status, startAt: r.startAt.toISOString(), endAt: r.endAt.toISOString() })) },
+    }, ...rows.map((r) => ({
+      key: `WORK_PERMIT:${r.id}`, title: `${r.number} — ${r.permitType}`, summary: `${labelOf(r.status)} · ${iso(r.startAt)} s/d ${iso(r.endAt)}`,
+      link: `/work-permits?${qs({ q: r.number })}`, snapshot: { permitId: r.id, number: r.number, type: r.permitType, status: r.status },
+    }))];
+  },
   async FINDING({ siteId, start, end }) {
     const rows = await prisma.csmsFinding.findMany({ where: { siteId, status: 'DITUTUP', closedAt: { gte: start, lt: addDays(end, 1) } }, select: { number: true, source: true, closedAt: true } });
     if (!rows.length) return [];

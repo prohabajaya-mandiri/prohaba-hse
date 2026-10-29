@@ -7,6 +7,7 @@ import { SETTING_DEFAULTS } from '../settings-defaults.js';
 import { notifyRoles } from './notify.js';
 import { requirementReminders } from './csms.js';
 import { findingReminders } from './csms-findings.js';
+import { workPermitReminders } from './work-permits.js';
 
 const HSE = ['HO_HSE', 'HSE_SITE'];
 const when = (left) => (left < 0 ? `lewat ${-left} hari` : left === 0 ? 'hari ini' : `${left} hari lagi`);
@@ -117,6 +118,7 @@ export async function runReminders(now = today()) {
   const csmsCfg = { ...SETTING_DEFAULTS['csms.reminders'].value, ...s['csms.reminders'] };
   await requirementReminders(push, csmsCfg);
   await findingReminders(push, csmsCfg);
+  await workPermitReminders(push);
 
   await prisma.setting.upsert({
     where: { key: 'system.lastReminderRun' },
