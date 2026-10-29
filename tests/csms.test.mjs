@@ -110,3 +110,37 @@ test('akses modul CSMS: HRD & Direksi hanya baca; PJO/PM menulis untuk pemeriksa
   assert.equal(canAccess('PJO', '/api/csms/requirements/x/fulfillment', 'POST'), true);
   assert.equal(canAccess('HSE_SITE', '/api/csms/templates', 'POST'), true, 'diizinkan modul; ditolak service (hanya HO)');
 });
+
+test('temuan: unggah bukti tidak menutup; penutupan & buka kembali hanya HO dengan alasan', async () => {
+  const { findingActions, findingTransition } = await import('../src/lib/access.js');
+  assert.equal(findingTransition('HSE_SITE', 'START', 'TERBUKA').to, 'DALAM_PROSES');
+  assert.equal(findingTransition('HSE_SITE', 'SUBMIT_CLOSE', 'DALAM_PROSES').to, 'DIAJUKAN_TUTUP');
+  assert.equal(findingTransition('HSE_SITE', 'CLOSE', 'DIAJUKAN_TUTUP'), null, 'Site tidak menutup temuan');
+  assert.equal(findingTransition('HO_HSE', 'CLOSE', 'DALAM_PROSES'), null, 'harus diajukan dulu');
+  assert.equal(findingTransition('HO_HSE', 'CLOSE', 'DIAJUKAN_TUTUP').to, 'DITUTUP');
+  assert.equal(findingTransition('HO_HSE', 'RETURN', 'DIAJUKAN_TUTUP').noteRequired, true);
+  assert.equal(findingTransition('HO_HSE', 'REOPEN', 'DITUTUP').noteRequired, true);
+  assert.equal(findingTransition('PJO', 'START', 'TERBUKA'), null);
+  assert.deepEqual(findingActions('DIREKSI', 'TERBUKA'), []);
+});
+
+test('zona waktu site: hari ini dihitung per site (WIB/WITA/WIT)', async () => {
+  const { todayIn, tzLabel } = await import('../src/lib/dates.js');
+  const t = new Date('2026-10-29T16:30:00Z'); // 23:30 WIB, 00:30 WITA esok hari, 01:30 WIT
+  assert.equal(iso(todayIn('Asia/Jakarta', t)), '2026-10-29');
+  assert.equal(iso(todayIn('Asia/Makassar', t)), '2026-10-30');
+  assert.equal(iso(todayIn('Asia/Jayapura', t)), '2026-10-30');
+  assert.equal(iso(todayIn('Zona/Asal', t)), '2026-10-29', 'zona tidak dikenal jatuh ke zona aplikasi');
+  assert.equal(tzLabel('Asia/Makassar'), 'WITA');
+});
+
+test('saran bukti dari modul hanya untuk butir yang isinya sesuai; MCU tanpa data medis', async () => {
+  const { suggestedSources, SOURCE_TYPES } = await import('../src/lib/domain/csms.js');
+  assert.deepEqual(suggestedSources('AMM-VIB1-F-SHE-008A', 'U12.02'), [{ type: 'MCU' }]);
+  assert.deepEqual(suggestedSources('AMM-VIB1-F-SHE-008A', 'U06.03').map((s) => s.indicator), ['INSPECTION', 'PATROL']);
+  assert.deepEqual(suggestedSources('AMM-VIB1-F-SHE-008A', 'U01.01'), [], 'kebijakan = dokumen, bukan data modul');
+  assert.deepEqual(suggestedSources('OWNER-LAIN', 'U12.02'), []);
+  const counted = template.elements.flatMap((e) => e.items).filter((i) => suggestedSources(template.sourceDocCode ?? 'AMM-VIB1-F-SHE-008A', i.id).length);
+  assert.equal(counted.length, 15, '15 butir 008A punya saran sumber modul');
+  assert.equal(SOURCE_TYPES.MCU.module, '/mcu');
+});

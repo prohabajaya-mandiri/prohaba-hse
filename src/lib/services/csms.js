@@ -1,11 +1,12 @@
 import { prisma } from '../prisma.js';
-import { canAccess, canManageCsms, canSeeSite, csmsActions, csmsTransition, siteScope } from '../access.js';
+import { canAccess, canManageCsms, canSeeSite, csmsActions, csmsTransition, ROLES, siteScope } from '../access.js';
 import { actorName, audit, diff } from '../audit.js';
-import { addDays, iso, monthRange, today, todayIso } from '../dates.js';
+import { addDays, iso, monthRange, today, todayIn, todayIso, tzLabel } from '../dates.js';
 import {
   completeness, currentPeriodKey, derivedFlags, dueDateOf, EDITABLE, FREQUENCIES, maxScoreCheck, periodOf, PIC_ROLES,
-  requiredPeriods, RESPONSIBILITIES, rollupStatus,
+  requiredPeriods, RESPONSIBILITIES, rollupStatus, SOURCE_TYPES, suggestedSources,
 } from '../domain/csms.js';
+import { buildSourceOptions, resolveSource, sourceRange } from './csms-sources.js';
 import { getSetting } from '../settings.js';
 import { bool, choice, date, ensure, id as idOf, InputError, int, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
 import { attachFiles } from './common.js';
@@ -264,7 +265,7 @@ export async function listApplications(user, { siteId, status } = {}) {
   };
   const rows = await prisma.csmsSiteApplication.findMany({
     where,
-    include: { site: { select: { id: true, code: true, name: true } }, template: { select: { id: true, code: true, version: true, name: true, ownerName: true, status: true } } },
+    include: { site: { select: { id: true, code: true, name: true, timezone: true } }, template: { select: { id: true, code: true, version: true, name: true, ownerName: true, status: true, sourceDocCode: true } } },
     orderBy: [{ site: { name: 'asc' } }, { startDate: 'desc' }],
   });
   const projectIds = rows.map((r) => r.projectId).filter(Boolean);
@@ -462,7 +463,8 @@ export async function checklist(user, f = {}) {
   const month = MONTH_RE.test(f.period ?? '') ? f.period : todayIso().slice(0, 7);
   if (!app) return { apps, app: null, month, rows: [], total: 0, summary: completeness([]), elements: [] };
   const { start, end } = monthRange(month);
-  const now = today();
+  // Tenggat dihitung dengan tanggal hari ini menurut zona waktu site.
+  const now = todayIn(app.site.timezone);
   const threshold = (await getSetting('reminder.thresholds')).document;
   const reqs = await prisma.csmsRequirement.findMany({
     where: { applicationId: app.id, isActive: true, ...requirementScope(user) },
@@ -510,7 +512,7 @@ export async function checklist(user, f = {}) {
   }
   const skip = f.skip ?? 0, take = f.take ?? 50;
   const elements = [...new Map(reqs.map((r) => [r.element.number, r.element.name])).entries()].map(([number, name]) => ({ number, name }));
-  return { apps, app, month, rows: filtered.slice(skip, skip + take), total: filtered.length, summary, elements, threshold };
+  return { apps, app, month, rows: filtered.slice(skip, skip + take), total: filtered.length, summary, elements, threshold, tz: tzLabel(app.site.timezone) };
 }
 
 function canFill(user, app, req) {
@@ -521,7 +523,7 @@ function canFill(user, app, req) {
 async function loadRequirement(db, user, reqId) {
   const r = await db.csmsRequirement.findUnique({
     where: { id: reqId },
-    include: { item: true, element: true, application: { include: { site: { select: { id: true, code: true, name: true } }, template: { select: { id: true, code: true, version: true, name: true, ownerName: true, sourceDocCode: true, sourceRevision: true } } } } },
+    include: { item: true, element: true, application: { include: { site: { select: { id: true, code: true, name: true, timezone: true } }, template: { select: { id: true, code: true, version: true, name: true, ownerName: true, sourceDocCode: true, sourceRevision: true } } } } },
   });
   ensure(r, 'Butir CSMS tidak ditemukan.', 404);
   assertSite(user, r.application.siteId);
@@ -553,7 +555,8 @@ function assertCanFill(user, req) {
 /** Detail butir: persyaratan lengkap, acuan template, dokumen induk, bukti per periode, riwayat. */
 export async function requirementDetail(user, reqId, periodKey) {
   const r = await loadRequirement(prisma, user, reqId);
-  const key = periodKey || (r.frequency === 'CUSTOM' ? (r.schedule ?? []).find((d) => d >= todayIso()) ?? (r.schedule ?? []).at(-1) : currentPeriodKey(r.frequency, today()));
+  const siteToday = todayIn(r.application.site.timezone);
+  const key = periodKey || (r.frequency === 'CUSTOM' ? (r.schedule ?? []).find((d) => d >= iso(siteToday)) ?? (r.schedule ?? []).at(-1) : currentPeriodKey(r.frequency, siteToday));
   const fulfillments = await prisma.csmsFulfillment.findMany({
     where: { requirementId: r.id },
     orderBy: { periodStart: 'desc' },
@@ -582,6 +585,10 @@ export async function requirementDetail(user, reqId, periodKey) {
     canFill: canFill(user, r.application, r) && r.applicability === 'APPLICABLE',
     canManage: canManageCsms(user),
     masterDocs,
+    tz: tzLabel(r.application.site.timezone),
+    today: iso(siteToday),
+    suggestions: r.item ? suggestedSources(r.application.template.sourceDocCode, r.item.internalCode) : [],
+    sourceTypes: Object.entries(SOURCE_TYPES).filter(([, t]) => canAccess(user.role, t.module)).map(([type, t]) => ({ type, label: t.label })),
     history: fulfillments.map((x) => ({ id: x.id, periodKey: x.periodKey, status: x.status, version: x.version, dueDate: x.dueDate, verifiedAt: x.verifiedAt, evidenceCount: x.evidenceLinks.length })),
     approvals,
   };
@@ -606,6 +613,7 @@ function decorateFulfillment(x, docs, files, verifiedSnapshot) {
         ...e, linkedAt: l.linkedAt, linkedByName: l.linkedByName, file: e.fileId ? files[e.fileId] ?? null : null,
         document: doc ? { id: doc.id, number: doc.number, title: doc.title, revision: doc.revision, status: doc.status, versionId, fileId: doc.versions[0]?.fileId ?? null } : null,
         changedSinceVerified: x.status === 'VERIFIED' && Boolean(doc) && e.id in verifiedVersions && verifiedVersions[e.id] !== versionId,
+        source: e.kind === 'SOURCE' ? { label: SOURCE_TYPES[e.sourceType]?.label ?? e.sourceType, link: e.snapshot?.link ?? null } : null,
       };
     }),
   };
@@ -622,7 +630,7 @@ async function snapshotEvidence(tx, fulfillmentId) {
   return links.map(({ evidence: e }) => {
     const v = e.documentId ? versions.find((x) => x.documentId === e.documentId) : null;
     const f = e.fileId ? fileRows.find((x) => x.id === e.fileId) : null;
-    return { evidenceId: e.id, kind: e.kind, title: e.title, fileId: e.fileId, fileName: f?.fileName ?? null, sha256: f?.sha256 ?? null, documentId: e.documentId, documentVersionId: v?.id ?? null, documentFileId: v?.fileId ?? null, revision: v?.revision ?? null, validUntil: e.validUntil ? iso(e.validUntil) : null };
+    return { evidenceId: e.id, kind: e.kind, title: e.title, sourceType: e.sourceType, summary: e.kind === 'SOURCE' ? e.description : null, fileId: e.fileId, fileName: f?.fileName ?? null, sha256: f?.sha256 ?? null, documentId: e.documentId, documentVersionId: v?.id ?? null, documentFileId: v?.fileId ?? null, revision: v?.revision ?? null, validUntil: e.validUntil ? iso(e.validUntil) : null };
   });
 }
 
@@ -806,6 +814,44 @@ export async function canReadEvidenceFile(user, fileRow) {
   return (await prisma.csmsEvidenceLink.count({ where: { evidenceId: fileRow.entityId, fulfillment: { requirement: { picRole: 'HRD' } } } })) > 0;
 }
 
+// ─── Bukti dari data modul ─────────────────────────────────────────────────
+
+async function sourceContext(user, reqId, periodKey) {
+  const req = await loadRequirement(prisma, user, reqId);
+  const p = resolvePeriod(req, text(periodKey, 'Periode', 20));
+  const { start, end } = sourceRange(p, req.application, todayIn(req.application.site.timezone));
+  return { req, ctx: { siteId: req.application.siteId, start, end } };
+}
+
+/** Pilihan bukti dari modul untuk periode butir (saran sumber ditampilkan lebih dulu). */
+export async function requirementSources(user, reqId, { periodKey, types } = {}) {
+  const { req, ctx } = await sourceContext(user, reqId, periodKey);
+  const suggested = req.item ? suggestedSources(req.application.template.sourceDocCode, req.item.internalCode) : [];
+  const wanted = types ? String(types).split(',').filter((t) => Object.hasOwn(SOURCE_TYPES, t)) : [...new Set([...suggested.map((s) => s.type), ...Object.keys(SOURCE_TYPES)])];
+  const groups = await buildSourceOptions(user, { ...ctx, types: wanted });
+  return { from: iso(ctx.start), to: iso(ctx.end), suggested, groups: groups.map((g) => ({ ...g, suggested: suggested.some((s) => s.type === g.type), options: g.options.map(({ snapshot, ...o }) => { void snapshot; return { ...o, suggested: suggested.some((s) => s.type === g.type && (!s.indicator || s.indicator === o.indicator)) }; }) })) };
+}
+
+/** Tautkan ringkasan data modul sebagai bukti. Ringkasan dihitung ulang di server (tidak mempercayai klien). */
+export async function linkSource(user, reqId, body) {
+  object(body, ['periodKey', 'key']);
+  const { req, ctx } = await sourceContext(user, reqId, body.periodKey);
+  assertCanFill(user, req);
+  const src = await resolveSource(user, ctx, String(body.key ?? ''));
+  return prisma.$transaction(async (tx) => {
+    const { ful } = await editableFulfillment(tx, user, reqId, body.periodKey);
+    const ev = await tx.csmsEvidence.create({
+      data: {
+        siteId: req.application.siteId, kind: 'SOURCE', sourceType: src.type, sourceId: src.key, title: src.title, description: src.summary,
+        snapshot: { ...src.snapshot, link: src.link }, evidenceDate: todayIn(req.application.site.timezone), createdById: user.id, createdByName: actorName(user),
+      },
+    });
+    await tx.csmsEvidenceLink.create({ data: { evidenceId: ev.id, fulfillmentId: ful.id, linkedByName: actorName(user) } });
+    await audit(tx, user, { action: 'UPDATE', module: 'csms', recordId: ful.id, siteId: req.application.siteId, after: { source: src.key, summary: src.summary }, note: `Tautkan data modul ${reqCode(req)} ${ful.periodKey}` });
+    return { fulfillmentId: ful.id, evidenceId: ev.id };
+  }, { timeout: 20000 });
+}
+
 // ─── Verifikasi: antrean pemeriksaan ────────────────────────────────────────
 
 export async function reviewQueue(user, f = {}) {
@@ -966,3 +1012,59 @@ export async function templateItemOptions() {
 
 /** Proyek aktif per site untuk mengaitkan penerapan dengan owner di Site & Proyek. */
 export const projectOptions = () => prisma.project.findMany({ where: { status: 'ACTIVE' }, select: { id: true, siteId: true, name: true, owner: true }, orderBy: { name: 'asc' } });
+
+// ─── Pengingat (dipanggil runReminders; idempoten lewat dedupeKey) ───────────
+
+const whenText = (days) => (days < 0 ? `lewat ${-days} hari` : days === 0 ? 'hari ini' : `${days} hari lagi`);
+const dayDiff = (a, b) => Math.round((b - a) / 86400000);
+
+/** Tenggat butir mendekat/terlewati & bukti mendekati kedaluwarsa, memakai tanggal menurut zona waktu site. */
+export async function requirementReminders(push, cfg) {
+  const apps = await prisma.csmsSiteApplication.findMany({ where: { status: 'ACTIVE' }, include: { site: { select: { id: true, code: true, timezone: true } } } });
+  for (const app of apps) {
+    const now = todayIn(app.site.timezone);
+    const from = addDays(now, -cfg.lateWindowDays), to = addDays(now, cfg.dueSoonDays);
+    const reqs = await prisma.csmsRequirement.findMany({ where: { applicationId: app.id, isActive: true, applicability: 'APPLICABLE', frequency: { not: 'EVENT' } }, include: { item: { select: { sourceCode: true, refCode: true } } } });
+    const fuls = await prisma.csmsFulfillment.findMany({ where: { requirementId: { in: reqs.map((r) => r.id) } }, select: { requirementId: true, periodKey: true, status: true } });
+    const status = Object.fromEntries(fuls.map((x) => [`${x.requirementId}|${x.periodKey}`, x.status]));
+    for (const r of reqs) {
+      // Periode yang tenggatnya jatuh di jendela pengingat (periode bisa berakhir jauh sebelum tenggatnya).
+      // Butir sekali/awal proyek tetap diingatkan walau sudah lama terlambat (dedupeKey: sekali saja);
+      // butir berkala dibatasi jendela agar periode harian lama tidak membanjiri notifikasi.
+      const once = ['ONCE', 'ON_CHANGE'].includes(r.frequency);
+      const periods = requiredPeriods(r, addDays(from, -400), to, { startDate: app.startDate, endDate: app.endDate }).filter((p) => p.dueDate && (once || p.dueDate >= from) && p.dueDate <= to);
+      for (const p of periods) {
+        const st = status[`${r.id}|${p.periodKey}`] ?? 'BELUM';
+        if (['SUBMITTED', 'REVIEWED', 'VERIFIED'].includes(st)) continue;
+        const left = dayDiff(now, p.dueDate);
+        const late = left < 0;
+        const roles = new Set(r.responsibility === 'HO' ? ['HO_HSE'] : ['HSE_SITE']);
+        if (r.picRole && ROLES.includes(r.picRole)) roles.add(r.picRole);
+        if (late) roles.add('HO_HSE');
+        await push([...roles], app.siteId, {
+          type: 'CSMS', title: `Tenggat CSMS ${reqCode(r)} · ${app.site.code} · ${p.periodKey}`,
+          body: `${st === 'REVISION' ? 'Perlu revisi. ' : st === 'BELUM' ? 'Belum diisi. ' : 'Masih draft. '}Tenggat ${iso(p.dueDate)} ${tzLabel(app.site.timezone)} (${whenText(left)}).`,
+          link: `/csms/requirements/${r.id}?period=${encodeURIComponent(p.periodKey)}`, severity: late ? 'DANGER' : 'WARNING',
+          dedupeKey: `csms-due-${r.id}-${p.periodKey}-${late ? 'late' : 'due'}`, dueDate: p.dueDate,
+        });
+      }
+    }
+  }
+  const sites = Object.fromEntries((await prisma.site.findMany({ select: { id: true, timezone: true } })).map((x) => [x.id, x.timezone]));
+  const evidence = await prisma.csmsEvidence.findMany({
+    where: { validUntil: { not: null, lte: addDays(today(), cfg.evidenceExpiringDays + 1), gte: addDays(today(), -cfg.lateWindowDays - 1) }, links: { some: { fulfillment: { status: { in: ['SUBMITTED', 'REVIEWED', 'VERIFIED'] } } } } },
+    include: { links: { take: 1, include: { fulfillment: { select: { requirementId: true, periodKey: true, siteId: true } } } } },
+  });
+  for (const e of evidence) {
+    const f = e.links[0]?.fulfillment;
+    if (!f) continue;
+    const now = todayIn(sites[f.siteId]);
+    const left = dayDiff(now, e.validUntil);
+    if (left > cfg.evidenceExpiringDays || left < -cfg.lateWindowDays) continue;
+    await push(['HSE_SITE'], f.siteId, {
+      type: 'CSMS', title: `Bukti CSMS ${left < 0 ? 'kedaluwarsa' : 'mendekati kedaluwarsa'}: ${e.title}`, body: `Berlaku sampai ${iso(e.validUntil)} (${whenText(left)}). Perbarui bukti agar diperiksa ulang.`,
+      link: `/csms/requirements/${f.requirementId}?period=${encodeURIComponent(f.periodKey)}`, severity: left < 0 ? 'DANGER' : 'WARNING',
+      dedupeKey: `csms-ev-${e.id}-${iso(e.validUntil)}-${left < 0 ? 'late' : 'due'}`, dueDate: e.validUntil,
+    });
+  }
+}

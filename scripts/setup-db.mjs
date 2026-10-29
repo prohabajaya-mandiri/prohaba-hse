@@ -75,7 +75,7 @@ if (phase === 'roles') {
   const client = new pg.Client({ connectionString: direct.toString(), ssl: { ca: readFileSync('prisma/certs/supabase-ca.crt', 'utf8'), rejectUnauthorized: true } });
   await client.connect();
   const ownerSql = async (query) => (await client.query(query)).rows;
-  const appendOnly = ['AuditLog', 'ApprovalLog', 'HseReportHistory'];
+  const appendOnly = ['AuditLog', 'ApprovalLog', 'HseReportHistory', 'CsmsFindingHistory'];
   await ownerSql(`BEGIN;
     DO $$ DECLARE t record; BEGIN
       FOR t IN SELECT tablename FROM pg_tables WHERE schemaname=${q(schema)} AND tablename<>'_prisma_migrations' LOOP

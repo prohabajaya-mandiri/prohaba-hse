@@ -110,6 +110,7 @@ model Site {
   name      String
   location  String?
   region    String // TIMUR | BARAT | HO
+  timezone  String? // Asia/Jakarta (WIB) | Asia/Makassar (WITA) | Asia/Jayapura (WIT); kosong = zona aplikasi
   isHo      Boolean   @default(false)
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
@@ -136,6 +137,8 @@ model Site {
   registrations Registration[]
   csmsApplications CsmsSiteApplication[]
   documentAccess   HseDocumentSite[]
+  csmsProfile      SiteCsmsProfile?
+  csmsFindings     CsmsFinding[]
 }
 
 model Project {
@@ -159,9 +162,13 @@ model Project {
 model SiteResponsible {
   id        String    @id @default(cuid())
   siteId    String
-  role      String // PJO | PM | HSE_SITE
+  role      String // PJO | PM | HSE_SITE | SAFETY_OFFICER
   name      String
   phone     String?
+  email     String?
+  competency  String? // kompetensi kepengawasan PJO (POP/POM/POU)
+  approvalNo  String? // nomor surat pengesahan PJO
+  approvalDate DateTime?
   userId    String?
   startDate DateTime
   endDate   DateTime?
@@ -920,6 +927,7 @@ model CsmsRequirement {
   item             CsmsItem?           @relation(fields: [itemId], references: [id], onDelete: Restrict)
   element          CsmsElement         @relation(fields: [elementId], references: [id])
   fulfillments     CsmsFulfillment[]
+  findings         CsmsFinding[]
 
   @@unique([applicationId, itemId])
   @@index([applicationId, elementId])
@@ -987,6 +995,7 @@ model CsmsEvidence {
   description   String?
   evidenceDate  DateTime?
   validUntil    DateTime?
+  snapshot      Json? // SOURCE: ringkasan data modul saat ditautkan (angka tidak berubah walau sumber berubah)
   createdById   String
   createdByName String
   createdAt     DateTime  @default(now())
@@ -1008,6 +1017,78 @@ model CsmsEvidenceLink {
 
   @@id([evidenceId, fulfillmentId])
   @@index([fulfillmentId])
+}
+
+// Profil perusahaan untuk data administrasi owner (AMM-VIB1-F-SHE-008B). Satu baris (id = "PJM").
+model CompanyProfile {
+  id               String    @id @default("PJM")
+  name             String
+  hoAddress        String?
+  businessCategory String? // INTI | NON_INTI (kategori usaha jasa pertambangan)
+  businessScale    String? // LOKAL | NASIONAL
+  iujpNumber       String?
+  iujpExpiry       DateTime?
+  notes            String?
+  updatedByName    String?
+  updatedAt        DateTime  @updatedAt
+}
+
+// Data administrasi per site (008B). Legalitas dikelola HO; data operasional dapat diperbarui HSE Site.
+model SiteCsmsProfile {
+  siteId         String   @id
+  userDepartment String? // departemen user/owner
+  siteAddress    String?
+  province       String?
+  regency        String?
+  riskLevel      String? // RENDAH | SEDANG | TINGGI (data terpisah dari hasil assessment)
+  workScope      String?
+  updatedByName  String?
+  updatedAt      DateTime @updatedAt
+  site           Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}
+
+// Temuan & tindak lanjut. Unggahan bukti tidak menutup temuan; penutupan hanya oleh verifikator HO.
+model CsmsFinding {
+  id               String    @id @default(cuid())
+  number           String    @unique
+  source           String // ASSESSMENT | INSPEKSI | AUDIT | INSIDEN | PEMERIKSAAN_DOKUMEN
+  siteId           String
+  requirementId    String?
+  description      String
+  picRole          String?
+  picName          String?
+  dueDate          DateTime?
+  correctiveAction String?
+  status           String    @default("TERBUKA") // TERBUKA | DALAM_PROSES | DIAJUKAN_TUTUP | DITUTUP
+  incidentId       String? // temuan dari modul Insiden ditautkan, bukan disalin
+  incidentActionId String?   @unique
+  verifierName     String?
+  closedAt         DateTime?
+  createdById      String
+  createdByName    String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  site             Site             @relation(fields: [siteId], references: [id])
+  requirement      CsmsRequirement? @relation(fields: [requirementId], references: [id])
+  history          CsmsFindingHistory[]
+
+  @@index([siteId, status])
+  @@index([status, dueDate])
+  @@index([incidentId])
+}
+
+model CsmsFindingHistory {
+  id         String      @id @default(cuid())
+  findingId  String
+  action     String // CREATE | EDIT | START | SUBMIT_CLOSE | RETURN | CLOSE | REOPEN
+  fromStatus String?
+  toStatus   String
+  note       String?
+  actorName  String
+  createdAt  DateTime    @default(now())
+  finding    CsmsFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@index([findingId, createdAt])
 }
 
 // ─── 16. NOTIFIKASI & APPROVAL ───────────────────────────────────────────────

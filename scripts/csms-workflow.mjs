@@ -23,7 +23,7 @@ async function login({ email, password }) {
     return { status: res.status, data };
   };
   return {
-    get: (p) => call('GET', p), post: (p, b) => call('POST', p, b), put: (p, b) => call('PUT', p, b), del: (p) => call('DELETE', p),
+    cookie, get: (p) => call('GET', p), post: (p, b) => call('POST', p, b), put: (p, b) => call('PUT', p, b), del: (p) => call('DELETE', p),
     upload: (p, data, name = 'bukti-uji.pdf') => {
       const f = new FormData();
       f.set('data', JSON.stringify(data));
@@ -157,6 +157,69 @@ for (const [who, c, path] of [['HO', ho, '/csms?tab=summary'], ['HO', ho, '/csms
 }
 const setupAsSite = await site.get('/csms/templates/' + tpl.id);
 check(setupAsSite.status === 307, 'HSE Site diarahkan keluar dari halaman template', setupAsSite.status);
+
+console.log('11. Zona waktu site');
+const tz = await ho.put(`/api/sites/${TBG.id}`, { code: TBG.code, name: TBG.name, location: TBG.location ?? '', region: TBG.region, timezone: 'Asia/Makassar', isHo: false, isActive: TBG.isActive });
+check(tz.status === 200, 'HO menetapkan zona waktu TBG = WITA', tz);
+check((await site.get(`/api/csms/requirements/${rAttend.id}?period=${P}`)).data.tz === 'WITA', 'tenggat TBG ditampilkan dengan WITA');
+const resp = await ho.post(`/api/sites/${TBG.id}/responsibles`, { role: 'SAFETY_OFFICER', name: 'UJI Safety Officer', phone: '0812000000', email: 'so@uji.local', startDate: '2026-10-29' });
+check(resp.status === 200 || resp.data?.error?.includes('setelah'), 'HO mencatat Safety Officer di Site & Proyek', resp);
+
+console.log('12. Bukti dari data modul (tanpa input ulang)');
+const rMcu = req('U12.02'), rStat = req('U06.05');
+const srcMcu = (await site.get(`/api/csms/requirements/${rMcu.id}/sources?period=AWAL`)).data;
+check(srcMcu.suggested?.[0]?.type === 'MCU' && srcMcu.groups.some((g) => g.type === 'MCU' && g.suggested), 'U12.02 menyarankan sumber MCU', srcMcu.suggested);
+const mcuOpt = srcMcu.groups.find((g) => g.type === 'MCU')?.options[0];
+if (mcuOpt) {
+  check(!/[A-Z][a-z]+ [A-Z][a-z]+/.test(mcuOpt.summary.replace(/Belum MCU|Proses MCU|FU terlambat|MCU kedaluwarsa|FOLLOW UP/g, '')), 'ringkasan MCU tanpa nama personel', mcuOpt.summary);
+  const linked = await site.post(`/api/csms/requirements/${rMcu.id}/sources`, { periodKey: 'AWAL', key: mcuOpt.key });
+  check(linked.status === 200, 'HSE Site menautkan rekap MCU sebagai bukti', linked);
+  const ev = (await site.get(`/api/csms/requirements/${rMcu.id}?period=AWAL`)).data.current.evidence.find((e) => e.kind === 'SOURCE');
+  check(ev?.snapshot?.counts && ev.source?.link?.startsWith('/mcu'), 'bukti menyimpan snapshot angka & tautan ke modul MCU', ev);
+} else console.log('  (dev: tidak ada personel aktif di TBG untuk rekap MCU)');
+check((await site.post(`/api/csms/requirements/${rMcu.id}/sources`, { periodKey: 'AWAL', key: 'MCU:PALSU' })).status === 404, 'kunci sumber palsu ditolak (ringkasan dihitung ulang di server)');
+check((await hrd.get(`/api/csms/requirements/${rStat.id}/sources?period=AWAL`)).status === 403, 'HRD tidak dapat menarik sumber untuk butir non-HRD');
+const srcStat = (await site.get(`/api/csms/requirements/${rStat.id}/sources?period=AWAL`)).data;
+check(srcStat.groups.find((g) => g.type === 'PERFORMANCE')?.suggested, 'U06.05 menyarankan statistik HSE Performance');
+
+console.log('13. Temuan & tindak lanjut');
+const fnd = await site.post('/api/csms/findings', { siteId: TBG.id, source: 'INSPEKSI', requirementId: rAttend.id, description: 'UJI: APAR area workshop kedaluwarsa', picRole: 'HSE_SITE', dueDate: '2026-11-05' });
+check(fnd.status === 200 && fnd.data.number?.startsWith('TMN-'), 'HSE Site mencatat temuan bernomor', fnd);
+const fid = fnd.data.id;
+check((await site.post('/api/csms/findings', { siteId: LHT.id, source: 'INSPEKSI', description: 'x' })).status === 403, 'HSE Site TBG tidak dapat mencatat temuan LHT');
+check((await site.post(`/api/csms/findings/${fid}`, { action: 'SUBMIT_CLOSE' })).status === 400, 'tidak dapat mengajukan penutupan tanpa tindakan perbaikan');
+check((await site.put(`/api/csms/findings/${fid}`, { correctiveAction: 'APAR diganti & dicek ulang' })).status === 200, 'HSE Site mengisi tindakan perbaikan');
+check((await site.post(`/api/csms/findings/${fid}`, { action: 'SUBMIT_CLOSE' })).status === 400, 'tidak dapat mengajukan penutupan tanpa bukti');
+const ff = new FormData(); ff.append('files', new Blob(['%PDF-1.4\n% UJI temuan\n%%EOF\n'], { type: 'application/pdf' }), 'apar.pdf');
+const upF = await fetch(base + `/api/csms/findings/${fid}/files`, { method: 'POST', body: ff, headers: { cookie: site.cookie() } }).then(async (r) => ({ status: r.status, data: await r.json() }));
+check(upF.status === 200, 'HSE Site mengunggah bukti penyelesaian', upF);
+const afterUp = (await site.get(`/api/csms/findings/${fid}`)).data;
+check(afterUp.status === 'TERBUKA', 'unggahan bukti tidak menutup temuan');
+check((await site.post(`/api/csms/findings/${fid}`, { action: 'SUBMIT_CLOSE' })).data?.status === 'DIAJUKAN_TUTUP', 'HSE Site mengajukan penutupan');
+check((await site.post(`/api/csms/findings/${fid}`, { action: 'CLOSE' })).status === 409, 'HSE Site tidak dapat menutup temuan');
+check((await ho.post(`/api/csms/findings/${fid}`, { action: 'RETURN' })).status === 400, 'pengembalian tanpa alasan ditolak');
+check((await ho.post(`/api/csms/findings/${fid}`, { action: 'CLOSE', note: 'Terverifikasi' })).data?.status === 'DITUTUP', 'HO menutup temuan setelah verifikasi');
+const fileId = afterUp.files[0]?.id;
+check(fileId && (await hrd.get(`/api/files/${fileId}`)).status === 403, 'HRD tidak dapat mengunduh bukti temuan');
+check((await ho.post(`/api/csms/findings/${fid}`, { action: 'REOPEN', note: 'UJI dibuka kembali' })).data?.status === 'DALAM_PROSES', 'HO membuka kembali dengan alasan');
+const hist = (await ho.get(`/api/csms/findings/${fid}`)).data.history.map((h) => h.action);
+check(['CREATE', 'SUBMIT_CLOSE', 'CLOSE', 'REOPEN'].every((a) => hist.includes(a)), 'riwayat temuan lengkap', hist);
+check((await hrd.get('/api/csms/findings')).data.rows.length === 0, 'HRD tidak melihat register temuan');
+
+console.log('14. Profil perusahaan & site (008B)');
+check((await site.put('/api/csms/profile', { name: 'x' })).status === 403, 'HSE Site tidak dapat mengubah legalitas perusahaan');
+check((await ho.put('/api/csms/profile', { name: 'PT. Prohaba Jaya Mandiri', businessCategory: 'NON_INTI', businessScale: 'NASIONAL', iujpNumber: 'UJI-IUJP-001', iujpExpiry: '2027-12-31', hoAddress: 'UJI alamat HO' })).status === 200, 'HO menyimpan profil perusahaan');
+check((await site.put(`/api/csms/profile/sites/${TBG.id}`, { riskLevel: 'RENDAH' })).status === 400, 'HSE Site tidak dapat menetapkan tingkat risiko');
+check((await site.put(`/api/csms/profile/sites/${TBG.id}`, { siteAddress: 'UJI jalan tambang km 10', province: 'Kalimantan Timur', regency: 'Kutai Kartanegara', workScope: 'UJI lingkup pekerjaan' })).status === 200, 'HSE Site memperbarui data operasional site');
+check((await ho.put(`/api/csms/profile/sites/${TBG.id}`, { siteAddress: 'UJI jalan tambang km 10', province: 'Kalimantan Timur', regency: 'Kutai Kartanegara', workScope: 'UJI lingkup pekerjaan', riskLevel: 'TINGGI', userDepartment: 'UJI Dept. Mining' })).status === 200, 'HO menetapkan departemen user & tingkat risiko');
+const admin = (await site.get('/api/csms/profile')).data;
+const rowT = admin.rows.find((r) => r.siteCode === 'TBG');
+check(admin.rows.every((r) => r.siteCode === 'TBG') && rowT?.safetyOfficer && rowT.iujpNumber === 'UJI-IUJP-001' && typeof rowT.manpower === 'number', 'baris 008B TBG terisi dari sumber utama (site lain tidak tampil)', rowT && { so: rowT.safetyOfficer, mp: rowT.manpower, missing: rowT.missing });
+
+console.log('15. Halaman Tahap 2');
+for (const [who, c, path] of [['HO', ho, `/csms/findings/${fid}`], ['Site', site, `/csms/findings/${fid}`], ['HO', ho, '/csms?tab=verify&fstatus=OPEN'], ['Site', site, '/csms?tab=summary'], ['HO', ho, '/sites']]) {
+  check((await c.get(path)).status === 200, `${who} ${path}`);
+}
 
 console.log(failures ? `\n${failures} pemeriksaan gagal` : '\nSemua pemeriksaan lulus');
 process.exit(failures ? 1 : 0);
