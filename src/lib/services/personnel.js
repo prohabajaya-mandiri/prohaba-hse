@@ -5,7 +5,7 @@ import { audit, diff } from '../audit.js';
 import { decrypt, encrypt, lookupHash, maskAccount, maskNik } from '../crypto.js';
 import { daysBetween, iso, today } from '../dates.js';
 import { nextNumber } from '../sequence.js';
-import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, normalizeCategory, EMPLOYMENT_TYPES, IMPORT_COLUMNS, MARITAL, WORK_STATUSES, mapImportRow, normalizeImportRow, tenure } from '../domain/personnel.js';
+import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, normalizeCategory, EMPLOYMENT_TYPES, IMPORT_COLUMNS, INACTIVE_STATUSES, MARITAL, WORK_STATUSES, mapImportRow, normalizeImportRow, tenure } from '../domain/personnel.js';
 import { fitness } from '../domain/mcu.js';
 import { getSetting } from '../settings.js';
 import { bankAccount as parseBankAccount, bool, choice, ensure, InputError, nik as parseNik, nip as parseNip, npwp as parseNpwp, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
@@ -174,7 +174,7 @@ export async function setWorkStatus(user, id, body) {
   const status = choice(body.workStatus, WORK_STATUSES, 'Status kerja');
   const existing = await scopedPersonnel(user, id);
   return prisma.$transaction(async (tx) => {
-    await tx.personnel.update({ where: { id }, data: { workStatus: status, isFormer: status === 'RESIGN' } });
+    await tx.personnel.update({ where: { id }, data: { workStatus: status, isFormer: INACTIVE_STATUSES.includes(status) } });
     await audit(tx, user, { action: 'UPDATE', module: 'personnel', recordId: id, siteId: existing.currentSiteId, before: { workStatus: existing.workStatus }, after: { workStatus: status }, note: text(body.note, 'Catatan', 500, true) });
     return { id, workStatus: status };
   });

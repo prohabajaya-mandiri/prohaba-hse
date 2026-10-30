@@ -8,11 +8,12 @@ export function normalizeCategory(v) {
   return CATEGORY_ALIASES[key] ?? String(v).toUpperCase();
 }
 const CATEGORY_ALIASES = { STAFF: 'STAFF', STAF: 'STAFF', HARIANKANTOR: 'HARIAN_KANTOR', HARIANMANDOR: 'MANPOWER', MANPOWER: 'MANPOWER' };
-export const WORK_STATUSES = ['ACTIVE', 'CUTI', 'SAKIT', 'MCU', 'RESIGN', 'DIRUMAHKAN', 'MUTASI'];
+export const WORK_STATUSES = ['ACTIVE', 'CUTI', 'SAKIT', 'MCU', 'RESIGN', 'PHK', 'DIRUMAHKAN', 'MUTASI'];
 export const MARITAL = ['MENIKAH', 'BELUM_MENIKAH', 'CERAI'];
 export const MARITAL_LABELS = { MENIKAH: 'Menikah', BELUM_MENIKAH: 'Belum menikah', CERAI: 'Cerai' };
 export const BLOOD_TYPES = ['A', 'B', 'AB', 'O'];
-export const INACTIVE_STATUSES = ['RESIGN'];
+// Status yang menjadikan personel "mantan" (isFormer).
+export const INACTIVE_STATUSES = ['RESIGN', 'PHK'];
 
 // Status kepegawaian sesuai UU Ketenagakerjaan / PP 35/2021:
 // PKWT = kontrak waktu tertentu (memiliki tanggal akhir kontrak), PKWTT = karyawan tetap.

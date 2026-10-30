@@ -208,7 +208,7 @@ model Personnel {
   initialSiteId    String?
   currentSiteId    String?
   startDate        DateTime?
-  workStatus       String    @default("ACTIVE") // ACTIVE | CUTI | SAKIT | MCU | RESIGN | DIRUMAHKAN | MUTASI (status operasional)
+  workStatus       String    @default("ACTIVE") // ACTIVE | CUTI | SAKIT | MCU | RESIGN | PHK | DIRUMAHKAN | MUTASI (status operasional)
   employmentType   String? // PKWT | PKWTT (status kepegawaian; diubah hanya oleh HRD/HO HSE)
   contractEndDate  DateTime? // akhir kontrak, khusus PKWT
   bpjsKesehatan    String?

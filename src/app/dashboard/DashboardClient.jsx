@@ -9,7 +9,7 @@ import { fmtNum, labelOf } from '@/lib/labels';
 import { CATEGORIES, WORK_STATUSES } from '@/lib/domain/personnel';
 
 // Warna grafik diredam: hijau K3 sebagai warna utama, aksen lembut seperlunya.
-const STATUS_COLORS = { ACTIVE: '#086840', CUTI: '#5b8fc7', SAKIT: '#d08a4a', MCU: '#7fb3a0', RESIGN: '#b3b9c2', DIRUMAHKAN: '#d4b45a', MUTASI: '#8aa5c9' };
+const STATUS_COLORS = { ACTIVE: '#086840', CUTI: '#5b8fc7', SAKIT: '#d08a4a', MCU: '#7fb3a0', RESIGN: '#b3b9c2', PHK: '#c0504d', DIRUMAHKAN: '#d4b45a', MUTASI: '#8aa5c9' };
 const FIT_COLORS = { FIT: '#086840', FOLLOW_UP: '#d4a73a', UNFIT: '#c2453d', PROSES: '#5b8fc7', BELUM_MCU: '#b3b9c2', FU_TERLAMBAT: '#d08a4a', MCU_KEDALUWARSA: '#8f2a24' };
 
 export default function DashboardClient({ sites, data }) {
