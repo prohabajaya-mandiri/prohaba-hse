@@ -141,6 +141,9 @@ model Site {
   csmsFindings     CsmsFinding[]
   csmsAssessments  CsmsAssessment[]
   workPermits      WorkPermit[]
+  hazardReports    HazardReport[]
+  inspections      Inspection[]
+  correctiveActions CorrectiveAction[]
 }
 
 model Project {
@@ -621,6 +624,122 @@ model IncidentAction {
   status      String    @default("OPEN") // OPEN | DONE
   doneAt      DateTime?
   incident    Incident  @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+}
+
+// ─── 12a. HAZARD REPORT, INSPEKSI & P2H, TINDAKAN KOREKTIF (CAPA) ────────────
+
+// Laporan bahaya (unsafe act / unsafe condition) dari lapangan. Risiko = kemungkinan × keparahan (5×5).
+model HazardReport {
+  id              String    @id @default(cuid())
+  number          String    @unique
+  siteId          String
+  observedAt      DateTime // waktu lokal site, seperti Insiden
+  location        String
+  type            String // UNSAFE_ACT | UNSAFE_CONDITION
+  category        String
+  description     String
+  immediateAction String?
+  likelihood      Int // 1–5
+  severity        Int // 1–5
+  riskLevel       String // RENDAH | SEDANG | TINGGI | EKSTREM
+  status          String    @default("BARU") // BARU | TINDAK_LANJUT (ada CAPA) | SELESAI
+  closedNote      String?
+  closedAt        DateTime?
+  closedBy        String?
+  reporterName    String
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  site            Site      @relation(fields: [siteId], references: [id])
+
+  @@index([siteId, status])
+  @@index([observedAt])
+}
+
+// Template checklist inspeksi area/alat dan P2H unit. items: [{ text, critical }].
+model InspectionTemplate {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  kind        String // P2H | AREA | APAR | LAINNYA
+  unitType    String? // jenis unit untuk P2H (Dump Truck, Excavator, LV, ...)
+  items       Json
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  inspections Inspection[]
+}
+
+// Hasil inspeksi/P2H. answers menyalin butir template saat diisi agar riwayat tidak berubah bila template diedit.
+model Inspection {
+  id            String             @id @default(cuid())
+  number        String             @unique
+  siteId        String
+  templateId    String
+  templateName  String
+  kind          String
+  inspectedOn   DateTime
+  shift         String? // PAGI | MALAM
+  location      String?
+  unitCode      String? // nomor lambung / kode unit (P2H)
+  unitType      String?
+  hourMeter     Int?
+  inspectorName String
+  answers       Json // [{ text, critical, result: OK | TIDAK_OK | NA, note }]
+  okCount       Int                @default(0)
+  notOkCount    Int                @default(0)
+  result        String // LAYAK | TIDAK_LAYAK (butir kritis TIDAK_OK)
+  notes         String?
+  createdBy     String
+  createdAt     DateTime           @default(now())
+  site          Site               @relation(fields: [siteId], references: [id])
+  template      InspectionTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([siteId, inspectedOn])
+  @@index([unitCode, inspectedOn])
+}
+
+// Register tindakan korektif lapangan. Terbuka → Dalam proses → Diajukan tutup → Ditutup (verifikasi).
+model CorrectiveAction {
+  id               String    @id @default(cuid())
+  number           String    @unique
+  siteId           String
+  sourceType       String // HAZARD | INSPECTION | AUDIT | MANUAL
+  sourceId         String?
+  sourceRef        String? // nomor dokumen sumber (HZ-/INS-) untuk tampilan
+  title            String
+  description      String?
+  riskLevel        String // RENDAH | SEDANG | TINGGI | EKSTREM
+  picName          String
+  dueDate          DateTime
+  correctiveAction String? // tindakan yang sudah dilakukan PIC
+  status           String    @default("TERBUKA") // TERBUKA | DALAM_PROSES | DIAJUKAN_TUTUP | DITUTUP
+  verifierName     String?
+  closedAt         DateTime?
+  createdById      String
+  createdByName    String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  site             Site      @relation(fields: [siteId], references: [id])
+  history          CorrectiveActionHistory[]
+
+  @@index([siteId, status])
+  @@index([status, dueDate])
+  @@index([sourceType, sourceId])
+}
+
+model CorrectiveActionHistory {
+  id         String           @id @default(cuid())
+  actionId   String
+  action     String // CREATE | EDIT | START | SUBMIT_CLOSE | RETURN | CLOSE | REOPEN
+  fromStatus String?
+  toStatus   String
+  note       String?
+  actorName  String
+  createdAt  DateTime         @default(now())
+  capa       CorrectiveAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([actionId, createdAt])
 }
 
 // ─── 13. TRAINING & KOMPETENSI ───────────────────────────────────────────────

@@ -59,6 +59,7 @@ const SITE_USAGE = {
   users: 'akses pengguna', personnel: 'personel (site saat ini)', initialStaff: 'personel (site awal)', placements: 'penempatan',
   mutationsTo: 'mutasi', mcus: 'MCU', permits: 'permit', mobilizations: 'mobilisasi', leaves: 'cuti/izin', rosterPolicies: 'pola roster',
   dailyPerf: 'kinerja harian', activities: 'aktivitas HSE', reports: 'laporan HSE', incidents: 'insiden', trainings: 'training', documents: 'dokumen HSE', registrations: 'pendaftaran pegawai', csmsApplications: 'penerapan CSMS', csmsFindings: 'temuan CSMS', csmsAssessments: 'assessment CSMS', workPermits: 'izin kerja khusus',
+  hazardReports: 'hazard report', inspections: 'inspeksi/P2H', correctiveActions: 'tindakan korektif',
 };
 
 /** Hapus permanen hanya untuk site yang belum pernah dipakai (mis. salah input). */

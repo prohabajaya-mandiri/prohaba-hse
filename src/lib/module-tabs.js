@@ -41,6 +41,14 @@ export const MODULE_TABS = {
       ['indicators', 'Indikator & target'],
     ],
   },
+  '/inspections': {
+    param: 'tab',
+    items: [
+      ['list', 'Riwayat inspeksi'],
+      ['units', 'Status unit (P2H)'],
+      ['templates', 'Template checklist', ['HO_HSE']],
+    ],
+  },
 };
 
 export function tabsFor(path, role) {

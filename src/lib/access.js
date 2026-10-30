@@ -40,6 +40,10 @@ export const MODULES = {
   csms: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI', 'HRD'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
   // Izin kerja khusus dari owner (aktivitas), terpisah dari Permit & SKS personel.
   'work-permits': { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE'] },
+  // Lapangan: PJO/PM ikut melapor bahaya, inspeksi & mengerjakan tindakan korektif. Penutupan CAPA dicek di capaTransition.
+  hazards: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
+  inspections: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
+  actions: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
   settings: { read: ['HO_HSE', 'DIREKSI', 'HRD'], write: ['HO_HSE'] },
   users: { read: ['HO_HSE'], write: ['HO_HSE'] },
   'audit-log': { read: ['HO_HSE', 'DIREKSI'] },

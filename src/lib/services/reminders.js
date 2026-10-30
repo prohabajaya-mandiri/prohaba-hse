@@ -7,6 +7,7 @@ import { SETTING_DEFAULTS } from '../settings-defaults.js';
 import { notifyRoles } from './notify.js';
 import { requirementReminders } from './csms.js';
 import { findingReminders } from './csms-findings.js';
+import { capaReminders } from './capa.js';
 import { workPermitReminders } from './work-permits.js';
 
 const HSE = ['HO_HSE', 'HSE_SITE'];
@@ -119,6 +120,8 @@ export async function runReminders(now = today()) {
   await requirementReminders(push, csmsCfg);
   await findingReminders(push, csmsCfg);
   await workPermitReminders(push);
+  // Tindakan korektif lapangan (hazard report, inspeksi/P2H): H-1 dan terlambat.
+  await capaReminders(push);
 
   await prisma.setting.upsert({
     where: { key: 'system.lastReminderRun' },

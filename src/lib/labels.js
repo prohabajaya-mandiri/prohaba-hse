@@ -59,6 +59,11 @@ export const LABELS = {
   TERCATAT: 'Tercatat', BERAKHIR: 'Berakhir', DIBATALKAN: 'Dibatalkan', FINAL: 'Final',
   // indikator
   ACTIVITY: 'Aktivitas', OBSERVATION: 'Observasi', INCIDENT: 'Kejadian',
+  // hazard report, inspeksi & tindakan korektif
+  EKSTREM: 'Ekstrem', UNSAFE_ACT: 'Unsafe act', UNSAFE_CONDITION: 'Unsafe condition', BARU: 'Baru',
+  HAZARD: 'Hazard report', INSPECTION: 'Inspeksi / P2H', MANUAL: 'Manual',
+  P2H: 'P2H unit', AREA: 'Area kerja', APAR: 'APAR', LAYAK: 'Layak', TIDAK_LAYAK: 'Tidak layak', OK: 'OK', TIDAK_OK: 'Tidak OK',
+  PAGI: 'Pagi', MALAM: 'Malam',
 };
 
 export const labelOf = (v) => LABELS[v] ?? v;
@@ -84,6 +89,7 @@ export const STATUS_STYLES = {
   TERCATAT: gray, BERAKHIR: orange, DIBATALKAN: gray, FINAL: green,
   TERBUKA: red, DALAM_PROSES: yellow, DIAJUKAN_TUTUP: blue, DITUTUP: green, RENDAH: green, SEDANG: yellow, TINGGI: red,
   SCREENING: gray, MENUNGGU_HASIL: blue, SUBMIT: blue, FEEDBACK: navy, SUBMIT_FU: yellow, MOBILISASI: navy,
+  EKSTREM: red, UNSAFE_ACT: orange, UNSAFE_CONDITION: yellow, BARU: red, LAYAK: green, TIDAK_LAYAK: red, OK: green, TIDAK_OK: red,
 };
 
 export const idr = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v ?? 0));
