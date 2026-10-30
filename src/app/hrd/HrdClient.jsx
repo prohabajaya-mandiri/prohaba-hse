@@ -82,7 +82,7 @@ export default function HrdClient({ sites, board, scenarios }) {
           <div style={{ width: '100%', height: 260 }}>
             <ResponsiveContainer>
               <BarChart data={byMonth}>
-                <CartesianGrid stroke="#e3e6eb" vertical={false} />
+                <CartesianGrid stroke="var(--gray-200)" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={(v) => (v / 1e6).toFixed(0) + ' jt'} tick={{ fontSize: 11 }} width={56} />
                 <Tooltip formatter={(v) => idr(v)} />

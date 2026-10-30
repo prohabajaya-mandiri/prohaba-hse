@@ -314,10 +314,10 @@ export function PersonnelPicker({ value, onChange, params = {}, required }) {
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
         onChange={(e) => { setTerm(e.target.value); setOpen(true); }} />
       {open && items.length > 0 && (
-        <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 'calc(100% + 4px)', background: 'white', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', maxHeight: 260, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 'calc(100% + 4px)', background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', maxHeight: 260, overflowY: 'auto' }}>
           {items.map((p) => (
             <button type="button" key={p.id} onMouseDown={() => { setSelected(p); onChange(p.id, p); setTerm(''); setOpen(false); }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: 'none', background: p.id === value ? 'var(--brand-50)' : 'white', cursor: 'pointer', fontSize: 14 }}>
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: 'none', background: p.id === value ? 'var(--brand-50)' : 'var(--white)', cursor: 'pointer', fontSize: 14 }}>
               <strong>{p.name}</strong> <span className="muted">{p.nip && `· NIP ${p.nip} `}· {p.position} · {p.siteName ?? '-'}</span>
             </button>
           ))}

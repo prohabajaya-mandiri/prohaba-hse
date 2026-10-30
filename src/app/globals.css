@@ -93,7 +93,9 @@
   --gray-700: #3a424e;
   --gray-800: #262c36;
   --gray-900: #151a21;
+  /* --white = permukaan (kartu, header); --on-color = teks di atas warna solid. */
   --white: #ffffff;
+  --on-color: #ffffff;
 
   /* Adaptif: perangkat Apple memakai SF Pro bawaan sistem (-apple-system /
      BlinkMacSystemFont), selain itu Inter. Keduanya mengganti gaya Text dan
@@ -125,6 +127,67 @@
 
   --focus-ring: 0 0 0 3px rgb(8 104 64 / 0.2);
 }
+
+/* ─── Mode gelap ──────────────────────────────────────────────────────────
+   Diaktifkan lewat tombol di header (data-theme="dark" pada <html>). Skala abu
+   dibalik, --white menjadi permukaan gelap, dan tint 50–200 menjadi warna
+   redup agar badge/latar status tetap terbaca. Warna solid (600) tetap. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --gray-25: #161b22;
+  --gray-50: #0f1318;
+  --gray-100: #222831;
+  --gray-200: #2c333d;
+  --gray-300: #3d4550;
+  --gray-400: #7d8693;
+  --gray-500: #9aa3ae;
+  --gray-600: #b4bcc6;
+  --gray-700: #cdd3db;
+  --gray-800: #e3e7ec;
+  --gray-900: #f3f5f7;
+  --white: #181d24;
+
+  --brand-50: #12261c;
+  --brand-100: #173224;
+  --brand-200: #1f4a33;
+  --brand-700: #74bd92;
+  --brand-800: #a9d8bb;
+  --brand-900: #d4ecdd;
+  --accent-50: #12261c;
+  --accent-100: #173224;
+
+  --orange-50: #2e2013;
+  --orange-100: #3d2a17;
+  --orange-600: #f59a55;
+  --green-50: #11251a;
+  --green-100: #163222;
+  --green-200: #1f4a30;
+  --green-600: #4cc27a;
+  --green-700: #74d197;
+  --red-50: #2d1716;
+  --red-100: #3d1c1a;
+  --red-200: #5c2724;
+  --red-600: #ef6b63;
+  --red-700: #f4938d;
+  --yellow-50: #2b230f;
+  --yellow-100: #3a2f12;
+  --yellow-700: #e8c35c;
+  --blue-50: #0f2230;
+  --blue-100: #132c3e;
+  --blue-600: #4fb3e3;
+  --blue-700: #7cc6ea;
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+  --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 12px 24px -8px rgb(0 0 0 / 0.5), 0 4px 8px -4px rgb(0 0 0 / 0.35);
+  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.6);
+  --focus-ring: 0 0 0 3px rgb(116 189 146 / 0.3);
+}
+/* Tombol solid memakai --brand-700/800 untuk hover; di mode gelap keduanya terang. */
+[data-theme="dark"] .btn-primary:hover { background: var(--brand-500); }
+[data-theme="dark"] .btn-primary:active { background: var(--brand-400); }
 
 /* ─── Reset & dasar ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
@@ -350,7 +413,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   padding: 0 6px;
   border-radius: var(--radius-full);
   background: var(--accent-500);
-  color: var(--white);
+  color: var(--on-color);
   font-size: 11px;
   font-weight: 600;
   text-align: center;
@@ -377,7 +440,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   height: 38px;
   border-radius: var(--radius-full);
   background: var(--brand-600);
-  color: var(--white);
+  color: var(--on-color);
   display: grid;
   place-items: center;
   font-size: 13px;
@@ -473,7 +536,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   padding: 0 5px;
   border-radius: var(--radius-full);
   background: var(--red-500);
-  color: var(--white);
+  color: var(--on-color);
   font-size: 10.5px;
   font-weight: 600;
   display: grid;
@@ -594,11 +657,11 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .btn svg { width: 17px; height: 17px; }
 .btn:hover { text-decoration: none; }
 
-.btn-primary { background: var(--brand-600); color: var(--white); }
+.btn-primary { background: var(--brand-600); color: var(--on-color); }
 .btn-primary:hover { background: var(--brand-700); }
 .btn-primary:active { background: var(--brand-800); }
 
-.btn-orange { background: var(--orange-500); color: var(--white); }
+.btn-orange { background: var(--orange-500); color: var(--on-color); }
 .btn-orange:hover { background: var(--orange-600); }
 
 .btn-outline { background: var(--white); color: var(--gray-700); border-color: var(--gray-300); }
@@ -620,7 +683,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .btn-ghost:hover { background: var(--gray-100); color: var(--gray-900); text-decoration: none; }
 .btn-ghost:disabled { opacity: 0.4; background: transparent; }
 
-.btn-danger { background: var(--red-600); color: var(--white); }
+.btn-danger { background: var(--red-600); color: var(--on-color); }
 .btn-danger:hover { background: var(--red-700); }
 .btn-danger-outline { background: var(--white); color: var(--red-600); border-color: var(--red-200); }
 .btn-danger-outline:hover { background: var(--red-50); }
@@ -1109,7 +1172,7 @@ details.card[open] > summary::after { transform: rotate(-135deg) translateY(-3px
 .stepper { display: flex; gap: 6px; flex-wrap: wrap; }
 .stepper .step { padding: 6px 12px; border-radius: var(--radius-full); font-size: 13px; font-weight: 500; background: var(--gray-100); color: var(--gray-500); }
 .stepper .step.done { background: var(--green-50); color: var(--green-700); }
-.stepper .step.current { background: var(--brand-600); color: var(--white); }
+.stepper .step.current { background: var(--brand-600); color: var(--on-color); }
 
 /* ─── Penomoran halaman ─────────────────────────────────────────────────── */
 .pager {

@@ -82,7 +82,7 @@ export default function DashboardClient({ sites, data }) {
           <div style={{ width: '100%', height: 280 }}>
             <ResponsiveContainer>
               <BarChart data={siteChart}>
-                <CartesianGrid stroke="#e3e6eb" vertical={false} />
+                <CartesianGrid stroke="var(--gray-200)" vertical={false} />
                 <XAxis dataKey="site" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} width={40} allowDecimals={false} />
                 <Tooltip />

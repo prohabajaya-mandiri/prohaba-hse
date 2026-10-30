@@ -59,7 +59,7 @@ export default function PerformanceClient({ tab, sites, data, activities, daily,
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer>
                 <ComposedChart data={data.trend} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid stroke="#e3e6eb" vertical={false} />
+                  <CartesianGrid stroke="var(--gray-200)" vertical={false} />
                   <XAxis dataKey="period" tick={{ fontSize: 11 }} />
                   <YAxis yAxisId="mh" tick={{ fontSize: 11 }} width={60} />
                   <YAxis yAxisId="n" orientation="right" tick={{ fontSize: 11 }} width={36} allowDecimals={false} />

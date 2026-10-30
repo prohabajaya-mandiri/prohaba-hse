@@ -20,7 +20,7 @@ export default function NotificationsClient({ data, page }) {
       <Card padding={0}>
         {data.rows.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: 'var(--gray-500)' }}>Tidak ada notifikasi.</div>}
         {data.rows.map((n) => (
-          <div key={n.id} style={{ display: 'flex', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--gray-100)', background: n.readAt ? 'white' : 'var(--navy-50)', flexWrap: 'wrap' }}>
+          <div key={n.id} style={{ display: 'flex', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--gray-100)', background: n.readAt ? 'var(--white)' : 'var(--navy-50)', flexWrap: 'wrap' }}>
             <span style={{ width: 4, borderRadius: 4, background: COLOR[n.severity] ?? COLOR.INFO, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--gray-900)' }}>{n.title}</div>

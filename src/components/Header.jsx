@@ -1,18 +1,33 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { Bell, ChevronDown, KeyRound, LogOut, Menu } from 'lucide-react';
+import { Bell, ChevronDown, KeyRound, LogOut, Menu, Moon, Sun } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/access';
 
-const initials = (name) => (name || 'U').trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+// Tema awal dipasang skrip di layout.js; atribut data-theme pada <html> jadi sumber kebenaran.
+const subscribeTheme = (cb) => {
+  const mo = new MutationObserver(cb);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  return () => mo.disconnect();
+};
+
+const initials =(name) => (name || 'U').trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 
 export default function Header({ title, subtitle, user, onMenuClick }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unread, setUnread] = useState(0);
+  const dark = useSyncExternalStore(subscribeTheme, () => document.documentElement.dataset.theme === 'dark', () => false);
   const pathname = usePathname();
+
+  const toggleTheme = () => {
+    const next = !dark;
+    if (next) document.documentElement.dataset.theme = 'dark';
+    else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem('theme', next ? 'dark' : 'light'); } catch {}
+  };
 
   useEffect(() => {
     let alive = true;
@@ -49,6 +64,10 @@ export default function Header({ title, subtitle, user, onMenuClick }) {
           <strong>{today.toLocaleDateString('id-ID', { weekday: 'long' })}</strong>
           {today.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
         </div>
+
+        <button type="button" className="header-btn" onClick={toggleTheme} title={dark ? 'Mode terang' : 'Mode gelap'} aria-label={dark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'} aria-pressed={dark}>
+          {dark ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
 
         <Link href="/notifications" className="header-btn" title="Notifikasi" aria-label={unread ? `Notifikasi, ${unread} belum dibaca` : 'Notifikasi'}>
           <Bell size={20} />
