@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Users, HardHat, Building, HeartPulse, BadgeCheck, CalendarClock, Clock, Siren, FileWarning, Activity } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import { Card, DataTable, FilterBar, Kpi } from '@/components/ui';
+import { DonutCenter, GlassGradients, glassAxis, glassGrid, glassLegend, glassStroke, glassTooltip, gradId, stackedBarShape } from '@/components/charts';
 import { formatDate } from '@/lib/dates';
 import { fmtNum, labelOf } from '@/lib/labels';
 import { CATEGORIES, WORK_STATUSES } from '@/lib/domain/personnel';
@@ -11,6 +12,28 @@ import { CATEGORIES, WORK_STATUSES } from '@/lib/domain/personnel';
 // Warna grafik diredam: hijau K3 sebagai warna utama, aksen lembut seperlunya.
 const STATUS_COLORS = { ACTIVE: '#086840', CUTI: '#5b8fc7', SAKIT: '#d08a4a', MCU: '#7fb3a0', RESIGN: '#b3b9c2', PHK: '#c0504d', DIRUMAHKAN: '#d4b45a', MUTASI: '#8aa5c9' };
 const FIT_COLORS = { FIT: '#086840', FOLLOW_UP: '#d4a73a', UNFIT: '#c2453d', PROSES: '#5b8fc7', BELUM_MCU: '#b3b9c2', FU_TERLAMBAT: '#d08a4a', MCU_KEDALUWARSA: '#8f2a24' };
+const SITE_ORDER = ['Staff', 'Harian Kantor', 'Harian Mandor'];
+const SITE_COLORS = { Staff: '#086840', 'Harian Kantor': '#8cc4a4', 'Harian Mandor': '#2f9a63' };
+
+// Donut kaca: potongan membulat dengan celah, total di tengah.
+function Donut({ prefix, data, colors, centerLabel }) {
+  const total = data.reduce((a, d) => a + d.value, 0);
+  return (
+    <div style={{ position: 'relative', width: '100%', height: 260 }}>
+      <ResponsiveContainer>
+        <PieChart>
+          <GlassGradients prefix={prefix} colors={Object.fromEntries(data.map((d) => [d.key, colors[d.key] ?? '#b3b9c2']))} />
+          <Pie data={data} dataKey="value" nameKey="name" innerRadius={64} outerRadius={94} paddingAngle={data.length > 1 ? 3 : 0} cornerRadius={8} {...glassStroke}>
+            {data.map((d) => <Cell key={d.key} fill={`url(#${gradId(prefix, d.key)})`} />)}
+          </Pie>
+          <Tooltip {...glassTooltip} />
+          <Legend {...glassLegend} />
+        </PieChart>
+      </ResponsiveContainer>
+      <DonutCenter value={fmtNum(total)} label={centerLabel} />
+    </div>
+  );
+}
 
 export default function DashboardClient({ sites, data }) {
   const statusData = WORK_STATUSES.map((s) => ({ name: labelOf(s), value: data.totals.statuses[s] ?? 0, key: s })).filter((x) => x.value);
@@ -50,46 +73,27 @@ export default function DashboardClient({ sites, data }) {
 
       <div className="grid-2">
         <Card title="Status kerja">
-          <div style={{ width: '100%', height: 240 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
-                  {statusData.map((d) => <Cell key={d.key} fill={STATUS_COLORS[d.key]} />)}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <Donut prefix="ws" data={statusData} colors={STATUS_COLORS} centerLabel="personel" />
         </Card>
         <Card title="Kelayakan kesehatan (MCU terbaru)">
-          <div style={{ width: '100%', height: 240 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={fitData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
-                  {fitData.map((d) => <Cell key={d.key} fill={FIT_COLORS[d.key] ?? '#b3b9c2'} />)}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <Donut prefix="fit" data={fitData} colors={FIT_COLORS} centerLabel="personel" />
         </Card>
       </div>
 
       {siteChart.length > 1 && (
         <Card title="Personel per site">
-          <div style={{ width: '100%', height: 280 }}>
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer>
-              <BarChart data={siteChart}>
-                <CartesianGrid stroke="var(--gray-200)" vertical={false} />
-                <XAxis dataKey="site" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} width={40} allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="Staff" stackId="a" fill="#086840" />
-                <Bar dataKey="Harian Kantor" stackId="a" fill="#b7d3c3" />
-                <Bar dataKey="Harian Mandor" stackId="a" fill="#5fa883" radius={[4, 4, 0, 0]} />
+              <BarChart data={siteChart} barCategoryGap="28%" margin={{ top: 8, right: 8, left: -8 }}>
+                <GlassGradients prefix="site" colors={SITE_COLORS} />
+                <CartesianGrid {...glassGrid} />
+                <XAxis dataKey="site" {...glassAxis} />
+                <YAxis {...glassAxis} width={40} allowDecimals={false} />
+                <Tooltip {...glassTooltip} />
+                <Legend {...glassLegend} />
+                {SITE_ORDER.map((k) => (
+                  <Bar key={k} dataKey={k} stackId="a" fill={`url(#${gradId('site', k)})`} {...glassStroke} maxBarSize={56} shape={stackedBarShape(k, SITE_ORDER)} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
