@@ -55,7 +55,14 @@ const commit = await hse.post('/api/personnel/import', { mode: 'commit', rows })
 check(commit.data?.created === 1 && commit.data.skipped === 2, 'Commit import hanya menyimpan baris valid', commit.data);
 
 console.log('MCU → status & permit');
-const mcu = await hse.form('POST', '/api/mcu', { personnelId: pid, type: 'PRE_EMPLOYMENT', clinic: 'Klinik Uji', stage: 'SELESAI', screeningDate: today, mcuDate: today, result: 'FOLLOW_UP', feedbackDate: today });
+const mcuNew = await hse.form('POST', '/api/mcu', { personnelId: pid, type: 'PRE_EMPLOYMENT', clinic: 'Klinik Uji', screeningDate: today });
+check(mcuNew.status === 200 && mcuNew.data.stage === 'SCREENING', 'MCU baru dimulai dari screening', mcuNew.data);
+const skip = await hse.form('POST', `/api/mcu/${mcuNew.data.id}/advance`, { stage: 'SUBMIT', resultDate: today, result: 'FIT' });
+check(skip.status === 409, 'MCU tidak bisa melompati tahap', skip.data);
+let mcu = mcuNew;
+for (const step of [{ stage: 'MCU', mcuDate: today }, { stage: 'MENUNGGU_HASIL' }, { stage: 'SUBMIT', resultDate: today, result: 'FOLLOW_UP' }]) {
+  mcu = await hse.form('POST', `/api/mcu/${mcuNew.data.id}/advance`, step);
+}
 check(mcu.status === 200 && mcu.data.fuDueDate, 'MCU FOLLOW UP menghasilkan batas FU otomatis', mcu.data);
 const permitNoAck = await hse.form('POST', '/api/permits', { personnelId: pid, kind: 'PERMIT', permitType: 'SIMPER', number: 'UJI-' + Date.now(), startDate: today, endDate: new Date(Date.now() + 300 * 864e5).toISOString().slice(0, 10), basisResult: 'FOLLOW_UP' });
 check(permitNoAck.status === 422, 'Permit 10 bulan untuk FOLLOW UP memerlukan konfirmasi', permitNoAck.data);

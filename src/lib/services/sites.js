@@ -108,17 +108,70 @@ export async function saveProject(user, siteId, body) {
   });
 }
 
+const RESPONSIBLE_ROLES = ['PJO', 'PM', 'HSE_SITE', 'SAFETY_OFFICER'];
+
+const responsibleFields = (role, body) => ({
+  name: text(body.name, 'Nama', 120), phone: text(body.phone, 'Telepon', 30, true), email: text(body.email, 'Email', 150, true),
+  // Data pengesahan PJO untuk administrasi owner (008B).
+  ...(role === 'PJO' ? { competency: text(body.competency, 'Kompetensi kepengawasan', 60, true), approvalNo: text(body.approvalNo, 'Nomor surat pengesahan', 100, true), approvalDate: optionalDate(body.approvalDate, 'Tanggal pengesahan') } : {}),
+});
+
+/** Penanggung jawab sebelumnya yang ditutup otomatis saat `row` ditambahkan (selesai sehari sebelum row mulai). */
+const predecessorOf = (tx, row) => tx.siteResponsible.findFirst({
+  where: { siteId: row.siteId, role: row.role, id: { not: row.id }, endDate: addDays(row.startDate, -1) },
+});
+
+async function loadResponsible(tx, user, siteId, respId) {
+  requireSite(user, siteId);
+  const row = await tx.siteResponsible.findFirst({ where: { id: respId, siteId } });
+  ensure(row, 'Penanggung jawab tidak ditemukan.', 404);
+  return row;
+}
+
+// Koreksi salah input. Peran tidak bisa diubah (pakai hapus lalu tambah); bila tanggal mulai digeser,
+// tanggal selesai penanggung jawab sebelumnya ikut digeser agar riwayat tetap bersambung.
+export async function updateResponsible(user, siteId, respId, body) {
+  object(body, ['name', 'phone', 'email', 'competency', 'approvalNo', 'approvalDate', 'startDate', 'endDate']);
+  return prisma.$transaction(async (tx) => {
+    const before = await loadResponsible(tx, user, siteId, respId);
+    const startDate = date(body.startDate, 'Tanggal mulai');
+    const endDate = before.endDate ? date(body.endDate, 'Tanggal selesai') : null;
+    ensure(!endDate || endDate >= startDate, 'Tanggal selesai harus sama atau setelah tanggal mulai.');
+    const data = { ...responsibleFields(before.role, body), startDate, endDate };
+    if (+startDate !== +before.startDate) {
+      const prev = await predecessorOf(tx, before);
+      if (prev) {
+        ensure(startDate > prev.startDate, `Tanggal mulai harus setelah ${prev.name} mulai.`);
+        await tx.siteResponsible.update({ where: { id: prev.id }, data: { endDate: addDays(startDate, -1) } });
+      }
+    }
+    const row = await tx.siteResponsible.update({ where: { id: respId }, data });
+    const d = diff(before, data);
+    if (d.changed) await audit(tx, user, { action: 'UPDATE', module: 'sites', recordId: siteId, siteId, ...d, note: `Koreksi penanggung jawab ${before.role} ${before.name}` });
+    return row;
+  });
+}
+
+// Hapus entri salah input. Bila yang dihapus masih aktif, penanggung jawab yang tadinya ditutup
+// otomatis olehnya diaktifkan kembali.
+export async function deleteResponsible(user, siteId, respId) {
+  return prisma.$transaction(async (tx) => {
+    const row = await loadResponsible(tx, user, siteId, respId);
+    const prev = row.endDate ? null : await predecessorOf(tx, row);
+    if (prev) await tx.siteResponsible.update({ where: { id: prev.id }, data: { endDate: null } });
+    await tx.siteResponsible.delete({ where: { id: respId } });
+    await audit(tx, user, { action: 'DELETE', module: 'sites', recordId: siteId, siteId, before: row, note: `Hapus penanggung jawab ${row.role} ${row.name}${prev ? `; ${prev.name} aktif kembali` : ''}` });
+    return { id: respId, reactivated: prev?.name ?? null };
+  });
+}
+
 // Pergantian penanggung jawab menutup penanggung jawab lama sehingga riwayat tetap tersimpan.
 export async function assignResponsible(user, siteId, body) {
   requireSite(user, siteId);
   object(body, ['role', 'name', 'phone', 'email', 'competency', 'approvalNo', 'approvalDate', 'userId', 'startDate']);
-  const role = choice(body.role, ['PJO', 'PM', 'HSE_SITE', 'SAFETY_OFFICER'], 'Peran');
+  const role = choice(body.role, RESPONSIBLE_ROLES, 'Peran');
   const startDate = date(body.startDate, 'Tanggal mulai');
-  const data = {
-    siteId, role, name: text(body.name, 'Nama', 120), phone: text(body.phone, 'Telepon', 30, true), email: text(body.email, 'Email', 150, true), userId: optionalId(body.userId), startDate,
-    // Data pengesahan PJO untuk administrasi owner (008B).
-    ...(role === 'PJO' ? { competency: text(body.competency, 'Kompetensi kepengawasan', 60, true), approvalNo: text(body.approvalNo, 'Nomor surat pengesahan', 100, true), approvalDate: optionalDate(body.approvalDate, 'Tanggal pengesahan') } : {}),
-  };
+  const data = { siteId, role, userId: optionalId(body.userId), startDate, ...responsibleFields(role, body) };
   return prisma.$transaction(async (tx) => {
     const current = await tx.siteResponsible.findMany({ where: { siteId, role, endDate: null } });
     for (const c of current) {

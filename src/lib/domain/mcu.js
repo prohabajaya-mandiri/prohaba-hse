@@ -16,6 +16,50 @@ export const MCU_STAGE_LABELS = {
   SELESAI: 'Selesai',
 };
 
+/** Tahap awal: Pre-Employment dimulai dari screening; jenis lain langsung dari pemeriksaan MCU. */
+export const firstStage = (type) => (type === 'PRE_EMPLOYMENT' ? 'SCREENING' : 'MCU');
+
+/**
+ * Tahap berikutnya dari catatan MCU. Alur hanya maju satu tahap agar admin tidak bisa
+ * melompat atau mundur. Mobilisasi hanya untuk Pre-Employment; UNFIT langsung selesai.
+ */
+export function nextStage({ stage, type, result }) {
+  const afterResult = type === 'PRE_EMPLOYMENT' && result !== 'UNFIT' ? 'MOBILISASI' : 'SELESAI';
+  switch (stage) {
+    case 'SCREENING': return 'MCU';
+    case 'MCU': return 'MENUNGGU_HASIL';
+    case 'MENUNGGU_HASIL': return 'SUBMIT';
+    case 'SUBMIT': return 'FEEDBACK';
+    case 'FEEDBACK': return result === 'FOLLOW_UP' ? 'FOLLOW_UP' : afterResult;
+    case 'FOLLOW_UP': return 'SUBMIT_FU';
+    case 'SUBMIT_FU': return afterResult;
+    case 'MOBILISASI': return 'SELESAI';
+    default: return null;
+  }
+}
+
+/** Isian yang wajib/boleh diisi saat masuk ke tahap `to` (dari tahap `from`). */
+export function stepFields(from, to) {
+  if (to === 'MCU') return ['mcuDate'];
+  if (to === 'SUBMIT') return ['resultDate', 'result', 'fuDueDate', 'validUntil', 'notes'];
+  if (to === 'FEEDBACK') return ['submitDate'];
+  if (from === 'FEEDBACK') return ['feedbackDate', 'feedback'];
+  return [];
+}
+
+/** Field yang sudah "terbuka" (tahapnya sudah dilalui) sehingga boleh dikoreksi lewat edit. */
+export function reachedFields(stage) {
+  const i = MCU_STAGES.indexOf(stage);
+  const at = (s) => i >= MCU_STAGES.indexOf(s);
+  return [
+    'clinic', 'cost', 'screeningDate',
+    ...(at('MCU') ? ['mcuDate'] : []),
+    ...(at('SUBMIT') ? ['resultDate', 'result', 'fuDueDate', 'validUntil', 'notes'] : []),
+    ...(at('FEEDBACK') ? ['submitDate'] : []),
+    ...(i > MCU_STAGES.indexOf('FEEDBACK') ? ['feedbackDate', 'feedback'] : []),
+  ];
+}
+
 /**
  * Estimasi tanggal tiap tahap: Screening 1 → MCU 1 → tunggu hasil 3 → submit → feedback 3–5
  * → FU 2 (jika perlu) → submit FU → mobilisasi 2. Durasi hanya perencanaan, bukan keputusan medis.

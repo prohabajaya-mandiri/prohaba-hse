@@ -2,12 +2,30 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Edit, GitBranchPlus } from 'lucide-react';
+import { Plus, Edit, GitBranchPlus, ArrowRight } from 'lucide-react';
 import { Badge, DataTable, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, useSubmit } from '@/components/ui';
 import { formatDate, iso, todayIso } from '@/lib/dates';
-import { MCU_RESULTS, MCU_STAGES, MCU_STAGE_LABELS, MCU_TYPES, MCU_TYPE_LABELS, planMcu } from '@/lib/domain/mcu';
+import { firstStage, MCU_RESULTS, MCU_STAGES, MCU_STAGE_LABELS, MCU_TYPES, MCU_TYPE_LABELS, nextStage, planMcu, reachedFields, stepFields } from '@/lib/domain/mcu';
 
-const EMPTY = { personnelId: '', type: 'PRE_EMPLOYMENT', clinic: '', stage: 'SCREENING', screeningDate: todayIso(), mcuDate: '', resultDate: '', submitDate: '', feedbackDate: '', result: 'PENDING', fuDueDate: '', validUntil: '', cost: '', notes: '', feedback: '', parentId: '' };
+const EMPTY = { personnelId: '', type: 'PRE_EMPLOYMENT', clinic: '', screeningDate: todayIso(), mcuDate: todayIso(), cost: '', parentId: '' };
+const RESULT_OPTIONS = [['FIT', 'FIT'], ['FOLLOW_UP', 'FOLLOW UP'], ['UNFIT', 'UNFIT']];
+const EVENT_DATES = ['mcuDate', 'resultDate', 'submitDate', 'feedbackDate'];
+
+// Definisi isian MCU; tiap tahap hanya menampilkan isiannya sendiri (lihat stepFields/reachedFields).
+const fieldDefs = (cfg, v) => ({
+  clinic: { name: 'clinic', label: 'Klinik', required: true },
+  cost: { name: 'cost', label: 'Biaya (Rp)', type: 'number', min: 0 },
+  screeningDate: { name: 'screeningDate', label: 'Tgl screening', type: 'date', required: true },
+  mcuDate: { name: 'mcuDate', label: 'Tgl MCU', type: 'date', required: true, min: v.screeningDate || undefined, max: todayIso() },
+  resultDate: { name: 'resultDate', label: 'Tgl hasil keluar', type: 'date', required: true, min: v.mcuDate || undefined, max: todayIso() },
+  result: { name: 'result', label: 'Hasil', type: 'select', options: RESULT_OPTIONS, required: true },
+  fuDueDate: { name: 'fuDueDate', label: 'Batas Follow Up', type: 'date', hidden: (x) => x.result !== 'FOLLOW_UP', hint: 'Kosongkan untuk estimasi otomatis.' },
+  validUntil: { name: 'validUntil', label: 'MCU annual berikutnya', type: 'date', hidden: (x) => x.result !== 'FIT', hint: `Kosongkan: otomatis ${cfg.annualMonths} bulan dari tgl MCU.` },
+  submitDate: { name: 'submitDate', label: 'Tgl submit hasil', type: 'date', required: true, min: v.resultDate || undefined, max: todayIso() },
+  feedbackDate: { name: 'feedbackDate', label: 'Tgl feedback', type: 'date', required: true, min: v.submitDate || undefined, max: todayIso() },
+  feedback: { name: 'feedback', label: 'Feedback owner/klinik', type: 'textarea', span: true },
+  notes: { name: 'notes', label: 'Catatan medis (terenkripsi)', type: 'textarea', span: true },
+});
 
 function DueBadge({ due, label }) {
   if (!due) return null;
@@ -19,41 +37,64 @@ function DueBadge({ due, label }) {
 export default function McuClient({ sites, data, page, canEdit, preselect }) {
   const { submit, busy } = useSubmit();
   const [form, setForm] = useState(preselect && canEdit ? { ...EMPTY, personnelId: preselect } : null);
+  const [step, setStep] = useState(null);
   const [files, setFiles] = useState([]);
   const [detail, setDetail] = useState(null);
   const cfg = data.cfg;
+  const d = (row, k) => iso(row[k]) ?? '';
 
-  const open = (row) => {
+  // Input MCU baru: hanya data tahap pertama. Tahap berikutnya diisi bertahap lewat "Lanjut".
+  const openNew = () => { setFiles([]); setForm({ ...EMPTY }); };
+
+  // Koreksi data tahap yang sudah dilalui (tahap tidak bisa diubah).
+  const openEdit = (row) => {
     setFiles([]);
-    if (!row) return setForm({ ...EMPTY });
-    const d = (k) => iso(row[k]) ?? '';
-    setForm({
-      id: row.id, personnelId: row.personnelId, personName: row.personnel.name, type: row.type, clinic: row.clinic, stage: row.stage,
-      screeningDate: d('screeningDate'), mcuDate: d('mcuDate'), resultDate: d('resultDate'), submitDate: d('submitDate'), feedbackDate: d('feedbackDate'),
-      result: row.result, fuDueDate: d('fuDueDate'), validUntil: d('validUntil'), cost: row.cost ?? '', notes: row.canMedical ? row.notes ?? '' : undefined, feedback: row.feedback ?? '',
-    });
+    const keys = reachedFields(row.stage).filter((k) => k !== 'notes' || row.canMedical);
+    const vals = Object.fromEntries(keys.map((k) => [k, ['clinic', 'feedback', 'notes'].includes(k) ? row[k] ?? '' : k === 'cost' ? row.cost ?? '' : k === 'result' ? (row.result === 'PENDING' ? '' : row.result) : d(row, k)]));
+    setForm({ id: row.id, personName: row.personnel.name, stage: row.stage, keys, ...vals });
+  };
+
+  const openStep = (row) => {
+    setFiles([]);
+    setDetail(null);
+    const to = nextStage(row);
+    const keys = stepFields(row.stage, to).filter((k) => k !== 'notes' || row.canMedical);
+    const vals = Object.fromEntries(keys.map((k) => [k, EVENT_DATES.includes(k) ? (d(row, k) && d(row, k) <= todayIso() ? d(row, k) : todayIso()) : '']));
+    setStep({ id: row.id, personName: row.personnel.name, from: row.stage, to, keys, screeningDate: d(row, 'screeningDate'), mcuDate: d(row, 'mcuDate'), resultDate: d(row, 'resultDate'), submitDate: d(row, 'submitDate'), ...vals });
   };
 
   const followUp = (row) => {
     setFiles([]);
     setDetail(null);
-    setForm({ ...EMPTY, personnelId: row.personnelId, personName: row.personnel.name, type: 'FOLLOW_UP', parentId: row.id, clinic: row.clinic, stage: 'FOLLOW_UP', screeningDate: '', mcuDate: todayIso() });
+    setForm({ ...EMPTY, personnelId: row.personnelId, personName: row.personnel.name, type: 'FOLLOW_UP', parentId: row.id, clinic: row.clinic });
+  };
+
+  const send = async (url, body, method = 'POST') => {
+    const fd = new FormData();
+    fd.set('data', JSON.stringify(body));
+    files.forEach((f) => fd.append('files', f));
+    return submit(url, { method, form: fd });
   };
 
   const save = async (e) => {
     e.preventDefault();
-    const { id, personName, ...body } = form;
-    void personName;
-    if (id) delete body.personnelId;
-    if (body.notes === undefined) delete body.notes;
-    if (!body.parentId) delete body.parentId;
-    const fd = new FormData();
-    fd.set('data', JSON.stringify(body));
-    files.forEach((f) => fd.append('files', f));
-    if (await submit(id ? `/api/mcu/${id}` : '/api/mcu', { method: id ? 'PUT' : 'POST', form: fd })) setForm(null);
+    if (form.id) {
+      if (await send(`/api/mcu/${form.id}`, Object.fromEntries(form.keys.map((k) => [k, form[k]])), 'PUT')) setForm(null);
+      return;
+    }
+    const dateKey = firstStage(form.type) === 'SCREENING' ? 'screeningDate' : 'mcuDate';
+    const body = { personnelId: form.personnelId, type: form.type, clinic: form.clinic, cost: form.cost, [dateKey]: form[dateKey], ...(form.parentId ? { parentId: form.parentId } : {}) };
+    if (await send('/api/mcu', body)) setForm(null);
   };
 
-  const plan = form ? planMcu(form.screeningDate || form.mcuDate || todayIso(), cfg.durations, form.result === 'FOLLOW_UP') : null;
+  const saveStep = async (e) => {
+    e.preventDefault();
+    const body = { stage: step.to, ...Object.fromEntries(step.keys.map((k) => [k, step[k]])) };
+    if (await send(`/api/mcu/${step.id}/advance`, body)) setStep(null);
+  };
+
+  const defs = (v) => fieldDefs(cfg, v);
+  const plan = form && !form.id ? planMcu(form.screeningDate || form.mcuDate || todayIso(), cfg.durations) : null;
 
   return (
     <div className="stack">
@@ -65,7 +106,7 @@ export default function McuClient({ sites, data, page, canEdit, preselect }) {
         { name: 'stage', label: 'Tahap', type: 'select', options: MCU_STAGES.map((s) => [s, MCU_STAGE_LABELS[s]]) },
         { name: 'due', label: 'Pengingat', type: 'select', options: [['annual', `Annual ≤ ${cfg.thresholds.mcuAnnual} hari`], ['fu', `Follow Up ≤ ${cfg.thresholds.followUp} hari`]] },
       ]}>
-        {canEdit && <button className="btn btn-primary" onClick={() => open(null)}><Plus size={16} /> Input MCU</button>}
+        {canEdit && <button className="btn btn-primary" onClick={openNew}><Plus size={16} /> Input MCU</button>}
       </FilterBar>
 
       <div className="notice info">
@@ -121,41 +162,58 @@ export default function McuClient({ sites, data, page, canEdit, preselect }) {
             <div className="row-actions">
               <Link className="btn btn-ghost btn-sm" href={'/personnel/' + detail.personnelId}>Profil personel</Link>
               {canEdit && detail.result === 'FOLLOW_UP' && <button className="btn btn-outline btn-sm" onClick={() => followUp(detail)}><GitBranchPlus size={15} /> Catat hasil Follow Up</button>}
-              {canEdit && <button className="btn btn-primary btn-sm" onClick={() => { setDetail(null); open(detail); }}><Edit size={15} /> Perbarui</button>}
+              {canEdit && <button className="btn btn-outline btn-sm" onClick={() => { setDetail(null); openEdit(detail); }}><Edit size={15} /> Koreksi data</button>}
+              {canEdit && nextStage(detail) && <button className="btn btn-primary btn-sm" onClick={() => openStep(detail)}><ArrowRight size={15} /> Lanjut ke {MCU_STAGE_LABELS[nextStage(detail)]}</button>}
             </div>
           </div>
         )}
       </Modal>
 
-      <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.id ? `Perbarui MCU — ${form.personName}` : form?.parentId ? `Follow Up — ${form.personName}` : 'Input MCU'} subtitle="HSE Site dapat memperbarui tanpa approval HO; perubahan dicatat di audit log." size="modal-xl">
+      <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.id ? `Koreksi data MCU — ${form.personName}` : form?.parentId ? `Follow Up — ${form.personName}` : 'Input MCU'}
+        subtitle={form?.id ? `Tahap saat ini: ${MCU_STAGE_LABELS[form.stage]}. Hanya data tahap yang sudah dilalui yang bisa dikoreksi; perubahan dicatat di audit log.` : 'Isi data tahap pertama. Tahap berikutnya diisi bertahap dari detail MCU (tombol Lanjut).'} size="modal-lg">
         {form && (
           <form onSubmit={save} className="stack">
-            <FormFields columns={3} values={form} setValues={setForm} fields={[
-              ...(form.id || form.parentId ? [] : [{ name: 'personnelId', label: 'Personel', type: 'personnel', required: true, span: true }]),
-              { name: 'type', label: 'Jenis MCU', type: 'select', options: MCU_TYPES.map((t) => [t, MCU_TYPE_LABELS[t]]), required: true, noEmpty: true },
-              { name: 'clinic', label: 'Klinik', required: true },
-              { name: 'stage', label: 'Tahap saat ini', type: 'select', options: MCU_STAGES.map((s) => [s, MCU_STAGE_LABELS[s]]), noEmpty: true },
-              { name: 'screeningDate', label: 'Tgl screening', type: 'date' },
-              { name: 'mcuDate', label: 'Tgl MCU', type: 'date' },
-              { name: 'resultDate', label: 'Tgl hasil keluar', type: 'date' },
-              { name: 'submitDate', label: 'Tgl submit', type: 'date' },
-              { name: 'feedbackDate', label: 'Tgl feedback', type: 'date' },
-              { name: 'result', label: 'Hasil', type: 'select', options: MCU_RESULTS, noEmpty: true },
-              { name: 'fuDueDate', label: 'Batas Follow Up', type: 'date', hidden: (v) => v.result !== 'FOLLOW_UP', hint: 'Kosongkan untuk estimasi otomatis.' },
-              { name: 'validUntil', label: 'MCU annual berikutnya', type: 'date', hidden: (v) => v.result !== 'FIT', hint: `Kosongkan: otomatis ${cfg.annualMonths} bulan dari tgl MCU.` },
-              { name: 'cost', label: 'Biaya (Rp)', type: 'number', min: 0 },
-              { name: 'feedback', label: 'Feedback', type: 'textarea', span: true },
-              ...(form.notes !== undefined ? [{ name: 'notes', label: 'Catatan medis (terenkripsi)', type: 'textarea', span: true }] : []),
-            ]} />
-            <div className="form-grid"><FileInput label="Dokumen hasil MCU (privat)" onChange={setFiles} /></div>
+            {form.id ? (
+              <FormFields values={form} setValues={setForm} fields={form.keys.map((k) => defs(form)[k])} />
+            ) : (
+              <FormFields values={form} setValues={setForm} fields={[
+                ...(form.parentId ? [] : [{ name: 'personnelId', label: 'Personel', type: 'personnel', required: true, span: true }]),
+                { name: 'type', label: 'Jenis MCU', type: 'select', options: MCU_TYPES.filter((t) => (form.parentId ? t === 'FOLLOW_UP' : t !== 'FOLLOW_UP')).map((t) => [t, MCU_TYPE_LABELS[t]]), required: true, noEmpty: true, hint: 'Pre-Employment dimulai dari screening; jenis lain langsung dari tanggal MCU.' },
+                defs(form).clinic,
+                firstStage(form.type) === 'SCREENING' ? defs(form).screeningDate : { ...defs({}).mcuDate, min: undefined },
+                defs(form).cost,
+              ]} />
+            )}
+            {form.id && form.keys.includes('notes') && <div className="form-grid"><FileInput label="Dokumen hasil MCU (privat)" onChange={setFiles} /></div>}
             {plan && (
               <div className="notice info">
-                Estimasi siap mobilisasi: <strong>{formatDate(plan.readyDate)}</strong> ({plan.totalDays} hari dari {form.screeningDate ? 'screening' : 'MCU'}).
+                Estimasi siap mobilisasi: <strong>{formatDate(plan.readyDate)}</strong> ({plan.totalDays} hari dari {firstStage(form.type) === 'SCREENING' ? 'screening' : 'MCU'}).
               </div>
             )}
             <div className="modal-footer" style={{ padding: 0 }}>
               <button type="button" className="btn btn-ghost" onClick={() => setForm(null)}>Batal</button>
               <button className="btn btn-primary" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal open={Boolean(step)} onClose={() => setStep(null)} title={step ? `${MCU_STAGE_LABELS[step.from]} → ${MCU_STAGE_LABELS[step.to]} — ${step.personName}` : ''}
+        subtitle={step && !step.keys.length ? `Konfirmasi bahwa tahap ${MCU_STAGE_LABELS[step.from]} sudah selesai.` : 'Isi data tahap ini. Tanggal tidak boleh setelah hari ini atau sebelum tahap sebelumnya.'}>
+        {step && (
+          <form onSubmit={saveStep} className="stack">
+            <div className="stepper">
+              {MCU_STAGES.map((s) => {
+                const i = MCU_STAGES.indexOf(s);
+                const idx = MCU_STAGES.indexOf(step.to);
+                return <span key={s} className={`step ${i < idx ? 'done' : i === idx ? 'current' : ''}`}>{MCU_STAGE_LABELS[s]}</span>;
+              })}
+            </div>
+            {step.keys.length > 0 && <FormFields values={step} setValues={setStep} fields={step.keys.map((k) => defs(step)[k])} />}
+            {step.keys.includes('result') && <div className="form-grid"><FileInput label="Dokumen hasil MCU (privat)" onChange={setFiles} /></div>}
+            <div className="modal-footer" style={{ padding: 0 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setStep(null)}>Batal</button>
+              <button className="btn btn-primary" disabled={busy}>{busy ? 'Menyimpan…' : `Simpan & lanjut ke ${MCU_STAGE_LABELS[step.to]}`}</button>
             </div>
           </form>
         )}

@@ -16,6 +16,7 @@ export default function SitesClient({ sites, canEdit }) {
   const [siteForm, setSiteForm] = useState(null);
   const [projectForm, setProjectForm] = useState(null);
   const [respForm, setRespForm] = useState(null);
+  const [respEdit, setRespEdit] = useState(null);
   const [detailId, setDetailId] = useState(null);
   const detail = sites.find((s) => s.id === detailId);
 
@@ -41,6 +42,22 @@ export default function SitesClient({ sites, canEdit }) {
     e.preventDefault();
     const { siteId, ...body } = respForm;
     if (await submit(`/api/sites/${siteId}/responsibles`, { body })) setRespForm(null);
+  };
+  const editResp = (s, r) => setRespEdit({
+    siteId: s.id, id: r.id, role: r.role, active: !r.endDate, name: r.name, phone: r.phone ?? '', email: r.email ?? '',
+    competency: r.competency ?? '', approvalNo: r.approvalNo ?? '', approvalDate: iso(r.approvalDate) ?? '', startDate: iso(r.startDate) ?? '', endDate: iso(r.endDate) ?? '',
+  });
+  const updateResp = async (e) => {
+    e.preventDefault();
+    const { siteId, id, role, active, ...body } = respEdit;
+    void role; void active;
+    if (await submit(`/api/sites/${siteId}/responsibles/${id}`, { method: 'PUT', body, success: 'Penanggung jawab diperbarui.' })) setRespEdit(null);
+  };
+  const removeResp = async () => {
+    const { siteId, id, role, name, active } = respEdit;
+    const msg = `Hapus ${ROLE_NAMES[role]} ${name} dari riwayat? Gunakan hanya untuk salah input.` + (active ? ` Penanggung jawab ${ROLE_NAMES[role]} sebelumnya (jika ada) akan aktif kembali.` : '');
+    if (!(await showConfirm(msg, 'Hapus penanggung jawab'))) return;
+    if (await submit(`/api/sites/${siteId}/responsibles/${id}`, { method: 'DELETE', success: `${name} dihapus dari riwayat.` })) setRespEdit(null);
   };
 
   return (
@@ -98,6 +115,7 @@ export default function SitesClient({ sites, canEdit }) {
                   { key: 'pjo', label: 'Kompetensi / pengesahan', render: (r) => (r.role === 'PJO' && (r.competency || r.approvalNo) ? <div>{r.competency ?? '-'}<div className="muted">{r.approvalNo ?? ''}{r.approvalDate ? ` · ${formatDate(r.approvalDate)}` : ''}</div></div> : <span className="muted">-</span>) },
                   { key: 'start', label: 'Mulai', render: (r) => formatDate(r.startDate) },
                   { key: 'end', label: 'Selesai', render: (r) => (r.endDate ? formatDate(r.endDate) : <Badge value="AKTIF" />) },
+                  ...(canEdit ? [{ key: 'e', label: '', render: (r) => <button className="btn btn-ghost btn-sm" title="Edit penanggung jawab" aria-label={`Edit ${r.name}`} onClick={() => editResp(detail, r)}><Edit size={14} /></button> }] : []),
                 ]} />
             </Card>
           </div>
@@ -153,6 +171,27 @@ export default function SitesClient({ sites, canEdit }) {
               { name: 'startDate', label: 'Mulai bertugas', type: 'date', required: true },
             ]} />
             <button className="btn btn-primary" disabled={busy}>Simpan</button>
+          </form>
+        )}
+      </Modal>
+
+      <Modal open={Boolean(respEdit)} onClose={() => setRespEdit(null)} title={respEdit ? `Edit ${ROLE_NAMES[respEdit.role]} — ${respEdit.name}` : ''} subtitle="Untuk koreksi salah input. Pergantian orang tetap memakai Ganti penanggung jawab.">
+        {respEdit && (
+          <form onSubmit={updateResp}>
+            <FormFields values={respEdit} setValues={setRespEdit} fields={[
+              { name: 'name', label: 'Nama', required: true },
+              { name: 'phone', label: 'Telepon' },
+              { name: 'email', label: 'Email' },
+              { name: 'competency', label: 'Kompetensi kepengawasan (POP/POM/POU)', hidden: (v) => v.role !== 'PJO' },
+              { name: 'approvalNo', label: 'Nomor surat pengesahan PJO', hidden: (v) => v.role !== 'PJO' },
+              { name: 'approvalDate', label: 'Tanggal pengesahan PJO', type: 'date', hidden: (v) => v.role !== 'PJO' },
+              { name: 'startDate', label: 'Mulai bertugas', type: 'date', required: true },
+              { name: 'endDate', label: 'Selesai bertugas', type: 'date', required: true, hidden: (v) => v.active },
+            ]} />
+            <div className="row-actions" style={{ justifyContent: 'space-between' }}>
+              <button className="btn btn-primary" disabled={busy}>Simpan</button>
+              <button type="button" className="btn btn-outline text-red" disabled={busy} onClick={removeResp}><Trash2 size={15} /> Hapus</button>
+            </div>
           </form>
         )}
       </Modal>

@@ -3,44 +3,52 @@ import { canSeeSensitive, siteFilter } from '../access.js';
 import { audit, diff } from '../audit.js';
 import { decrypt, encrypt } from '../crypto.js';
 import { addDays, today } from '../dates.js';
-import { annualValidUntil, dueState, MCU_RESULTS, MCU_STAGES, MCU_TYPES, planMcu } from '../domain/mcu.js';
+import { annualValidUntil, dueState, firstStage, MCU_RESULTS, MCU_STAGE_LABELS, MCU_STAGES, MCU_TYPES, nextStage, planMcu, reachedFields, stepFields } from '../domain/mcu.js';
 import { getSettings } from '../settings.js';
 import { choice, ensure, id, object, optionalDate, optionalId, optionalNumber, text } from '../validation.js';
 import { attachFiles, filesOf, groupBy, requireSite, scopedPersonnel } from './common.js';
-
-const FIELDS = ['personnelId', 'type', 'parentId', 'clinic', 'stage', 'screeningDate', 'mcuDate', 'resultDate', 'submitDate', 'feedbackDate', 'result', 'fuDueDate', 'validUntil', 'cost', 'notes', 'feedback'];
 
 export async function mcuSettings() {
   const s = await getSettings(['mcu.durations', 'mcu.annualMonths', 'reminder.thresholds']);
   return { durations: s['mcu.durations'], annualMonths: s['mcu.annualMonths'], thresholds: s['reminder.thresholds'] };
 }
 
-function parse(body, existing, cfg) {
-  object(body, FIELDS);
-  const v = {
-    type: choice(body.type ?? existing?.type, MCU_TYPES, 'Jenis MCU'),
-    clinic: text(body.clinic ?? existing?.clinic, 'Klinik', 150),
-    stage: choice(body.stage ?? existing?.stage ?? 'SCREENING', MCU_STAGES, 'Tahap'),
-    screeningDate: optionalDate(body.screeningDate, 'Tanggal screening'),
-    mcuDate: optionalDate(body.mcuDate, 'Tanggal MCU'),
-    resultDate: optionalDate(body.resultDate, 'Tanggal hasil'),
-    submitDate: optionalDate(body.submitDate, 'Tanggal submit'),
-    feedbackDate: optionalDate(body.feedbackDate, 'Tanggal feedback'),
-    result: choice(body.result ?? existing?.result ?? 'PENDING', MCU_RESULTS, 'Hasil'),
-    fuDueDate: optionalDate(body.fuDueDate, 'Batas Follow Up'),
-    validUntil: optionalDate(body.validUntil, 'Berlaku sampai'),
-    cost: optionalNumber(body.cost, 'Biaya', 0, 1e10),
-    feedback: text(body.feedback, 'Feedback', 2000, true),
-  };
-  ensure(!v.screeningDate || !v.mcuDate || v.mcuDate >= v.screeningDate, 'Tanggal MCU tidak boleh sebelum screening.');
-  ensure(v.result === 'PENDING' || v.mcuDate, 'Tanggal MCU wajib diisi sebelum hasil ditetapkan.');
-  // Jatuh tempo MCU annual mengikuti tanggal MCU; Follow Up mengikuti estimasi durasi FU.
-  if (v.result === 'FIT' && !v.validUntil) v.validUntil = annualValidUntil(v.mcuDate, cfg.annualMonths);
-  if (v.result === 'FOLLOW_UP' && !v.fuDueDate) v.fuDueDate = addDays(v.feedbackDate ?? v.resultDate ?? v.mcuDate, cfg.durations.followUp);
-  if (['FIT', 'UNFIT'].includes(v.result)) v.fuDueDate = null;
-  const notes = body.notes === undefined ? undefined : text(body.notes, 'Catatan medis', 2000, true);
+const DATE_LABELS = { screeningDate: 'Tanggal screening', mcuDate: 'Tanggal MCU', resultDate: 'Tanggal hasil keluar', submitDate: 'Tanggal submit', feedbackDate: 'Tanggal feedback', fuDueDate: 'Batas Follow Up', validUntil: 'MCU annual berikutnya' };
+const ORDER = ['screeningDate', 'mcuDate', 'resultDate', 'submitDate', 'feedbackDate'];
+
+/** Urutan tanggal antar tahap wajib maju (screening ≤ MCU ≤ hasil ≤ submit ≤ feedback). */
+function checkOrder(r) {
+  const set = ORDER.filter((k) => r[k]);
+  for (let i = 1; i < set.length; i++) {
+    ensure(+new Date(r[set[i]]) >= +new Date(r[set[i - 1]]), `${DATE_LABELS[set[i]]} tidak boleh sebelum ${DATE_LABELS[set[i - 1]].toLowerCase()}.`);
+  }
+}
+
+/** Isian tahap: hanya `keys` yang dibaca dari body. Hasil (FIT/FU/UNFIT) menentukan jatuh tempo otomatis. */
+function parseStep(body, keys, merged, cfg, { required = [] } = {}) {
+  const v = {};
+  for (const k of keys) {
+    if (k in DATE_LABELS) v[k] = optionalDate(body[k], DATE_LABELS[k]);
+    else if (k === 'result') v.result = choice(body.result, ['FIT', 'FOLLOW_UP', 'UNFIT'], 'Hasil');
+    else if (k === 'feedback') v.feedback = text(body.feedback, 'Feedback', 2000, true);
+    else if (k === 'clinic') v.clinic = text(body.clinic, 'Klinik', 150);
+    else if (k === 'cost') v.cost = optionalNumber(body.cost, 'Biaya', 0, 1e10);
+  }
+  for (const k of required) ensure(v[k], `${DATE_LABELS[k] ?? 'Hasil'} wajib diisi.`);
+  const r = { ...merged, ...v };
+  checkOrder(r);
+  if (keys.includes('result')) {
+    // Jatuh tempo MCU annual mengikuti tanggal MCU; Follow Up mengikuti estimasi durasi FU.
+    if (r.result === 'FIT' && !v.validUntil) v.validUntil = annualValidUntil(r.mcuDate, cfg.annualMonths);
+    if (r.result === 'FOLLOW_UP' && !v.fuDueDate) v.fuDueDate = addDays(r.resultDate ?? r.mcuDate, cfg.durations.followUp);
+    if (r.result !== 'FIT') v.validUntil = null;
+    if (r.result !== 'FOLLOW_UP') v.fuDueDate = null;
+  }
+  const notes = keys.includes('notes') && body.notes !== undefined ? text(body.notes, 'Catatan medis', 2000, true) : undefined;
   return { v, notes };
 }
+
+const notFuture = (d, label) => ensure(!d || d <= today(), `${label} tidak boleh setelah hari ini.`);
 
 export async function listMcu(user, f, { skip = 0, take = 50 } = {}) {
   const now = today();
@@ -84,7 +92,14 @@ export async function createMcu(user, body, files) {
   const person = await scopedPersonnel(user, id(body.personnelId, 'Personel'));
   const siteId = requireSite(user, person.currentSiteId);
   const cfg = await mcuSettings();
-  const { v, notes } = parse(body, null, cfg);
+  // MCU baru selalu dimulai dari tahap pertama; tahap berikutnya lewat advanceMcu.
+  object(body, ['personnelId', 'type', 'parentId', 'clinic', 'cost', 'screeningDate', 'mcuDate']);
+  const type = choice(body.type, MCU_TYPES, 'Jenis MCU');
+  const stage = firstStage(type);
+  const dateKey = stage === 'SCREENING' ? 'screeningDate' : 'mcuDate';
+  const { v } = parseStep(body, ['clinic', 'cost', dateKey], {}, cfg, { required: [dateKey] });
+  if (dateKey === 'mcuDate') notFuture(v.mcuDate, 'Tanggal MCU');
+  Object.assign(v, { type, stage, result: 'PENDING' });
   const parentId = optionalId(body.parentId, 'MCU asal');
   return prisma.$transaction(async (tx) => {
     if (parentId) {
@@ -93,22 +108,51 @@ export async function createMcu(user, body, files) {
     }
     // MCU baru menggantikan status kesehatan sebelumnya (pengingat hanya dari catatan terbaru).
     await tx.mcuRecord.updateMany({ where: { personnelId: person.id, isLatest: true }, data: { isLatest: false } });
-    const row = await tx.mcuRecord.create({ data: { ...v, parentId, notesEnc: encrypt(notes), personnelId: person.id, siteId, createdBy: user.id, isLatest: true } });
+    const row = await tx.mcuRecord.create({ data: { ...v, parentId, personnelId: person.id, siteId, createdBy: user.id, isLatest: true } });
     await attachFiles(tx, user, files, { entityType: 'MCU', entityId: row.id, siteId, sensitivity: 'MEDICAL' });
     // Status MCU/permit ikut umpan sinkronisasi ERP (/personnel/changes), yang berkursor updatedAt personel.
     await tx.personnel.update({ where: { id: person.id }, data: { updatedAt: new Date() } });
-    await audit(tx, user, { action: 'CREATE', module: 'mcu', recordId: row.id, siteId, after: { person: person.code, ...v, notesEnc: notes ? 'x' : null } });
+    await audit(tx, user, { action: 'CREATE', module: 'mcu', recordId: row.id, siteId, after: { person: person.code, ...v } });
     return row;
   }, { timeout: 20000 });
 }
 
+/** Maju satu tahap. Hanya isian tahap tujuan yang diterima; tanggal kejadian tidak boleh di masa depan. */
+export async function advanceMcu(user, mcuId, body, files) {
+  const existing = await prisma.mcuRecord.findUnique({ where: { id: mcuId } });
+  ensure(existing, 'MCU tidak ditemukan.', 404);
+  requireSite(user, existing.siteId);
+  const to = nextStage(existing);
+  ensure(to, 'MCU ini sudah selesai.', 409);
+  ensure(body.stage === to, `Tahap berikutnya adalah ${MCU_STAGE_LABELS[to]}. Muat ulang halaman lalu coba lagi.`, 409);
+  const keys = stepFields(existing.stage, to);
+  object(body, ['stage', ...keys]);
+  const cfg = await mcuSettings();
+  const required = keys.filter((k) => ['mcuDate', 'resultDate', 'submitDate', 'feedbackDate', 'result'].includes(k));
+  const { v, notes } = parseStep(body, keys, existing, cfg, { required });
+  for (const k of ['mcuDate', 'resultDate', 'submitDate', 'feedbackDate']) if (v[k]) notFuture(v[k], DATE_LABELS[k]);
+  return prisma.$transaction(async (tx) => {
+    const data = { ...v, stage: to, ...(notes !== undefined && canSeeSensitive(user, 'MEDICAL', existing.siteId) ? { notesEnc: encrypt(notes) } : {}) };
+    const row = await tx.mcuRecord.update({ where: { id: mcuId }, data });
+    await tx.personnel.update({ where: { id: existing.personnelId }, data: { updatedAt: new Date() } });
+    await attachFiles(tx, user, files, { entityType: 'MCU', entityId: row.id, siteId: existing.siteId, sensitivity: 'MEDICAL' });
+    await audit(tx, user, { action: 'UPDATE', module: 'mcu', recordId: mcuId, siteId: existing.siteId, ...diff(existing, data), note: `Tahap ${MCU_STAGE_LABELS[existing.stage]} → ${MCU_STAGE_LABELS[to]}` });
+    return row;
+  }, { timeout: 20000 });
+}
+
+// Koreksi data tahap yang sudah dilalui. Tahap & jenis tidak bisa diubah di sini.
 export async function updateMcu(user, mcuId, body, files) {
   const existing = await prisma.mcuRecord.findUnique({ where: { id: mcuId } });
   ensure(existing, 'MCU tidak ditemukan.', 404);
   requireSite(user, existing.siteId);
   const cfg = await mcuSettings();
   delete body.personnelId;
-  const { v, notes } = parse(body, existing, cfg);
+  const keys = reachedFields(existing.stage);
+  object(body, keys);
+  const required = keys.filter((k) => ['mcuDate', 'resultDate', 'submitDate', 'feedbackDate', 'result'].includes(k));
+  if (existing.stage === 'SCREENING' || existing.screeningDate) required.push('screeningDate');
+  const { v, notes } = parseStep(body, keys, existing, cfg, { required });
   return prisma.$transaction(async (tx) => {
     const data = { ...v, ...(notes !== undefined && canSeeSensitive(user, 'MEDICAL', existing.siteId) ? { notesEnc: encrypt(notes) } : {}) };
     const row = await tx.mcuRecord.update({ where: { id: mcuId }, data });

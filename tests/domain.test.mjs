@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addDays, iso, isoWeekKey, isoWeekRange, toDate } from '../src/lib/dates.js';
-import { annualValidUntil, fitness, planMcu } from '../src/lib/domain/mcu.js';
+import { annualValidUntil, firstStage, fitness, nextStage, planMcu, reachedFields, stepFields } from '../src/lib/domain/mcu.js';
 import { permitStatus, permitWarnings, suggestedEnd } from '../src/lib/domain/permit.js';
 import { addWorkdays, cycleStart, nextLeaveDue, pickPolicy, rosterState } from '../src/lib/domain/roster.js';
 import { calcManhours, safeManhours, summarize } from '../src/lib/domain/performance.js';
@@ -287,4 +287,25 @@ test('no rekening opsional; bila diisi tetap divalidasi', () => {
   assert.equal(bankAccount(1234567890), '1234567890');
   assert.throws(() => bankAccount('12ab567'), /hanya angka/);
   assert.throws(() => bankAccount('1234'), /5–30 digit/);
+});
+
+test('MCU diisi bertahap: hanya maju satu tahap sesuai jenis & hasil', () => {
+  assert.equal(firstStage('PRE_EMPLOYMENT'), 'SCREENING');
+  assert.equal(firstStage('ANNUAL'), 'MCU');
+  const walk = (type, result) => {
+    const seen = [];
+    let stage = firstStage(type);
+    while (stage) { seen.push(stage); stage = nextStage({ stage, type, result }); }
+    return seen;
+  };
+  assert.deepEqual(walk('PRE_EMPLOYMENT', 'FIT'), ['SCREENING', 'MCU', 'MENUNGGU_HASIL', 'SUBMIT', 'FEEDBACK', 'MOBILISASI', 'SELESAI']);
+  assert.deepEqual(walk('PRE_EMPLOYMENT', 'FOLLOW_UP'), ['SCREENING', 'MCU', 'MENUNGGU_HASIL', 'SUBMIT', 'FEEDBACK', 'FOLLOW_UP', 'SUBMIT_FU', 'MOBILISASI', 'SELESAI']);
+  assert.deepEqual(walk('PRE_EMPLOYMENT', 'UNFIT'), ['SCREENING', 'MCU', 'MENUNGGU_HASIL', 'SUBMIT', 'FEEDBACK', 'SELESAI']);
+  assert.deepEqual(walk('ANNUAL', 'FIT'), ['MCU', 'MENUNGGU_HASIL', 'SUBMIT', 'FEEDBACK', 'SELESAI']);
+  assert.deepEqual(stepFields('SCREENING', 'MCU'), ['mcuDate']);
+  assert.ok(stepFields('MENUNGGU_HASIL', 'SUBMIT').includes('result'));
+  assert.deepEqual(stepFields('FEEDBACK', 'MOBILISASI'), ['feedbackDate', 'feedback']);
+  assert.ok(!reachedFields('SCREENING').includes('mcuDate'));
+  assert.ok(!reachedFields('MENUNGGU_HASIL').includes('result'));
+  assert.ok(reachedFields('SELESAI').includes('feedbackDate'));
 });
