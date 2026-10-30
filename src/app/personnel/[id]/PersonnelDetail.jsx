@@ -121,7 +121,7 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
               {item('Riwayat penyakit', p.medicalHistory)}
               <div>
                 <dt>Rekening</dt>
-                <dd>{p.bankName ? `${p.bankName} · ` : ''}{revealed.bankAccount ?? p.bankAccount ?? '-'} {p.access.bank && p.bankAccount && !revealed.bankAccount && <button className="btn btn-ghost btn-sm" onClick={() => reveal('BANK')}><Eye size={14} /></button>}</dd>
+                <dd>{p.bankName ? `${p.bankName} · ` : ''}{revealed.bankAccount ?? p.bankAccount ?? (p.access.bank ? <span className="badge badge-warning">Rekening belum diisi</span> : '-')} {p.access.bank && p.bankAccount && !revealed.bankAccount && <button className="btn btn-ghost btn-sm" onClick={() => reveal('BANK')}><Eye size={14} /></button>}</dd>
               </div>
             </dl>
           </Card>

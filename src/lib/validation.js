@@ -114,6 +114,13 @@ export function npwp(value) {
   ensure(/^(\d{15}|\d{16})$/.test(s), "NPWP harus 15 atau 16 digit angka.");
   return s;
 }
+// No rekening: opsional. Bila diisi, spasi/titik/strip dibuang lalu harus 5–30 digit angka.
+export function bankAccount(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const s = String(value).replace(/[\s.\-]/g, "");
+  ensure(/^\d{5,30}$/.test(s), "No rekening hanya angka (5–30 digit).");
+  return s;
+}
 // NIP perusahaan: opsional dan bebas format (disimpan apa adanya, hanya spasi di awal/akhir dibuang).
 export function nip(value) {
   if (value === undefined || value === null || String(value).trim() === "") return null;

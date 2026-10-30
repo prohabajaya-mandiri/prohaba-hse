@@ -8,7 +8,7 @@ import { nextNumber } from '../sequence.js';
 import { BLOOD_TYPES, CATEGORIES, CATEGORY_LABELS, normalizeCategory, EMPLOYMENT_TYPES, IMPORT_COLUMNS, MARITAL, WORK_STATUSES, mapImportRow, normalizeImportRow, tenure } from '../domain/personnel.js';
 import { fitness } from '../domain/mcu.js';
 import { getSetting } from '../settings.js';
-import { bool, choice, ensure, InputError, nik as parseNik, nip as parseNip, npwp as parseNpwp, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
+import { bankAccount as parseBankAccount, bool, choice, ensure, InputError, nik as parseNik, nip as parseNip, npwp as parseNpwp, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
 import { attachFiles, requireSite, scopedPersonnel, siteExists } from './common.js';
 
 const EDITABLE = [
@@ -22,9 +22,9 @@ const EDITABLE = [
  * Validasi & normalisasi input personel. `existing` diisi saat edit.
  * `errors` (array) diisi bila ingin mengumpulkan seluruh kesalahan sekaligus (import Excel);
  * tanpa `errors`, kesalahan pertama langsung dilempar.
- * `requireBank` = false untuk import Excel (rekening boleh dilengkapi kemudian).
+ * Rekening (nama bank, no rekening, pemilik) selalu opsional untuk semua kategori; bila diisi, formatnya divalidasi.
  */
-export function parsePersonnel(body, existing = null, { user = null, errors = null, requireBank = true } = {}) {
+export function parsePersonnel(body, existing = null, { user = null, errors = null } = {}) {
   object(body, EDITABLE);
   const f = (fn) => {
     try {
@@ -86,15 +86,8 @@ export function parsePersonnel(body, existing = null, { user = null, errors = nu
   if (!existing || body.nik !== undefined) sensitive.nik = f(() => parseNik(body.nik));
   if (!existing || body.ktpAddress !== undefined) sensitive.ktpAddress = f(() => text(body.ktpAddress, 'Alamat KTP', 500));
   if (body.npwp !== undefined) sensitive.npwp = f(() => parseNpwp(body.npwp));
-  if (body.bankAccount !== undefined) {
-    const acc = body.bankAccount ? String(body.bankAccount).replace(/[\s.-]/g, '') : null;
-    f(() => ensure(!acc || /^\d{5,30}$/.test(acc), 'No rekening hanya angka (5–30 digit).'));
-    sensitive.bankAccount = acc;
-  }
+  if (body.bankAccount !== undefined) sensitive.bankAccount = f(() => parseBankAccount(body.bankAccount));
   if (body.medicalHistory !== undefined) sensitive.medicalHistory = f(() => text(body.medicalHistory, 'Riwayat penyakit', 1000, true));
-  // Rekening wajib untuk staff saat ditambah lewat form. Tidak dipaksakan saat edit, karena personel
-  // hasil import boleh belum memiliki rekening dan field rekening tidak tampil bagi peran tanpa akses BANK.
-  if (requireBank && !existing && v.category === 'STAFF') f(() => ensure(sensitive.bankAccount && v.bankName, 'Rekening (nama bank & no rekening) wajib untuk kategori STAFF.'));
   if (v.category !== 'MANPOWER') v.foremanId = null;
   return { v, sensitive };
 }
@@ -387,7 +380,7 @@ async function validateImport(user, rawRows) {
       if (fid) body.foremanId = fid;
       else errors.push(`Mandor dengan NIP "${foremanRef}" tidak ditemukan.`);
     }
-    const result = parsePersonnel(body, null, { user, errors, requireBank: false });
+    const result = parsePersonnel(body, null, { user, errors });
     if (!errors.length) parsed = { ...result, siteId };
     let duplicate = null;
     if (parsed) {
@@ -474,9 +467,10 @@ export async function exportPersonnel(user, f) {
 // Hasil & masa berlaku MCU terakhir (tanpa catatan medis) dan permit (tanpa nomor) dipakai ERP untuk menandai
 // absensi/pengambilan BBM oleh personel MCU tidak berlaku atau SIMPER kedaluwarsa (tanda saja, tidak memblokir).
 // Setiap perubahan penempatan, MCU dan permit juga memperbarui updatedAt personel agar terbawa umpan ini.
+// Rekening hanya dikirim sebagai tanda `hasBankAccount` (terisi/belum) untuk peringatan payroll ERP, tanpa nomornya.
 const SYNC_SELECT = {
   id: true, code: true, nip: true, name: true, nikLast4: true, category: true, position: true, workStatus: true, isFormer: true,
-  employmentType: true, contractEndDate: true, startDate: true, phoneWa: true, bankName: true,
+  employmentType: true, contractEndDate: true, startDate: true, phoneWa: true, bankName: true, bankAccountEnc: true,
   bpjsKesehatan: true, bpjsKetenagakerjaan: true, updatedAt: true,
   currentSite: { select: { id: true, code: true, name: true, isHo: true } },
   placements: {
@@ -487,10 +481,11 @@ const SYNC_SELECT = {
   permits: { select: { id: true, siteId: true, permitType: true, startDate: true, endDate: true, revokedAt: true } },
 };
 
-const syncRow = ({ currentSite, placements, mcus, permits, nikHash, ...p }) => {
+export const syncRow = ({ currentSite, placements, mcus, permits, nikHash, bankAccountEnc, ...p }) => {
   void nikHash;
   return {
     ...p,
+    hasBankAccount: Boolean(bankAccountEnc),
     siteId: currentSite?.id ?? null,
     siteCode: currentSite?.code ?? null,
     siteName: currentSite?.name ?? null,

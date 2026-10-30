@@ -43,7 +43,7 @@ Bila Vercel Deployment Protection aktif pada E-HSE produksi, pastikan domain pro
 | `GET /personnel/:id/ktp` | File KTP (diaudit) |
 | `POST /personnel/import` | Import Excel (`preview`/`commit`) |
 | `GET /personnel/export`, `GET /personnel/template` | Export & template |
-| `GET /personnel/changes?since&after&limit` / `?ids=` | Umpan perubahan untuk salinan lokal, termasuk site aktif (`siteId`, `siteIsHo`), riwayat penempatan (`placements`), MCU terakhir (`mcu`: hasil & masa berlaku) dan permit (`permits`: jenis, site, tanggal, dicabut; tanpa nomor) |
+| `GET /personnel/changes?since&after&limit` / `?ids=` | Umpan perubahan untuk salinan lokal, termasuk site aktif (`siteId`, `siteIsHo`), riwayat penempatan (`placements`), MCU terakhir (`mcu`: hasil & masa berlaku) permit (`permits`: jenis, site, tanggal, dicabut; tanpa nomor) dan tanda rekening (`hasBankAccount`: terisi/belum, tanpa nomor) |
 | `POST /personnel/lookup` | Cocokkan NIK data lama |
 
 ## Data pegawai lama ERP
@@ -90,6 +90,14 @@ ERP menyalin hasil & masa berlaku MCU terakhir (tanpa catatan medis) dan permit 
 UNFIT/kedaluwarsa atau (BBM alat berat/kendaraan) SIMPER/KIMPER tidak berlaku di site tersebut — lihat
 `docs/absensi-barcode.md` dan `docs/bbm-drum-site.md` di prohaba-center. Perubahan MCU dan permit di E-HSE memperbarui
 `updatedAt` personel sehingga ikut umpan sinkronisasi; status kedaluwarsa dihitung ERP pada tanggal kejadian.
+
+## Rekening opsional
+
+Nama bank, nomor rekening dan nama pemilik rekening **tidak wajib** saat menambah, mengubah, mengimpor atau
+memverifikasi pendaftaran karyawan (semua kategori). Bila diisi, formatnya tetap divalidasi (no rekening 5–30 digit
+angka; nama bank maks. 60 karakter; nama pemilik maks. 120 karakter). Umpan perubahan hanya mengirim tanda
+`hasBankAccount`; ERP menyalinnya ke `Employee.hasBankAccount` (null = belum diterima) dan menampilkan peringatan
+"Rekening belum diisi" di rincian payroll serta detail karyawan. Payroll tetap dapat dibuat dan dibayar.
 
 ## Berkas bersama
 
