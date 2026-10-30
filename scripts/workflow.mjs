@@ -57,10 +57,10 @@ check(commit.data?.created === 1 && commit.data.skipped === 2, 'Commit import ha
 console.log('MCU → status & permit');
 const mcuNew = await hse.form('POST', '/api/mcu', { personnelId: pid, type: 'PRE_EMPLOYMENT', clinic: 'Klinik Uji', screeningDate: today });
 check(mcuNew.status === 200 && mcuNew.data.stage === 'SCREENING', 'MCU baru dimulai dari screening', mcuNew.data);
-const skip = await hse.form('POST', `/api/mcu/${mcuNew.data.id}/advance`, { stage: 'SUBMIT', resultDate: today, result: 'FIT' });
+const skip = await hse.form('POST', `/api/mcu/${mcuNew.data.id}/advance`, { stage: 'FEEDBACK', submitDate: today });
 check(skip.status === 409, 'MCU tidak bisa melompati tahap', skip.data);
 let mcu = mcuNew;
-for (const step of [{ stage: 'MCU', mcuDate: today }, { stage: 'MENUNGGU_HASIL' }, { stage: 'SUBMIT', resultDate: today, result: 'FOLLOW_UP' }]) {
+for (const step of [{ stage: 'MCU', mcuDate: today }, { stage: 'MENUNGGU_HASIL' }, { stage: 'SUBMIT', resultDate: today }, { stage: 'FEEDBACK', submitDate: today }, { stage: 'FOLLOW_UP', feedbackDate: today, result: 'FOLLOW_UP', fuDoctors: ['Dokter Umum', 'Dokter Mata'] }]) {
   mcu = await hse.form('POST', `/api/mcu/${mcuNew.data.id}/advance`, step);
 }
 check(mcu.status === 200 && mcu.data.fuDueDate, 'MCU FOLLOW UP menghasilkan batas FU otomatis', mcu.data);

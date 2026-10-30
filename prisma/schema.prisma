@@ -326,7 +326,7 @@ model McuRecord {
   type          String // PRE_EMPLOYMENT | ANNUAL | FOLLOW_UP | KHUSUS
   parentId      String? // MCU asal untuk Follow Up
   clinic        String
-  stage         String    @default("SCREENING") // SCREENING | MCU | MENUNGGU_HASIL | SUBMIT | FEEDBACK | FOLLOW_UP | SUBMIT_FU | MOBILISASI | SELESAI
+  stage         String    @default("SCREENING") // SCREENING | MCU | MENUNGGU_HASIL | SUBMIT (hasil keluar) | FEEDBACK (dikirim ke Paramedic) | FOLLOW_UP | SUBMIT_FU | MOBILISASI | SELESAI
   screeningDate DateTime?
   mcuDate       DateTime?
   resultDate    DateTime?
@@ -334,6 +334,7 @@ model McuRecord {
   feedbackDate  DateTime?
   result        String    @default("PENDING") // PENDING | FIT | FOLLOW_UP | UNFIT
   fuDueDate     DateTime? // batas Follow Up
+  fuDoctors     String[]  @default([]) // dokter rujukan Follow Up (maks. 6)
   validUntil    DateTime? // jatuh tempo MCU annual berikutnya
   isLatest      Boolean   @default(true) // catatan terbaru per personel (dasar status & pengingat)
   cost          Decimal?  @db.Decimal(14, 2)

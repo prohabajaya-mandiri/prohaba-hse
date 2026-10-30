@@ -8,20 +8,27 @@ export const MCU_STAGE_LABELS = {
   SCREENING: 'Screening',
   MCU: 'MCU',
   MENUNGGU_HASIL: 'Menunggu hasil',
-  SUBMIT: 'Submit hasil',
-  FEEDBACK: 'Feedback',
+  SUBMIT: 'Hasil keluar',
+  FEEDBACK: 'Dikirim ke Paramedic',
   FOLLOW_UP: 'Follow Up',
   SUBMIT_FU: 'Submit FU',
   MOBILISASI: 'Mobilisasi',
   SELESAI: 'Selesai',
 };
 
+// Follow Up dirujuk ke maksimal 6 dokter.
+export const FU_DOCTORS = ['Dokter Umum', 'Dokter Sp. Penyakit Dalam', 'Dokter Mata', 'Dokter Ahli Gizi', 'Dokter Sp. Jantung', 'Dokter Sp. THT', 'Dokter Gigi'];
+export const FU_DOCTOR_SLOTS = 6;
+
 /** Tahap awal: Pre-Employment dimulai dari screening; jenis lain langsung dari pemeriksaan MCU. */
 export const firstStage = (type) => (type === 'PRE_EMPLOYMENT' ? 'SCREENING' : 'MCU');
 
 /**
  * Tahap berikutnya dari catatan MCU. Alur hanya maju satu tahap agar admin tidak bisa
- * melompat atau mundur. Mobilisasi hanya untuk Pre-Employment; UNFIT langsung selesai.
+ * melompat atau mundur: MCU → menunggu hasil → hasil keluar → dikirim ke Paramedic Site →
+ * hasil FIT/FOLLOW UP/UNFIT dari feedback Paramedic. Karena itu tahap setelah FEEDBACK
+ * bergantung pada `result` yang diisi di langkah yang sama. Mobilisasi hanya untuk
+ * Pre-Employment; UNFIT langsung selesai.
  */
 export function nextStage({ stage, type, result }) {
   const afterResult = type === 'PRE_EMPLOYMENT' && result !== 'UNFIT' ? 'MOBILISASI' : 'SELESAI';
@@ -41,9 +48,9 @@ export function nextStage({ stage, type, result }) {
 /** Isian yang wajib/boleh diisi saat masuk ke tahap `to` (dari tahap `from`). */
 export function stepFields(from, to) {
   if (to === 'MCU') return ['mcuDate'];
-  if (to === 'SUBMIT') return ['resultDate', 'result', 'fuDueDate', 'validUntil', 'notes'];
+  if (to === 'SUBMIT') return ['resultDate', 'notes'];
   if (to === 'FEEDBACK') return ['submitDate'];
-  if (from === 'FEEDBACK') return ['feedbackDate', 'feedback'];
+  if (from === 'FEEDBACK') return ['feedbackDate', 'result', 'fuDoctors', 'fuDueDate', 'validUntil', 'feedback'];
   return [];
 }
 
@@ -54,9 +61,9 @@ export function reachedFields(stage) {
   return [
     'clinic', 'cost', 'screeningDate',
     ...(at('MCU') ? ['mcuDate'] : []),
-    ...(at('SUBMIT') ? ['resultDate', 'result', 'fuDueDate', 'validUntil', 'notes'] : []),
+    ...(at('SUBMIT') ? ['resultDate', 'notes'] : []),
     ...(at('FEEDBACK') ? ['submitDate'] : []),
-    ...(i > MCU_STAGES.indexOf('FEEDBACK') ? ['feedbackDate', 'feedback'] : []),
+    ...(i > MCU_STAGES.indexOf('FEEDBACK') ? ['feedbackDate', 'result', 'fuDoctors', 'fuDueDate', 'validUntil', 'feedback'] : []),
   ];
 }
 

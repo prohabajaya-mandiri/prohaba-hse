@@ -3,7 +3,7 @@ import { canSeeSensitive, siteFilter } from '../access.js';
 import { audit, diff } from '../audit.js';
 import { decrypt, encrypt } from '../crypto.js';
 import { addDays, today } from '../dates.js';
-import { annualValidUntil, dueState, firstStage, MCU_RESULTS, MCU_STAGE_LABELS, MCU_STAGES, MCU_TYPES, nextStage, planMcu, reachedFields, stepFields } from '../domain/mcu.js';
+import { annualValidUntil, dueState, firstStage, FU_DOCTOR_SLOTS, FU_DOCTORS, MCU_RESULTS, MCU_STAGE_LABELS, MCU_STAGES, MCU_TYPES, nextStage, planMcu, reachedFields, stepFields } from '../domain/mcu.js';
 import { getSettings } from '../settings.js';
 import { choice, ensure, id, object, optionalDate, optionalId, optionalNumber, text } from '../validation.js';
 import { attachFiles, filesOf, groupBy, requireSite, scopedPersonnel } from './common.js';
@@ -33,19 +33,30 @@ function parseStep(body, keys, merged, cfg, { required = [] } = {}) {
     else if (k === 'feedback') v.feedback = text(body.feedback, 'Feedback', 2000, true);
     else if (k === 'clinic') v.clinic = text(body.clinic, 'Klinik', 150);
     else if (k === 'cost') v.cost = optionalNumber(body.cost, 'Biaya', 0, 1e10);
+    else if (k === 'fuDoctors') v.fuDoctors = parseDoctors(body.fuDoctors);
   }
   for (const k of required) ensure(v[k], `${DATE_LABELS[k] ?? 'Hasil'} wajib diisi.`);
   const r = { ...merged, ...v };
   checkOrder(r);
   if (keys.includes('result')) {
-    // Jatuh tempo MCU annual mengikuti tanggal MCU; Follow Up mengikuti estimasi durasi FU.
+    // Hasil dari feedback Paramedic Site. Jatuh tempo annual mengikuti tanggal MCU; batas FU dihitung dari feedback.
     if (r.result === 'FIT' && !v.validUntil) v.validUntil = annualValidUntil(r.mcuDate, cfg.annualMonths);
-    if (r.result === 'FOLLOW_UP' && !v.fuDueDate) v.fuDueDate = addDays(r.resultDate ?? r.mcuDate, cfg.durations.followUp);
+    if (r.result === 'FOLLOW_UP' && !v.fuDueDate) v.fuDueDate = addDays(r.feedbackDate ?? r.resultDate ?? r.mcuDate, cfg.durations.followUp);
     if (r.result !== 'FIT') v.validUntil = null;
     if (r.result !== 'FOLLOW_UP') v.fuDueDate = null;
+    if (r.result === 'FOLLOW_UP') ensure(v.fuDoctors?.length, 'Pilih minimal satu dokter rujukan Follow Up.');
+    else v.fuDoctors = [];
   }
   const notes = keys.includes('notes') && body.notes !== undefined ? text(body.notes, 'Catatan medis', 2000, true) : undefined;
   return { v, notes };
+}
+
+/** Dokter rujukan Follow Up: maks. 6, dari daftar baku, tanpa duplikat. */
+function parseDoctors(raw) {
+  const list = (Array.isArray(raw) ? raw : []).filter(Boolean).map((d) => choice(d, FU_DOCTORS, 'Dokter Follow Up'));
+  ensure(list.length <= FU_DOCTOR_SLOTS, `Maksimal ${FU_DOCTOR_SLOTS} dokter Follow Up.`);
+  ensure(new Set(list).size === list.length, 'Dokter Follow Up tidak boleh dipilih dua kali.');
+  return list;
 }
 
 const notFuture = (d, label) => ensure(!d || d <= today(), `${label} tidak boleh setelah hari ini.`);
@@ -122,7 +133,9 @@ export async function advanceMcu(user, mcuId, body, files) {
   const existing = await prisma.mcuRecord.findUnique({ where: { id: mcuId } });
   ensure(existing, 'MCU tidak ditemukan.', 404);
   requireSite(user, existing.siteId);
-  const to = nextStage(existing);
+  // Setelah dikirim ke Paramedic, tahap berikutnya ditentukan hasil feedback yang diisi di langkah ini.
+  const result = existing.stage === 'FEEDBACK' ? choice(body.result, ['FIT', 'FOLLOW_UP', 'UNFIT'], 'Hasil') : existing.result;
+  const to = nextStage({ ...existing, result });
   ensure(to, 'MCU ini sudah selesai.', 409);
   ensure(body.stage === to, `Tahap berikutnya adalah ${MCU_STAGE_LABELS[to]}. Muat ulang halaman lalu coba lagi.`, 409);
   const keys = stepFields(existing.stage, to);

@@ -303,9 +303,10 @@ test('MCU diisi bertahap: hanya maju satu tahap sesuai jenis & hasil', () => {
   assert.deepEqual(walk('PRE_EMPLOYMENT', 'UNFIT'), ['SCREENING', 'MCU', 'MENUNGGU_HASIL', 'SUBMIT', 'FEEDBACK', 'SELESAI']);
   assert.deepEqual(walk('ANNUAL', 'FIT'), ['MCU', 'MENUNGGU_HASIL', 'SUBMIT', 'FEEDBACK', 'SELESAI']);
   assert.deepEqual(stepFields('SCREENING', 'MCU'), ['mcuDate']);
-  assert.ok(stepFields('MENUNGGU_HASIL', 'SUBMIT').includes('result'));
-  assert.deepEqual(stepFields('FEEDBACK', 'MOBILISASI'), ['feedbackDate', 'feedback']);
+  assert.ok(!stepFields('MENUNGGU_HASIL', 'SUBMIT').includes('result'));
+  assert.ok(stepFields('FEEDBACK', 'MOBILISASI').includes('result'));
+  assert.ok(stepFields('FEEDBACK', 'FOLLOW_UP').includes('fuDoctors'));
   assert.ok(!reachedFields('SCREENING').includes('mcuDate'));
-  assert.ok(!reachedFields('MENUNGGU_HASIL').includes('result'));
+  assert.ok(!reachedFields('FEEDBACK').includes('result'));
   assert.ok(reachedFields('SELESAI').includes('feedbackDate'));
 });
