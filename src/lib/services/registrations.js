@@ -207,7 +207,7 @@ export async function approveRegistration(user, id, body) {
     emergencyRelation: reg.emergencyRelation ?? undefined,
     ktpAddress: decrypt(reg.ktpAddressEnc),
     startDate: start,
-  }, null, { user, requireBank: false });
+  }, null, { user });
   const mcuDate = date(body.mcuDate ?? iso(reg.mcuDate), 'Tanggal MCU');
   ensure(mcuDate >= startDate, 'Tanggal MCU tidak boleh sebelum tanggal mulai kerja.');
   const clinic = text(body.clinic, 'Klinik MCU', 150);

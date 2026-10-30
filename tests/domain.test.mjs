@@ -10,7 +10,7 @@ import { DISCUSSED_SCENARIO, simulate, validateSteps } from '../src/lib/domain/h
 import { mapImportRow, nikInfo, normalizeCategory, normalizeDate, normalizeImportRow, parseKtp, tenure } from '../src/lib/domain/personnel.js';
 import { flattenKtp } from '../src/lib/domain/ktp-ocr.js';
 import ktpOcr from './fixtures/ktp-ocr.json' with { type: 'json' };
-import { nip } from '../src/lib/validation.js';
+import { bankAccount, nip } from '../src/lib/validation.js';
 
 const D = (s) => toDate(s);
 const durations = { screening: 1, mcu: 1, waitResult: 3, feedbackMin: 3, feedbackMax: 5, followUp: 2, mobilization: 2 };
@@ -279,4 +279,12 @@ test('kategori menerima label Harian Mandor; kode MANPOWER tetap dipakai', () =>
   assert.equal(normalizeCategory('Harian Kantor'), 'HARIAN_KANTOR');
   assert.equal(normalizeCategory('staff'), 'STAFF');
   assert.equal(normalizeImportRow(mapImportRow({ 'Kategori (Staff/Harian Kantor/Harian Mandor)': 'Harian Mandor' })).body.category, 'MANPOWER');
+});
+
+test('no rekening opsional; bila diisi tetap divalidasi', () => {
+  for (const blank of [undefined, null, '', '   ']) assert.equal(bankAccount(blank), null);
+  assert.equal(bankAccount('123-456.789 0'), '1234567890');
+  assert.equal(bankAccount(1234567890), '1234567890');
+  assert.throws(() => bankAccount('12ab567'), /hanya angka/);
+  assert.throws(() => bankAccount('1234'), /5–30 digit/);
 });

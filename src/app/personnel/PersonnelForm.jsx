@@ -78,9 +78,9 @@ export default function PersonnelForm({ initial, sites, editing, canMedical, can
     { name: 'shoeSize', label: 'Ukuran sepatu' },
     ...(canMedical || !editing ? [{ name: 'medicalHistory', label: editing ? 'Riwayat penyakit (isi bila diubah)' : 'Riwayat penyakit', type: 'textarea', span: true, hint: 'Opsional, disimpan terenkripsi.' }] : []),
     ...(canBank || !editing ? [
-      { section: 'Rekening (wajib untuk staff)' },
-      { name: 'bankName', label: 'Nama bank', required: values.category === 'STAFF' && !editing },
-      { name: 'bankAccount', label: editing ? 'No rekening (isi bila diubah)' : 'No rekening', inputMode: 'numeric', required: values.category === 'STAFF' && !editing },
+      { section: 'Rekening (opsional)' },
+      { name: 'bankName', label: 'Nama bank', hint: 'Boleh dikosongkan dan dilengkapi kemudian.' },
+      { name: 'bankAccount', label: editing ? 'No rekening (isi bila diubah)' : 'No rekening', inputMode: 'numeric', hint: 'Angka saja, 5–30 digit.' },
       { name: 'bankAccountName', label: 'Nama pemilik rekening' },
     ] : []),
   ];
