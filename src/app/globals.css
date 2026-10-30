@@ -1590,3 +1590,175 @@ th { letter-spacing: 0.04em; }
 /* Kop cetak (PDF via browser) — hanya tampil saat dicetak. */
 .print-only { display: none; }
 @media print { .print-only { display: block; } }
+
+/* ==========================================================================
+   LIQUID GLASS — nuansa HSE
+   Permukaan (sidebar, header, kartu, modal, menu) dibuat kaca buram di atas
+   latar kabut hijau K3 dengan pendar oranye keselamatan yang lembut. Teks
+   tetap memakai skala abu berkontras tinggi dan kaca cukup pekat (≥ 60%)
+   agar tabel & form terbaca untuk pengguna 30+ dan di layar lapangan.
+   Bagian ini hanya menimpa warna/efek permukaan; tata letak tidak berubah.
+   ========================================================================== */
+:root {
+  --glass-bg: rgb(255 255 255 / 0.62);
+  --glass-bg-strong: rgb(255 255 255 / 0.82);
+  --glass-bg-soft: rgb(255 255 255 / 0.42);
+  --glass-border: rgb(255 255 255 / 0.72);
+  --glass-edge: rgb(8 104 64 / 0.1);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.85), inset 0 -1px 0 rgb(8 104 64 / 0.05);
+  --glass-shadow: 0 10px 30px -12px rgb(6 74 46 / 0.22), 0 2px 6px -2px rgb(6 74 46 / 0.08);
+  --glass-blur: saturate(170%) blur(22px);
+  --glass-input: rgb(255 255 255 / 0.7);
+  --app-bg:
+    radial-gradient(1100px 700px at 8% -10%, rgb(116 189 146 / 0.55), transparent 60%),
+    radial-gradient(900px 600px at 105% 8%, rgb(169 216 187 / 0.6), transparent 55%),
+    radial-gradient(700px 520px at 85% 100%, rgb(248 160 24 / 0.16), transparent 60%),
+    radial-gradient(800px 600px at 0% 100%, rgb(23 132 79 / 0.22), transparent 60%),
+    linear-gradient(160deg, #e7f2ea 0%, #eef4ef 45%, #f4f1e8 100%);
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+}
+
+[data-theme="dark"] {
+  --glass-bg: rgb(22 32 28 / 0.6);
+  --glass-bg-strong: rgb(20 29 25 / 0.84);
+  --glass-bg-soft: rgb(30 44 37 / 0.4);
+  --glass-border: rgb(255 255 255 / 0.1);
+  --glass-edge: rgb(116 189 146 / 0.12);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 -1px 0 rgb(0 0 0 / 0.25);
+  --glass-shadow: 0 14px 34px -14px rgb(0 0 0 / 0.7), 0 2px 8px -2px rgb(0 0 0 / 0.4);
+  --glass-input: rgb(255 255 255 / 0.05);
+  --app-bg:
+    radial-gradient(1000px 700px at 5% -10%, rgb(23 132 79 / 0.35), transparent 60%),
+    radial-gradient(900px 600px at 105% 10%, rgb(8 104 64 / 0.3), transparent 55%),
+    radial-gradient(700px 520px at 85% 100%, rgb(240 120 32 / 0.12), transparent 60%),
+    linear-gradient(160deg, #07120d 0%, #0b1712 50%, #10140f 100%);
+}
+
+body, .app-layout, .login-page { background: var(--app-bg); background-attachment: fixed; }
+
+/* Satu resep kaca untuk semua permukaan. */
+.sidebar, .header, .card, .kpi-card, .menu-panel, .modal, .login-card, .glass-panel, .glass-nav {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+/* Sidebar & header mengapung sebagai panel kaca, berjarak dari tepi layar. */
+@media (min-width: 1025px) {
+  .sidebar {
+    top: 12px;
+    height: calc(100dvh - 24px);
+    margin: 12px 0 12px 12px;
+    border-radius: var(--radius-xl);
+  }
+}
+.header {
+  top: 12px;
+  margin: 12px 16px 0;
+  border-radius: var(--radius-xl);
+}
+.app-footer { background: transparent; border-top-color: var(--glass-edge); }
+
+.sidebar-nav { overflow-x: hidden; }
+.nav-item { margin: 1px 10px; padding: 9px 12px; border-radius: 12px; }
+.nav-item:hover { background: var(--glass-bg-soft); }
+.nav-item.active {
+  background: var(--glass-bg-strong);
+  color: var(--brand-700);
+  box-shadow: var(--glass-highlight), 0 4px 14px -6px rgb(8 104 64 / 0.35);
+}
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(var(--brand-500), var(--orange-500));
+}
+.nav-subitem { border-radius: 10px; }
+
+.header-btn, .icon-btn, .user-menu-trigger { border-radius: 12px; }
+.header-btn:hover, .icon-btn:hover, .user-menu-trigger:hover { background: var(--glass-bg-soft); }
+
+/* Kartu & KPI. */
+.card-header, .card-footer, .modal-header, .modal-footer { border-color: var(--glass-edge); }
+a .kpi-card, a.kpi-card { transition: transform var(--transition-normal), box-shadow var(--transition-normal); }
+a:hover .kpi-card, a.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--glass-highlight), 0 16px 34px -14px rgb(6 74 46 / 0.35); }
+.kpi-icon { background: var(--glass-bg-strong); box-shadow: var(--glass-highlight); border-radius: 12px; }
+
+/* Tabel di atas kaca: kepala tembus, garis halus. */
+th { background: transparent; border-bottom-color: var(--glass-edge); }
+td { border-bottom-color: var(--glass-edge); }
+tbody tr:hover { background: var(--glass-bg-soft); }
+
+/* Form: isian kaca bening. */
+.form-input, .form-select {
+  background-color: var(--glass-input);
+  border-color: rgb(8 104 64 / 0.22);
+  border-radius: 12px;
+}
+.form-input:hover, .form-select:hover { border-color: var(--brand-300); }
+
+/* Tombol kapsul; primer bergradien hijau K3 dengan kilau kaca. */
+.btn { border-radius: 12px; }
+.btn-primary {
+  background: linear-gradient(180deg, var(--brand-500), var(--brand-600) 55%, #075a37);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 6px 16px -6px rgb(8 104 64 / 0.55);
+}
+.btn-orange { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 6px 16px -6px rgb(240 120 32 / 0.5); }
+.btn-outline, .btn-danger-outline {
+  background: var(--glass-bg-soft);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight);
+}
+.btn-outline:hover { background: var(--glass-bg-strong); }
+.badge { border-radius: 999px; }
+.chip { background: var(--glass-bg-soft); border: 1px solid var(--glass-border); border-radius: 999px; }
+
+/* Tab jadi segmented control kaca. */
+.tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-highlight);
+}
+.tab { min-height: 38px; margin: 0; border: 0; border-radius: 10px; }
+.tab.active { background: var(--glass-bg-strong); box-shadow: var(--glass-highlight), 0 3px 10px -4px rgb(8 104 64 / 0.3); }
+
+.stepper .step { background: var(--glass-bg-soft); border: 1px solid var(--glass-border); }
+.stepper .step.current { border-color: transparent; box-shadow: 0 4px 12px -4px rgb(8 104 64 / 0.5); }
+
+.notice { border-radius: 14px; box-shadow: var(--glass-highlight); }
+.notice.info { background: rgb(212 236 221 / 0.6); }
+[data-theme="dark"] .notice.info { background: rgb(18 38 28 / 0.6); }
+[data-theme="dark"] .form-input, [data-theme="dark"] .form-select { border-color: rgb(116 189 146 / 0.22); }
+
+/* Modal & menu: kaca lebih pekat; latar belakang dibuat buram. */
+.modal-overlay {
+  background: rgb(6 30 20 / 0.28);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.modal, .menu-panel { background: var(--glass-bg-strong); }
+
+/* Pengguna yang meminta transparansi rendah, atau browser tanpa blur: permukaan padat. */
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar, .header, .card, .kpi-card, .menu-panel, .modal, .login-card { background: var(--white); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sidebar, .header, .card, .kpi-card, .menu-panel, .modal, .login-card { background: var(--white); }
+}
+
+@media (max-width: 1024px) {
+  .header { margin: 8px 8px 0; top: 8px; }
+}
