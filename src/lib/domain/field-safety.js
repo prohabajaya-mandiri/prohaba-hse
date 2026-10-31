@@ -2,17 +2,22 @@
 
 export const RISK_LEVELS = ['RENDAH', 'SEDANG', 'TINGGI', 'EKSTREM'];
 
-/** Matriks risiko 5×5: skor = kemungkinan × keparahan. 1–4 rendah, 5–9 sedang, 10–16 tinggi, 20–25 ekstrem. */
-export function riskLevel(likelihood, severity) {
-  const score = Number(likelihood) * Number(severity);
-  if (score >= 20) return 'EKSTREM';
-  if (score >= 10) return 'TINGGI';
-  if (score >= 5) return 'SEDANG';
-  return 'RENDAH';
-}
+// Matriks penilaian risiko owner (AMM, sheet "Matriks Resiko" pada formulir JSA): baris = keparahan 1–5,
+// kolom = kemungkinan 1–5. Dipakai sama di Hazard Report dan JSA agar penilaian tidak berbeda.
+const RISK_MATRIX = [
+  ['L', 'L', 'M', 'M', 'M'],
+  ['L', 'M', 'M', 'H', 'H'],
+  ['M', 'M', 'H', 'H', 'E'],
+  ['H', 'H', 'E', 'E', 'E'],
+  ['E', 'E', 'E', 'E', 'E'],
+];
+export const RISK_CODES = { L: 'RENDAH', M: 'SEDANG', H: 'TINGGI', E: 'EKSTREM' };
 
-export const LIKELIHOOD = [[1, '1 — Hampir tidak mungkin'], [2, '2 — Jarang'], [3, '3 — Mungkin'], [4, '4 — Sering'], [5, '5 — Hampir pasti']];
-export const SEVERITY = [[1, '1 — Tidak berarti (tanpa cedera)'], [2, '2 — Ringan (P3K)'], [3, '3 — Sedang (perawatan medis)'], [4, '4 — Berat (LTI / cacat)'], [5, '5 — Fatal / bencana']];
+export const riskCode = (likelihood, severity) => RISK_MATRIX[Number(severity) - 1]?.[Number(likelihood) - 1] ?? null;
+export const riskLevel = (likelihood, severity) => RISK_CODES[riskCode(likelihood, severity)] ?? null;
+
+export const LIKELIHOOD = [[1, '1 — Unlikely (hampir tidak mungkin)'], [2, '2 — Possible (mungkin)'], [3, '3 — Likely (kemungkinan besar)'], [4, '4 — Almost certain (hampir pasti)'], [5, '5 — Certain (pasti)']];
+export const SEVERITY = [[1, '1 — Negligible (tanpa cedera)'], [2, '2 — Minor (P3K)'], [3, '3 — Significant (perawatan medis)'], [4, '4 — Severe (LTI / cacat)'], [5, '5 — Catastrophic (fatal)']];
 
 // Tenggat tindakan korektif bawaan per tingkat risiko (hari kalender; draft parameter, dapat ditimpa saat dibuat).
 export const DUE_DAYS = { EKSTREM: 1, TINGGI: 3, SEDANG: 7, RENDAH: 14 };

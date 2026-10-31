@@ -15,7 +15,7 @@ const nowTime = () => new Date().toTimeString().slice(0, 5);
 function RiskPreview({ l, s }) {
   if (!l || !s) return null;
   const level = riskLevel(l, s);
-  return <div className="notice info" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>Tingkat risiko: <Badge value={level} /> <span className="muted">skor {l * s} · tindakan korektif bawaan {DUE_DAYS[level]} hari</span></div>;
+  return <div className="notice info" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>Tingkat risiko: <Badge value={level} /> <span className="muted">matriks owner K{l} × S{s} · tindakan korektif bawaan {DUE_DAYS[level]} hari</span></div>;
 }
 
 export default function HazardsClient({ user, sites, data, page, canEdit }) {

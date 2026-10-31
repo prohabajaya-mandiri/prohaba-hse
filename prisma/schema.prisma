@@ -144,6 +144,8 @@ model Site {
   hazardReports    HazardReport[]
   inspections      Inspection[]
   correctiveActions CorrectiveAction[]
+  fitSessions      FitSession[]
+  alcoholTests     AlcoholTest[]
 }
 
 model Project {
@@ -740,6 +742,76 @@ model CorrectiveActionHistory {
   capa       CorrectiveAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
 
   @@index([actionId, createdAt])
+}
+
+// ─── 12b. FIT TO WORK (P5M / SAFETY TALK) & TES ALKOHOL ──────────────────────
+
+// Satu sesi P5M/Safety Talk (form AMM-IPT-F-SHE-010A). Scan form bertanda tangan & foto = FileObject FIT_SESSION.
+model FitSession {
+  id          String     @id @default(cuid())
+  number      String     @unique
+  siteId      String
+  heldOn      DateTime
+  shift       String // PAGI | MALAM
+  topic       String
+  department  String?
+  location    String?
+  presenter   String // penyaji / Group Leader
+  notes       String?
+  total       Int        @default(0)
+  okCount     Int        @default(0) // AMAN
+  watchCount  Int        @default(0) // PENGAWASAN
+  stopCount   Int        @default(0) // TIDAK_BOLEH
+  createdBy   String
+  creatorName String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  site        Site       @relation(fields: [siteId], references: [id])
+  checks      FitCheck[]
+
+  @@index([siteId, heldOn])
+}
+
+// Baris peserta P5M. Status dihitung aplikasi dari jam istirahat & isian (lihat domain/fit-to-work.js).
+model FitCheck {
+  id            String     @id @default(cuid())
+  sessionId     String
+  personnelId   String? // kosong untuk pekerja yang belum ada di master (mis. subkon)
+  name          String
+  position      String?
+  healthy       Boolean    @default(true)
+  medication    Boolean    @default(false)
+  restToday     Int // jam istirahat hari ini
+  restYesterday Int? // jam istirahat kemarin (opsional, aturan 2 hari)
+  mentalReady   Boolean    @default(true)
+  allowedByGl   Boolean    @default(true)
+  status        String // AMAN | PENGAWASAN | TIDAK_BOLEH
+  reasons       String? // alasan status, dipisah "; "
+  note          String?
+  session       FitSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([personnelId])
+  @@index([status])
+}
+
+// Tes alkohol (umumnya tahunan). Hasil POSITIF memicu notifikasi.
+model AlcoholTest {
+  id          String   @id @default(cuid())
+  siteId      String
+  personnelId String?
+  name        String
+  testedOn    DateTime
+  result      String // NEGATIF | POSITIF
+  method      String? // breathalyzer / urine / lainnya
+  note        String?
+  createdBy   String
+  creatorName String
+  createdAt   DateTime @default(now())
+  site        Site     @relation(fields: [siteId], references: [id])
+
+  @@index([siteId, testedOn])
+  @@index([personnelId, testedOn])
 }
 
 // ─── 13. TRAINING & KOMPETENSI ───────────────────────────────────────────────

@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import { canAccess } from '../src/lib/access.js';
 import { capaActions, capaTransition, itemsToText, parseItemsText, riskLevel, summarizeAnswers } from '../src/lib/domain/field-safety.js';
 
-test('matriks risiko 5×5', () => {
-  assert.equal(riskLevel(1, 4), 'RENDAH');
-  assert.equal(riskLevel(1, 5), 'SEDANG');
-  assert.equal(riskLevel(3, 3), 'SEDANG');
-  assert.equal(riskLevel(2, 5), 'TINGGI');
-  assert.equal(riskLevel(4, 4), 'TINGGI');
-  assert.equal(riskLevel(4, 5), 'EKSTREM');
+test('matriks risiko mengikuti matriks owner (AMM) pada formulir JSA', () => {
+  // riskLevel(kemungkinan, keparahan) — contoh langsung dari baris JSA yang dikirim.
+  assert.equal(riskLevel(2, 2), 'SEDANG'); // 2×2 = M
+  assert.equal(riskLevel(2, 3), 'SEDANG'); // 2×3 = M
+  assert.equal(riskLevel(3, 3), 'TINGGI'); // 3×3 = H
+  assert.equal(riskLevel(2, 4), 'TINGGI'); // 2×4 = H
+  assert.equal(riskLevel(2, 5), 'EKSTREM'); // 2×5 = E (gerinda pecah)
+  assert.equal(riskLevel(1, 1), 'RENDAH');
+  assert.equal(riskLevel(5, 1), 'SEDANG');
+  assert.equal(riskLevel(3, 4), 'EKSTREM');
+  assert.equal(riskLevel(6, 1), null);
 });
 
 test('checklist: butir kritis Tidak OK = TIDAK LAYAK; non-kritis tetap layak', () => {

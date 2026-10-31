@@ -41,6 +41,14 @@ export const MODULE_TABS = {
       ['indicators', 'Indikator & target'],
     ],
   },
+  '/fit-to-work': {
+    param: 'tab',
+    items: [
+      ['screening', 'Skrining hari ini'],
+      ['sessions', 'Berkas P5M / Safety Talk'],
+      ['alcohol', 'Tes alkohol'],
+    ],
+  },
   '/inspections': {
     param: 'tab',
     items: [

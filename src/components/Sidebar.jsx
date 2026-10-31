@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
   Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus, ClipboardCheck, FileCheck2,
-  TriangleAlert, ClipboardList, ListChecks,
+  TriangleAlert, ClipboardList, ListChecks, UserCheck,
 } from 'lucide-react';
 import { useDialog } from './DialogProvider';
 import { canAccess, ROLE_LABELS } from '@/lib/access';
@@ -47,6 +47,7 @@ const NAV_ITEMS = [
     items: [
       { href: '/performance', label: 'HSE Performance', icon: Activity },
       { href: '/reports', label: 'Laporan HSE Site', icon: FileText },
+      { href: '/fit-to-work', label: 'Fit to Work (P5M)', icon: UserCheck },
       { href: '/hazards', label: 'Hazard Report', icon: TriangleAlert },
       { href: '/inspections', label: 'Inspeksi & P2H', icon: ClipboardList },
       { href: '/actions', label: 'Tindakan Korektif', icon: ListChecks },

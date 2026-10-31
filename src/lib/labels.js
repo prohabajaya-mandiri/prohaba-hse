@@ -64,6 +64,8 @@ export const LABELS = {
   HAZARD: 'Hazard report', INSPECTION: 'Inspeksi / P2H', MANUAL: 'Manual',
   P2H: 'P2H unit', AREA: 'Area kerja', APAR: 'APAR', LAYAK: 'Layak', TIDAK_LAYAK: 'Tidak layak', OK: 'OK', TIDAK_OK: 'Tidak OK',
   PAGI: 'Pagi', MALAM: 'Malam',
+  // fit to work
+  AMAN: 'Aman', PENGAWASAN: 'Dengan pengawasan', TIDAK_BOLEH: 'Tidak boleh kerja', NEGATIF: 'Negatif', POSITIF: 'Positif',
 };
 
 export const labelOf = (v) => LABELS[v] ?? v;
@@ -90,6 +92,7 @@ export const STATUS_STYLES = {
   TERBUKA: red, DALAM_PROSES: yellow, DIAJUKAN_TUTUP: blue, DITUTUP: green, RENDAH: green, SEDANG: yellow, TINGGI: red,
   SCREENING: gray, MENUNGGU_HASIL: blue, SUBMIT: blue, FEEDBACK: navy, SUBMIT_FU: yellow, MOBILISASI: navy,
   EKSTREM: red, UNSAFE_ACT: orange, UNSAFE_CONDITION: yellow, BARU: red, LAYAK: green, TIDAK_LAYAK: red, OK: green, TIDAK_OK: red,
+  AMAN: green, PENGAWASAN: yellow, TIDAK_BOLEH: red, NEGATIF: green, POSITIF: red,
 };
 
 export const idr = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v ?? 0));

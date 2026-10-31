@@ -44,6 +44,8 @@ export const MODULES = {
   hazards: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
   inspections: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
   actions: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
+  // P5M diisi GL/pengawas lapangan (PJO/PM) maupun HSE; tes alkohol oleh HSE (dicek di service).
+  'fit-to-work': { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
   settings: { read: ['HO_HSE', 'DIREKSI', 'HRD'], write: ['HO_HSE'] },
   users: { read: ['HO_HSE'], write: ['HO_HSE'] },
   'audit-log': { read: ['HO_HSE', 'DIREKSI'] },

@@ -11,9 +11,10 @@ import { canReadFindingFile } from '@/lib/services/csms-findings';
 import { canReadWorkPermitFile } from '@/lib/services/work-permits';
 import { canReadCapaFile } from '@/lib/services/capa';
 import { canReadFieldFile } from '@/lib/services/field-safety';
+import { canReadFitFile } from '@/lib/services/fit-to-work';
 
-// Bukti lapangan (hazard, inspeksi, tindakan korektif) adalah catatan K3: tidak dapat dihapus.
-const LOCKED = ['DOCUMENT', 'CSMS_EVIDENCE', 'CSMS_FINDING', 'WORK_PERMIT', 'CAPA', 'HAZARD', 'INSPECTION'];
+// Bukti lapangan (hazard, inspeksi, tindakan korektif, P5M, tes alkohol) adalah catatan K3: tidak dapat dihapus.
+const LOCKED = ['DOCUMENT', 'CSMS_EVIDENCE', 'CSMS_FINDING', 'WORK_PERMIT', 'CAPA', 'HAZARD', 'INSPECTION', 'FIT_SESSION', 'ALCOHOL_TEST'];
 
 // Selain sensitivitas & site, file mengikuti hak akses entitas asalnya (dokumen terbatas, bukti CSMS).
 async function entityAllows(user, row) {
@@ -26,6 +27,7 @@ async function entityAllows(user, row) {
   if (row.entityType === 'WORK_PERMIT') return canReadWorkPermitFile(user, row);
   if (row.entityType === 'CAPA') return canReadCapaFile(user, row);
   if (row.entityType === 'HAZARD' || row.entityType === 'INSPECTION') return canReadFieldFile(user, row);
+  if (row.entityType === 'FIT_SESSION' || row.entityType === 'ALCOHOL_TEST') return canReadFitFile(user, row);
   return true;
 }
 
