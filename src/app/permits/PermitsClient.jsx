@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Edit, RotateCw, Ban } from 'lucide-react';
-import { Badge, DataTable, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, useSubmit } from '@/components/ui';
+import { Badge, DataTable, DeleteButton, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
 import { apiFetch } from '@/lib/client-api';
 import { formatDate, iso, todayIso } from '@/lib/dates';
@@ -11,7 +11,7 @@ import { labelOf } from '@/lib/labels';
 
 const EMPTY = { personnelId: '', kind: 'PERMIT', permitType: '', number: '', issuer: '', startDate: todayIso(), endDate: '', basisResult: '', mcuId: '', isTemporary: false, notes: '', previousId: '' };
 
-export default function PermitsClient({ sites, data, page, canEdit, preselect }) {
+export default function PermitsClient({ sites, data, page, canEdit, canDelete, preselect }) {
   const { submit, busy } = useSubmit();
   const { showConfirm, showPrompt } = useDialog();
   const [form, setForm] = useState(preselect && canEdit ? { ...EMPTY, personnelId: preselect } : null);
@@ -101,6 +101,7 @@ export default function PermitsClient({ sites, data, page, canEdit, preselect })
             { key: 'basis', label: 'Acuan MCU', render: (r) => (<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}><Badge value={r.basisResult} />{r.isTemporary && <span className="chip">Sementara</span>}</div>) },
             { key: 'period', label: 'Masa berlaku', render: (r) => `${formatDate(r.startDate)} – ${formatDate(r.endDate)}` },
             { key: 'status', label: 'Status', render: (r) => (<div><Badge value={r.status} />{r.renewed && <div className="muted">sudah diperpanjang</div>}</div>) },
+            ...(canDelete ? [{ key: 'del', label: '', render: (r) => <DeleteButton url={`/api/permits/${r.id}`} title="Hapus permit" message={`Hapus permanen ${labelOf(r.kind)} ${r.number} milik ${r.personnel.name}? File lampirannya ikut terhapus. Gunakan hanya untuk salah input; permit yang tidak berlaku lagi cukup dicabut.`} success="Permit dihapus." /> }] : []),
           ]} />
       </div>
       <Pager page={page} total={data.total} />

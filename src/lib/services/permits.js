@@ -5,7 +5,7 @@ import { addDays, today } from '../dates.js';
 import { permitStatus, permitWarnings, suggestedEnd } from '../domain/permit.js';
 import { getSettings } from '../settings.js';
 import { bool, choice, date, ensure, id, InputError, object, optionalChoice, optionalId, text } from '../validation.js';
-import { attachFiles, filesOf, groupBy, requireSite, scopedPersonnel } from './common.js';
+import { attachFiles, detachFiles, filesOf, groupBy, purgeObjects, requireDelete, requireSite, scopedPersonnel } from './common.js';
 
 const FIELDS = ['personnelId', 'siteId', 'kind', 'permitType', 'number', 'issuer', 'startDate', 'endDate', 'basisResult', 'mcuId', 'isTemporary', 'notes', 'previousId', 'acknowledge'];
 
@@ -110,6 +110,24 @@ export async function updatePermit(user, permitId, body, files) {
     await audit(tx, user, { action: 'UPDATE', module: 'permits', recordId: permitId, siteId: existing.siteId, ...diff(existing, v), note: warnings.join(' ') || null });
     return row;
   }, { timeout: 20000 });
+}
+
+/** Hapus permanen permit salah input. Rantai perpanjangan disambung ke permit sebelumnya. */
+export async function deletePermit(user, permitId) {
+  requireDelete(user);
+  const existing = await prisma.permit.findUnique({ where: { id: permitId } });
+  ensure(existing, 'Permit tidak ditemukan.', 404);
+  requireSite(user, existing.siteId);
+  const keys = await prisma.$transaction(async (tx) => {
+    await tx.permit.updateMany({ where: { previousId: permitId }, data: { previousId: existing.previousId } });
+    const k = await detachFiles(tx, 'PERMIT', permitId);
+    await tx.permit.delete({ where: { id: permitId } });
+    await tx.personnel.update({ where: { id: existing.personnelId }, data: { updatedAt: new Date() } });
+    await audit(tx, user, { action: 'DELETE', module: 'permits', recordId: permitId, siteId: existing.siteId, before: existing, note: `Hapus ${existing.kind} ${existing.number}` });
+    return k;
+  }, { timeout: 20000 });
+  await purgeObjects(keys);
+  return { id: permitId };
 }
 
 export async function revokePermit(user, permitId, body) {

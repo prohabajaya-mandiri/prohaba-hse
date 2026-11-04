@@ -1,5 +1,7 @@
 import { api, formData, params } from '@/lib/http';
-import { updateMcu } from '@/lib/services/mcu';
+import { deleteMcu, updateMcu } from '@/lib/services/mcu';
+
+export const DELETE = api(async (request, context, user) => deleteMcu(user, (await params(context)).id));
 
 export const PUT = api(async (request, context, user) => {
   const form = await formData(request);

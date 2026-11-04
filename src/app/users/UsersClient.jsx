@@ -24,7 +24,6 @@ export default function UsersClient({ users, sites }) {
     { name: 'region', label: 'Wilayah (PM)', type: 'select', options: [['TIMUR', 'Timur'], ['BARAT', 'Barat']], hidden: (v) => v.role !== 'PM' },
     { name: 'password', label: form?.id ? 'Kata sandi baru (opsional)' : 'Kata sandi', type: 'password', required: !form?.id, hint: 'Minimal 10 karakter.' },
     { name: 'isActive', label: 'Akun aktif', type: 'checkbox' },
-    { name: 'isShared', label: 'Akun bersama site (wajib operator + PIN)', type: 'checkbox', hidden: (v) => v.role !== 'HSE_SITE', span: true },
   ];
 
   const save = async (e) => {
@@ -62,7 +61,7 @@ export default function UsersClient({ users, sites }) {
     <div className="stack">
       <div className="toolbar">
         <div className="notice info" style={{ flex: 1 }}>
-          Satu akun per orang disarankan. Akun bersama HSE Site wajib mendaftarkan operator; setiap login mencatat nama operator dan PIN sehingga audit log memuat pelaku aktual.
+          Setiap pengguna memakai akun pribadi, sehingga audit log memuat pelaku aktual.
         </div>
         <button className="btn btn-primary" onClick={() => setForm({ ...EMPTY })}><UserPlus size={17} /> Tambah pengguna</button>
       </div>

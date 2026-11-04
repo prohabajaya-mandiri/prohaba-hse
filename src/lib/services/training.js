@@ -4,7 +4,7 @@ import { audit, diff } from '../audit.js';
 import { addDays, addMonths, today } from '../dates.js';
 import { getSetting } from '../settings.js';
 import { array, bool, choice, date, ensure, id, InputError, int, object, optionalDate, optionalId, optionalNumber, text } from '../validation.js';
-import { attachFiles, filesOf, groupBy, requireSite, scopedPersonnel } from './common.js';
+import { attachFiles, detachFiles, filesOf, groupBy, purgeObjects, requireDelete, requireSite, scopedPersonnel } from './common.js';
 
 const MASTER_ROLES = ['HO_HSE', 'HRD'];
 const assertMaster = (user) => {
@@ -87,6 +87,21 @@ export async function saveCertificate(user, certId, body, files) {
     await audit(tx, user, { action: certId ? 'UPDATE' : 'CREATE', module: 'training', recordId: row.id, siteId: person.currentSiteId, ...(existing ? diff(existing, data) : { after: { person: person.code, ...data } }) });
     return row;
   }, { timeout: 20000 });
+}
+
+export async function deleteCertificate(user, certId) {
+  requireDelete(user);
+  const existing = await prisma.personnelCertificate.findUnique({ where: { id: certId } });
+  ensure(existing, 'Sertifikat tidak ditemukan.', 404);
+  const person = await scopedPersonnel(user, existing.personnelId);
+  const keys = await prisma.$transaction(async (tx) => {
+    const k = await detachFiles(tx, 'CERTIFICATE', certId);
+    await tx.personnelCertificate.delete({ where: { id: certId } });
+    await audit(tx, user, { action: 'DELETE', module: 'training', recordId: certId, siteId: person.currentSiteId, before: existing, note: `Hapus sertifikat ${person.code}` });
+    return k;
+  }, { timeout: 20000 });
+  await purgeObjects(keys);
+  return { id: certId };
 }
 
 export async function listSessions(user, f, { skip = 0, take = 30 } = {}) {

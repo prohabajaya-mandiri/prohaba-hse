@@ -1,7 +1,8 @@
 import { prisma } from '../prisma.js';
-import { canSeeSite, canWrite, siteScope } from '../access.js';
+import { canDeleteRecord, canSeeSite, canWrite, siteScope } from '../access.js';
 import { ensure, InputError } from '../validation.js';
 import { storeFile, readUpload } from '../files.js';
+import { deleteObject } from '../storage.js';
 
 export function requireSite(user, siteId) {
   ensure(siteId, 'Site wajib dipilih.');
@@ -39,6 +40,22 @@ export async function attachFiles(db, user, files, { entityType, entityId, siteI
     rows.push(await db.fileObject.create({ data, select: { id: true, fileName: true, mimeType: true, label: true } }));
   }
   return rows;
+}
+
+export function requireDelete(user) {
+  if (!canDeleteRecord(user)) throw new InputError('Penghapusan data hanya oleh HO HSE.', 403);
+}
+
+/** Hapus baris file satu entitas di dalam transaksi; kembalikan kunci storage untuk dibuang setelah commit. */
+export async function detachFiles(tx, entityType, entityId) {
+  const rows = await tx.fileObject.findMany({ where: { entityType, entityId }, select: { storageKey: true } });
+  await tx.fileObject.deleteMany({ where: { entityType, entityId } });
+  return rows.map((r) => r.storageKey);
+}
+
+/** Buang objek storage setelah commit. Gagal membuang tidak membatalkan penghapusan data. */
+export async function purgeObjects(keys) {
+  await Promise.allSettled(keys.map((k) => deleteObject(k)));
 }
 
 export function filesOf(entityType, ids) {

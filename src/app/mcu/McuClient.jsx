@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Edit, GitBranchPlus, ArrowRight } from 'lucide-react';
-import { Badge, DataTable, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, useSubmit } from '@/components/ui';
+import { Badge, DataTable, DeleteButton, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, useSubmit } from '@/components/ui';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { firstStage, FU_DOCTOR_SLOTS, FU_DOCTORS, MCU_RESULTS, MCU_STAGES, MCU_STAGE_LABELS, MCU_TYPES, MCU_TYPE_LABELS, nextStage, planMcu, reachedFields, stepFields } from '@/lib/domain/mcu';
 
@@ -47,7 +47,7 @@ function DueBadge({ due, label }) {
   return null;
 }
 
-export default function McuClient({ sites, data, page, canEdit, preselect }) {
+export default function McuClient({ sites, data, page, canEdit, canDelete, preselect }) {
   const { submit, busy } = useSubmit();
   const [form, setForm] = useState(preselect && canEdit ? { ...EMPTY, personnelId: preselect } : null);
   const [step, setStep] = useState(null);
@@ -137,6 +137,7 @@ export default function McuClient({ sites, data, page, canEdit, preselect }) {
             { key: 'stage', label: 'Tahap', render: (r) => <Badge value={r.stage} label={MCU_STAGE_LABELS[r.stage]} /> },
             { key: 'result', label: 'Hasil', render: (r) => (<div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Badge value={r.result} />{!r.isLatest && <span className="chip">riwayat</span>}</div>) },
             { key: 'due', label: 'Jatuh tempo', render: (r) => (<div><div>{r.result === 'FOLLOW_UP' ? 'FU: ' + formatDate(r.fuDueDate) : formatDate(r.validUntil)}</div><DueBadge due={r.annualDue} label="Annual" /><DueBadge due={r.fuDue} label="FU" /></div>) },
+            ...(canDelete ? [{ key: 'del', label: '', render: (r) => <DeleteButton url={`/api/mcu/${r.id}`} title="Hapus MCU" message={`Hapus permanen MCU ${MCU_TYPE_LABELS[r.type]} milik ${r.personnel.name}? Dokumen medisnya ikut terhapus. Bila ini catatan terbaru, MCU sebelumnya kembali menjadi acuan status kesehatan.`} success="MCU dihapus." /> }] : []),
           ]} />
       </div>
       <Pager page={page} total={data.total} />

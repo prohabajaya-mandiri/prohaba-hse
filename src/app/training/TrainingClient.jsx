@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Edit, ClipboardCheck, X } from 'lucide-react';
-import { Badge, Card, DataTable, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, PersonnelPicker, useSubmit } from '@/components/ui';
+import { Badge, Card, DataTable, DeleteButton, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, PersonnelPicker, useSubmit } from '@/components/ui';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
 
 
-export default function TrainingClient({ tab, sites, competencies, certificates, sessions, gaps, page, canEdit, canMaster, preselect }) {
+export default function TrainingClient({ tab, sites, competencies, certificates, sessions, gaps, page, canEdit, canDelete, canMaster, preselect }) {
   const { submit, busy } = useSubmit();
   const [cert, setCert] = useState(preselect && canEdit && tab === 'certificates' ? { personnelId: preselect, competencyId: '', certNumber: '', issuer: '', issueDate: '', expiryDate: '', notes: '' } : null);
   const [files, setFiles] = useState([]);
@@ -53,6 +53,7 @@ export default function TrainingClient({ tab, sites, competencies, certificates,
                 { key: 'status', label: 'Status', render: (c) => <Badge value={c.status} /> },
                 { key: 'f', label: 'File', render: (c) => (c.files.length ? <FileLinks files={c.files} /> : '-') },
                 ...(canEdit ? [{ key: 'e', label: '', render: (c) => <button className="btn btn-ghost btn-sm" onClick={() => { setFiles([]); setCert({ id: c.id, personName: c.personnel.name, personnelId: c.personnelId, competencyId: c.competencyId, certNumber: c.certNumber ?? '', issuer: c.issuer ?? '', issueDate: iso(c.issueDate) ?? '', expiryDate: iso(c.expiryDate) ?? '', notes: c.notes ?? '' }); }}><Edit size={14} /></button> }] : []),
+                ...(canDelete ? [{ key: 'del', label: '', render: (c) => <DeleteButton url={`/api/training/certificates/${c.id}`} title="Hapus sertifikat" message={`Hapus permanen sertifikat ${c.competency?.name ?? ''} milik ${c.personnel.name}? File lampirannya ikut terhapus.`} success="Sertifikat dihapus." /> }] : []),
               ]} />
           </div>
           <Pager page={page} total={certificates.total} />

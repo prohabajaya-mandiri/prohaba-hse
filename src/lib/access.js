@@ -126,6 +126,8 @@ export const canDecideMutation = (user) => user?.role === 'HO_HSE';
 // Koreksi tanggal pada riwayat penempatan mengubah masa kerja: hanya HO HSE.
 export const canCorrectPlacement = (user) => user?.role === 'HO_HSE';
 export const canManageMaster = (user) => user?.role === 'HO_HSE';
+// Hapus permanen catatan salah input (MCU, permit, sertifikat): hanya HO HSE, tercatat di audit log.
+export const canDeleteRecord = (user) => user?.role === 'HO_HSE';
 // Status kepegawaian (PKWT/PKWTT) & akhir kontrak menyangkut hubungan kerja: hanya HRD dan HO HSE.
 export const EMPLOYMENT_ROLES = ['HRD', 'HO_HSE'];
 export const canSetEmployment = (user) => EMPLOYMENT_ROLES.includes(user?.role);

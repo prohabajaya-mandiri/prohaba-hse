@@ -6,7 +6,7 @@ import { addDays, today } from '../dates.js';
 import { annualValidUntil, dueState, firstStage, FU_DOCTOR_SLOTS, FU_DOCTORS, MCU_RESULTS, MCU_STAGE_LABELS, MCU_STAGES, MCU_TYPES, nextStage, planMcu, reachedFields, stepFields } from '../domain/mcu.js';
 import { getSettings } from '../settings.js';
 import { choice, ensure, id, object, optionalDate, optionalId, optionalNumber, text } from '../validation.js';
-import { attachFiles, filesOf, groupBy, requireSite, scopedPersonnel } from './common.js';
+import { attachFiles, detachFiles, filesOf, groupBy, purgeObjects, requireDelete, requireSite, scopedPersonnel } from './common.js';
 
 export async function mcuSettings() {
   const s = await getSettings(['mcu.durations', 'mcu.annualMonths', 'reminder.thresholds']);
@@ -152,6 +152,31 @@ export async function advanceMcu(user, mcuId, body, files) {
     await audit(tx, user, { action: 'UPDATE', module: 'mcu', recordId: mcuId, siteId: existing.siteId, ...diff(existing, data), note: `Tahap ${MCU_STAGE_LABELS[existing.stage]} → ${MCU_STAGE_LABELS[to]}` });
     return row;
   }, { timeout: 20000 });
+}
+
+/** Hapus permanen MCU salah input. Bila yang dihapus catatan terbaru, MCU sebelumnya kembali menjadi acuan status. */
+export async function deleteMcu(user, mcuId) {
+  requireDelete(user);
+  const existing = await prisma.mcuRecord.findUnique({ where: { id: mcuId }, include: { _count: { select: { followUps: true } } } });
+  ensure(existing, 'MCU tidak ditemukan.', 404);
+  if (existing.siteId) requireSite(user, existing.siteId);
+  ensure(!existing._count.followUps, 'MCU ini punya catatan Follow Up. Hapus catatan Follow Up-nya terlebih dahulu.', 409);
+  const { _count, notesEnc, ...before } = existing;
+  void _count; void notesEnc;
+  const keys = await prisma.$transaction(async (tx) => {
+    const k = await detachFiles(tx, 'MCU', mcuId);
+    await tx.permit.updateMany({ where: { mcuId }, data: { mcuId: null } });
+    await tx.mcuRecord.delete({ where: { id: mcuId } });
+    if (existing.isLatest) {
+      const prev = await tx.mcuRecord.findFirst({ where: { personnelId: existing.personnelId }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+      if (prev) await tx.mcuRecord.update({ where: { id: prev.id }, data: { isLatest: true } });
+    }
+    await tx.personnel.update({ where: { id: existing.personnelId }, data: { updatedAt: new Date() } });
+    await audit(tx, user, { action: 'DELETE', module: 'mcu', recordId: mcuId, siteId: existing.siteId, before, note: `Hapus MCU ${existing.type} (${existing.stage})` });
+    return k;
+  }, { timeout: 20000 });
+  await purgeObjects(keys);
+  return { id: mcuId };
 }
 
 // Koreksi data tahap yang sudah dilalui. Tahap & jenis tidak bisa diubah di sini.

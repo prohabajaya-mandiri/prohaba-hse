@@ -17,7 +17,7 @@ export const MCU_STAGE_LABELS = {
 };
 
 // Follow Up dirujuk ke maksimal 6 dokter.
-export const FU_DOCTORS = ['Dokter Umum', 'Dokter Sp. Penyakit Dalam', 'Dokter Mata', 'Dokter Ahli Gizi', 'Dokter Sp. Jantung', 'Dokter Sp. THT', 'Dokter Gigi'];
+export const FU_DOCTORS = ['Dokter Umum', 'Dokter Sp. Penyakit Dalam', 'Dokter Mata', 'Dokter Ahli Gizi', 'Dokter Sp. Jantung', 'Dokter Sp. THT', 'Dokter Sp. Paru', 'Dokter Gigi'];
 export const FU_DOCTOR_SLOTS = 6;
 
 /** Tahap awal: Pre-Employment dimulai dari screening; jenis lain langsung dari pemeriksaan MCU. */

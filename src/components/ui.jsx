@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Paperclip, Search } from 'lucide-react';
+import { X, Paperclip, Search, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/client-api';
 import { useDialog } from './DialogProvider';
 import { STATUS_STYLES, labelOf } from '@/lib/labels';
@@ -182,6 +182,17 @@ export function useSubmit() {
 }
 
 // ─── Filter via query string (filter dijalankan di server) ──────────────────
+/** Tombol hapus baris tabel: selalu minta konfirmasi dan tidak ikut membuka detail baris. */
+export function DeleteButton({ url, message, title = 'Hapus', success = 'Data dihapus.' }) {
+  const { submit, busy } = useSubmit();
+  const { showConfirm } = useDialog();
+  const run = async (e) => {
+    e.stopPropagation();
+    if (await showConfirm(message, title)) await submit(url, { method: 'DELETE', success });
+  };
+  return <button type="button" className="btn btn-ghost btn-sm text-red" title={title} aria-label={title} disabled={busy} onClick={run}><Trash2 size={14} /></button>;
+}
+
 export function FilterBar({ filters, children }) {
   const router = useRouter();
   const pathname = usePathname();

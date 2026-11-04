@@ -49,3 +49,12 @@ test('akses modul lapangan: HRD tidak masuk, PJO/PM boleh melapor', () => {
     assert.equal(canAccess('DIREKSI', '/api' + p, 'POST'), false, p);
   }
 });
+
+test('hapus permanen hanya HO HSE; pilihan dokter FU bertambah tanpa menambah jumlah kolom', async () => {
+  const { canDeleteRecord } = await import('../src/lib/access.js');
+  const { FU_DOCTORS, FU_DOCTOR_SLOTS } = await import('../src/lib/domain/mcu.js');
+  assert.equal(canDeleteRecord({ role: 'HO_HSE' }), true);
+  for (const role of ['HSE_SITE', 'PJO', 'PM', 'HRD', 'DIREKSI']) assert.equal(canDeleteRecord({ role }), false, role);
+  assert.ok(FU_DOCTORS.includes('Dokter Sp. Paru'));
+  assert.equal(FU_DOCTOR_SLOTS, 6);
+});
