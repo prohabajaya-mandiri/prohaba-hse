@@ -6,8 +6,8 @@ import { fitness } from '../domain/mcu.js';
 import { permitStatus } from '../domain/permit.js';
 import { nextNumber } from '../sequence.js';
 import { getSetting } from '../settings.js';
-import { array, bool, choice, date, ensure, id, InputError, object, optionalDate, optionalNumber, text } from '../validation.js';
-import { requireSite } from './common.js';
+import { array, bool, choice, date, ensure, id, InputError, object, optionalDate, text } from '../validation.js';
+import { requireDelete, requireSite } from './common.js';
 import { endPlacement } from './placements.js';
 
 export const MOB_STATUSES = ['DIRENCANAKAN', 'MENUNGGU_PERSYARATAN', 'SIAP', 'PERJALANAN', 'TIBA', 'SELESAI', 'BATAL'];
@@ -70,13 +70,12 @@ function parse(body) {
     departDate: date(body.departDate, 'Tanggal berangkat'),
     arriveDate: optionalDate(body.arriveDate, 'Estimasi tiba'),
     transport: text(body.transport, 'Transportasi', 200, true),
-    cost: optionalNumber(body.cost, 'Biaya', 0, 1e11),
     notes: text(body.notes, 'Catatan', 1000, true),
   };
 }
 
 export async function createMobilization(user, body) {
-  object(body, ['type', 'siteId', 'origin', 'destination', 'departDate', 'arriveDate', 'transport', 'cost', 'notes', 'personnelIds', 'demobReason', 'nextStatus']);
+  object(body, ['type', 'siteId', 'origin', 'destination', 'departDate', 'arriveDate', 'transport', 'notes', 'personnelIds', 'demobReason', 'nextStatus']);
   const siteId = requireSite(user, body.siteId);
   const v = parse(body);
   const personnelIds = [...new Set(array(body.personnelIds, 'Personel', 200))];
@@ -102,12 +101,13 @@ export async function createMobilization(user, body) {
 }
 
 export async function updateMobilization(user, mobId, body) {
-  object(body, ['origin', 'destination', 'departDate', 'arriveDate', 'transport', 'cost', 'notes', 'type', 'addPersonnelIds', 'removeMemberIds']);
+  object(body, ['origin', 'destination', 'departDate', 'arriveDate', 'transport', 'notes', 'type', 'addPersonnelIds', 'removeMemberIds']);
   return prisma.$transaction(async (tx) => {
     const m = await tx.mobilization.findUnique({ where: { id: mobId } });
     ensure(m, 'Kloter tidak ditemukan.', 404);
     requireSite(user, m.siteId);
-    ensure(!LOCKED.includes(m.status), 'Kloter sudah berangkat/selesai; data tidak dapat diubah.', 409);
+    // Data perjalanan boleh dikoreksi kapan saja; anggota terkunci setelah kloter berangkat.
+    ensure(!LOCKED.includes(m.status) || !(body.addPersonnelIds?.length || body.removeMemberIds?.length), 'Kloter sudah berangkat/selesai; anggota tidak dapat diubah.', 409);
     const v = parse({ ...body, type: m.type });
     await tx.mobilization.update({ where: { id: mobId }, data: v });
     const adds = (body.addPersonnelIds ?? []).map((x) => id(x));
@@ -116,6 +116,20 @@ export async function updateMobilization(user, mobId, body) {
     for (const pid of adds) await tx.mobilizationMember.upsert({ where: { mobilizationId_personnelId: { mobilizationId: mobId, personnelId: id(pid) } }, create: { mobilizationId: mobId, personnelId: pid }, update: {} });
     if (body.removeMemberIds?.length) await tx.mobilizationMember.deleteMany({ where: { mobilizationId: mobId, id: { in: body.removeMemberIds.map((x) => id(x)) } } });
     await audit(tx, user, { action: 'UPDATE', module: 'mobilization', recordId: mobId, siteId: m.siteId, ...diff(m, v) });
+    return { ok: true };
+  });
+}
+
+/** Hapus permanen kloter salah input. Perubahan status personel yang sudah terjadi tidak ikut dibatalkan. */
+export async function deleteMobilization(user, mobId) {
+  requireDelete(user);
+  return prisma.$transaction(async (tx) => {
+    const m = await tx.mobilization.findUnique({ where: { id: mobId }, include: { members: true } });
+    ensure(m, 'Kloter tidak ditemukan.', 404);
+    requireSite(user, m.siteId);
+    await tx.mobilization.delete({ where: { id: mobId } });
+    const { members, ...before } = m;
+    await audit(tx, user, { action: 'DELETE', module: 'mobilization', recordId: mobId, siteId: m.siteId, before: { ...before, members: members.map((x) => x.personnelId) } });
     return { ok: true };
   });
 }

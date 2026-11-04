@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Edit } from 'lucide-react';
-import { Badge, DataTable, FilterBar, FormFields, Kpi, Modal, Pager, useSubmit } from '@/components/ui';
+import { Badge, DataTable, DeleteButton, FilterBar, FormFields, Kpi, Modal, Pager, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
@@ -13,12 +13,19 @@ import { CATEGORIES } from '@/lib/domain/personnel';
 const EMPTY_LEAVE = { personnelId: '', type: 'CUTI', startDate: todayIso(), endDate: '', reason: '' };
 const EMPTY_POLICY = { name: '', siteId: '', category: 'STAFF', maritalStatus: '', onsiteDays: 90, offDays: 14, countWorkdays: false, notes: '', isActive: true };
 
-export default function RosterClient({ tab, sites, board, leaves, policies, page, canEdit, canPolicy, preselect }) {
+export default function RosterClient({ tab, sites, board, leaves, policies, page, canEdit, canDelete, canPolicy, preselect }) {
   const { submit, busy } = useSubmit();
   const { showPrompt, showConfirm } = useDialog();
   const [leave, setLeave] = useState(preselect && canEdit ? { ...EMPTY_LEAVE, personnelId: preselect } : null);
   const [policy, setPolicy] = useState(null);
   const [fix, setFix] = useState(null);
+  const [leaveEdit, setLeaveEdit] = useState(null);
+
+  const saveLeaveEdit = async (e) => {
+    e.preventDefault();
+    const { id, type, startDate, endDate, returnDate, reason } = leaveEdit;
+    if (await submit(`/api/roster/leaves/${id}`, { body: { action: 'EDIT', type, startDate, endDate, returnDate, reason } })) setLeaveEdit(null);
+  };
 
   const openFix = (r) => setFix({ row: r, rosterStart: iso(r.cycleStart) ?? '', rosterPolicyId: r.rosterPolicyId ?? '', reason: '' });
 
@@ -37,11 +44,6 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
     if (action === 'RETURN') {
       const d = await showPrompt('Tanggal kembali aktual (YYYY-MM-DD)', 'Kembali bekerja', todayIso());
       if (d) await submit(`/api/roster/leaves/${l.id}`, { body: { action, returnDate: d } });
-    } else if (action === 'RESCHEDULE') {
-      const end = await showPrompt('Tanggal selesai baru (YYYY-MM-DD)', 'Ubah jadwal', iso(l.endDate));
-      if (!end) return;
-      const reason = await showPrompt('Alasan perubahan', 'Ubah jadwal');
-      if (reason) await submit(`/api/roster/leaves/${l.id}`, { body: { action, endDate: end, reason } });
     } else if (await showConfirm(action === 'START' ? 'Mulai cuti/izin ini sekarang?' : 'Batalkan rencana ini?')) {
       await submit(`/api/roster/leaves/${l.id}`, { body: { action } });
     }
@@ -104,8 +106,8 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
                     <div className="row-actions">
                       {l.status === 'RENCANA' && <button className="btn btn-sm btn-outline" onClick={() => act(l, 'START')}>Mulai</button>}
                       {['RENCANA', 'BERJALAN'].includes(l.status) && <button className="btn btn-sm btn-outline" onClick={() => act(l, 'RETURN')}>Kembali</button>}
-                      {['RENCANA', 'BERJALAN'].includes(l.status) && <button className="btn btn-sm btn-ghost" onClick={() => act(l, 'RESCHEDULE')}>Ubah</button>}
                       {l.status === 'RENCANA' && <button className="btn btn-sm btn-ghost" onClick={() => act(l, 'CANCEL')}>Batal</button>}
+                      <button className="btn btn-sm btn-ghost" title="Edit" aria-label={`Edit catatan ${l.personnel.name}`} onClick={() => setLeaveEdit({ ...l, startDate: iso(l.startDate), endDate: iso(l.endDate), returnDate: iso(l.returnDate) ?? '', reason: l.reason ?? '' })}><Edit size={15} /></button>
                     </div>
                   ),
                 },
@@ -148,6 +150,24 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
               { name: 'reason', label: 'Keterangan', type: 'textarea', span: true },
             ]} />
             <button className="btn btn-primary" disabled={busy}>Simpan</button>
+          </form>
+        )}
+      </Modal>
+
+      <Modal open={Boolean(leaveEdit)} onClose={() => setLeaveEdit(null)} title="Edit cuti, izin atau sakit" subtitle={leaveEdit ? `${leaveEdit.personnel.name} · ${leaveEdit.site.code}` : ''}>
+        {leaveEdit && (
+          <form onSubmit={saveLeaveEdit}>
+            <FormFields values={leaveEdit} setValues={setLeaveEdit} fields={[
+              { name: 'type', label: 'Jenis', type: 'select', options: LEAVE_TYPES, required: true, noEmpty: true },
+              { name: 'returnDate', label: 'Tanggal kembali', type: 'date' },
+              { name: 'startDate', label: 'Mulai', type: 'date', required: true },
+              { name: 'endDate', label: 'Selesai', type: 'date', required: true },
+              { name: 'reason', label: 'Keterangan', type: 'textarea', span: true },
+            ]} />
+            <div className="row-actions" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+              {canDelete ? <DeleteButton url={`/api/roster/leaves/${leaveEdit.id}`} title="Hapus catatan" label="Hapus" message={`Hapus permanen catatan ${labelOf(leaveEdit.type)} milik ${leaveEdit.personnel.name}? Gunakan hanya untuk salah input.`} success="Catatan dihapus." onDone={() => setLeaveEdit(null)} /> : <span />}
+              <button className="btn btn-primary" disabled={busy}>Simpan</button>
+            </div>
           </form>
         )}
       </Modal>

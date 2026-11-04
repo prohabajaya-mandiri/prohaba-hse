@@ -5,7 +5,7 @@ import { addDays, today } from '../dates.js';
 import { permitStatus, permitWarnings, suggestedEnd } from '../domain/permit.js';
 import { getSettings } from '../settings.js';
 import { bool, choice, date, ensure, id, InputError, object, optionalChoice, optionalId, text } from '../validation.js';
-import { attachFiles, detachFiles, filesOf, groupBy, purgeObjects, requireDelete, requireSite, scopedPersonnel } from './common.js';
+import { attachFiles, detachFiles, filesOf, groupBy, pendingPersonnel, purgeObjects, requireDelete, requireSite, scopedPersonnel } from './common.js';
 
 const FIELDS = ['personnelId', 'siteId', 'kind', 'permitType', 'number', 'issuer', 'startDate', 'endDate', 'basisResult', 'mcuId', 'isTemporary', 'notes', 'previousId', 'acknowledge'];
 
@@ -14,7 +14,7 @@ export async function permitSettings() {
   return { defaults: s['permit.defaults'], types: s['permit.types'], threshold: s['reminder.thresholds'].permit, fuThreshold: s['reminder.thresholds'].followUp };
 }
 
-export async function listPermits(user, f, { skip = 0, take = 50 } = {}) {
+export async function listPermits(user, f, { skip = 0, take = 50, withMissing = false } = {}) {
   const cfg = await permitSettings();
   const now = today();
   const where = { ...siteFilter(user, f.siteId) };
@@ -27,17 +27,21 @@ export async function listPermits(user, f, { skip = 0, take = 50 } = {}) {
   if (f.status === 'AKAN_HABIS') Object.assign(where, { revokedAt: null, endDate: { gte: now, lte: soon } });
   if (f.status === 'KEDALUWARSA') Object.assign(where, { revokedAt: null, endDate: { lt: now } });
   if (f.status === 'DICABUT') where.revokedAt = { not: null };
-  const [rows, total] = await Promise.all([
+  // Personel tanpa permit tampil setelah catatan yang ada, kecuali filter status mengarah ke isi catatan.
+  const onlyMissing = f.status === 'BELUM_INPUT';
+  const showMissing = withMissing && !f.kind && (!f.status || onlyMissing);
+  const [rows, recorded] = onlyMissing ? [[], 0] : await Promise.all([
     prisma.permit.findMany({
       where, skip, take, orderBy: [{ endDate: 'asc' }],
       include: { personnel: { select: { id: true, code: true, name: true, position: true } }, site: { select: { code: true } } },
     }),
     prisma.permit.count({ where }),
   ]);
+  const missing = showMissing ? await pendingPersonnel(user, f, { permits: { none: {} } }, { skip: Math.max(skip - recorded, 0), take: take - rows.length }) : { rows: [], total: 0 };
   const files = groupBy(await filesOf('PERMIT', rows.map((r) => r.id)), 'entityId');
   const renewed = new Set((await prisma.permit.findMany({ where: { previousId: { in: rows.map((r) => r.id) } }, select: { previousId: true } })).map((r) => r.previousId));
   return {
-    total, cfg,
+    total: recorded + missing.total, cfg, missing: missing.rows,
     rows: rows.map((r) => ({ ...r, status: permitStatus(r, now, cfg.threshold), renewed: renewed.has(r.id), files: files[r.id] ?? [] })),
   };
 }

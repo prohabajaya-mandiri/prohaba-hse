@@ -1,5 +1,5 @@
 import AppLayout from '@/components/AppLayout';
-import { canWrite } from '@/lib/access';
+import { canDeleteRecord, canWrite } from '@/lib/access';
 import { query, requirePage, scopedSites } from '@/lib/page';
 import { listLeaves, listPolicies, rosterBoard } from '@/lib/services/roster';
 import RosterClient from './RosterClient';
@@ -20,7 +20,7 @@ export default async function RosterPage({ searchParams }) {
   return (
     <AppLayout title="Roster, Cuti & Kehadiran" subtitle={tabLabel('/roster', tab)} user={user}>
       <RosterClient tab={tab} sites={sites} board={board} leaves={leaves} policies={policies} page={q.page}
-        canEdit={canWrite(user.role, 'roster')} canPolicy={user.role === 'HO_HSE'} preselect={q.personnelId ?? null} />
+        canEdit={canWrite(user.role, 'roster')} canDelete={canDeleteRecord(user)} canPolicy={user.role === 'HO_HSE'} preselect={q.personnelId ?? null} />
     </AppLayout>
   );
 }

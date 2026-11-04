@@ -18,7 +18,7 @@ export default async function WorkPermitsPage({ searchParams }) {
     prisma.project.findMany({ where: { status: 'ACTIVE' }, select: { id: true, siteId: true, name: true, owner: true } }),
   ]);
   return (
-    <AppLayout title="Izin Kerja Khusus" subtitle="Register izin kerja dari owner untuk pekerjaan berisiko (bukan permit/SKS personel)" user={user}>
+    <AppLayout title="Izin Kerja Khusus" subtitle="Register izin kerja dari owner untuk pekerjaan berisiko (bukan Permit to Work personel)" user={user}>
       <WorkPermitsClient sites={sites} data={data} types={types} projects={projects} page={q.page} canEdit={canWrite(user.role, 'work-permits')} />
     </AppLayout>
   );

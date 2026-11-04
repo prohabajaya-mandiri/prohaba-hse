@@ -117,7 +117,7 @@ export default function McuClient({ sites, data, page, canEdit, canDelete, prese
         { name: 'siteId', label: 'Site', type: 'select', options: sites.map((s) => [s.id, s.code]) },
         { name: 'type', label: 'Jenis', type: 'select', options: MCU_TYPES.map((t) => [t, MCU_TYPE_LABELS[t]]) },
         { name: 'result', label: 'Hasil', type: 'select', options: MCU_RESULTS },
-        { name: 'stage', label: 'Tahap', type: 'select', options: MCU_STAGES.map((s) => [s, MCU_STAGE_LABELS[s]]) },
+        { name: 'stage', label: 'Tahap', type: 'select', options: [['BELUM_INPUT', 'Belum input data MCU'], ...MCU_STAGES.map((s) => [s, MCU_STAGE_LABELS[s]])] },
         { name: 'due', label: 'Pengingat', type: 'select', options: [['annual', `Annual ≤ ${cfg.thresholds.mcuAnnual} hari`], ['fu', `Follow Up ≤ ${cfg.thresholds.followUp} hari`]] },
       ]}>
         {canEdit && <button className="btn btn-primary" onClick={openNew}><Plus size={16} /> Input MCU</button>}
@@ -128,16 +128,16 @@ export default function McuClient({ sites, data, page, canEdit, canDelete, prese
       </div>
 
       <div className="card">
-        <DataTable rows={data.rows} onRowClick={setDetail} empty="Belum ada data MCU."
+        <DataTable rows={[...data.rows, ...(data.missing ?? [])]} onRowClick={(r) => !r.missing && setDetail(r)} empty="Belum ada data MCU."
           columns={[
             { key: 'p', label: 'Personel', render: (r) => (<div><strong>{r.personnel.name}</strong><div className="muted">{r.personnel.code} · {r.site?.code ?? '-'}</div></div>) },
-            { key: 'type', label: 'Jenis', render: (r) => MCU_TYPE_LABELS[r.type] },
-            { key: 'clinic', label: 'Klinik' },
+            { key: 'type', label: 'Jenis', render: (r) => (r.missing ? '-' : MCU_TYPE_LABELS[r.type]) },
+            { key: 'clinic', label: 'Klinik', render: (r) => r.clinic ?? '-' },
             { key: 'date', label: 'Tgl MCU', render: (r) => formatDate(r.mcuDate ?? r.screeningDate) },
-            { key: 'stage', label: 'Tahap', render: (r) => <Badge value={r.stage} label={MCU_STAGE_LABELS[r.stage]} /> },
-            { key: 'result', label: 'Hasil', render: (r) => (<div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Badge value={r.result} />{!r.isLatest && <span className="chip">riwayat</span>}</div>) },
-            { key: 'due', label: 'Jatuh tempo', render: (r) => (<div><div>{r.result === 'FOLLOW_UP' ? 'FU: ' + formatDate(r.fuDueDate) : formatDate(r.validUntil)}</div><DueBadge due={r.annualDue} label="Annual" /><DueBadge due={r.fuDue} label="FU" /></div>) },
-            ...(canDelete ? [{ key: 'del', label: '', render: (r) => <DeleteButton url={`/api/mcu/${r.id}`} title="Hapus MCU" message={`Hapus permanen MCU ${MCU_TYPE_LABELS[r.type]} milik ${r.personnel.name}? Dokumen medisnya ikut terhapus. Bila ini catatan terbaru, MCU sebelumnya kembali menjadi acuan status kesehatan.`} success="MCU dihapus." /> }] : []),
+            { key: 'stage', label: 'Tahap', render: (r) => (r.missing ? <Badge value="BELUM_INPUT" label="Belum input data MCU" /> : <Badge value={r.stage} label={MCU_STAGE_LABELS[r.stage]} />) },
+            { key: 'result', label: 'Hasil', render: (r) => (r.missing ? '-' : <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Badge value={r.result} />{!r.isLatest && <span className="chip">riwayat</span>}</div>) },
+            { key: 'due', label: 'Jatuh tempo', render: (r) => (r.missing ? '-' : <div><div>{r.result === 'FOLLOW_UP' ? 'FU: ' + formatDate(r.fuDueDate) : formatDate(r.validUntil)}</div><DueBadge due={r.annualDue} label="Annual" /><DueBadge due={r.fuDue} label="FU" /></div>) },
+            ...(canEdit || canDelete ? [{ key: 'del', label: '', render: (r) => r.missing ? (canEdit && <button className="btn btn-outline btn-sm" onClick={() => { setFiles([]); setForm({ ...EMPTY, personnelId: r.personnelId }); }}>Input</button>) : canDelete && <DeleteButton url={`/api/mcu/${r.id}`} title="Hapus MCU" message={`Hapus permanen MCU ${MCU_TYPE_LABELS[r.type]} milik ${r.personnel.name}? Dokumen medisnya ikut terhapus. Bila ini catatan terbaru, MCU sebelumnya kembali menjadi acuan status kesehatan.`} success="MCU dihapus." /> }] : []),
           ]} />
       </div>
       <Pager page={page} total={data.total} />

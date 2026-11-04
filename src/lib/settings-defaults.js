@@ -48,9 +48,9 @@ export const SETTING_DEFAULTS = {
     value: { dueSoonDays: 7, evidenceExpiringDays: 30, findingDueSoonDays: 7, lateWindowDays: 60 },
   },
   'permit.types': {
-    label: 'Jenis permit / SKS',
+    label: 'Jenis Permit to Work',
     // Izin kerja aktivitas (ketinggian, panas, dll.) dicatat di Izin Kerja Khusus, bukan permit personel.
-    value: ['ID Card / Mine Permit', 'SIMPER', 'KIMPER', 'SKS'],
+    value: ['ID Card / Mine Permit', 'SIMPER', 'KIMPER'],
   },
 };
 

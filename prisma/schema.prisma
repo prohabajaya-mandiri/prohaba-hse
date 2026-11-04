@@ -433,6 +433,39 @@ model MobilizationMember {
   @@unique([mobilizationId, personnelId])
 }
 
+// ─── Pusat Bantuan & Komunikasi ──────────────────────────────────────────────
+model SupportTicket {
+  id            String   @id @default(cuid())
+  number        String   @unique
+  category      String // KENDALA_APLIKASI | LAPORAN_PEKERJAAN | INFORMASI_PENTING
+  message       String
+  status        String   @default("BARU") // BARU | DIPROSES | SELESAI
+  page          String? // halaman saat aduan dikirim
+  createdById   String
+  createdByName String
+  createdByRole String
+  siteCodes     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  replies       SupportReply[]
+
+  @@index([status, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model SupportReply {
+  id         String   @id @default(cuid())
+  ticketId   String
+  authorId   String
+  authorName String
+  fromHo     Boolean  @default(false)
+  message    String
+  createdAt  DateTime @default(now())
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
 // ─── 09. ROSTER, CUTI & KEHADIRAN ────────────────────────────────────────────
 
 model RosterPolicy {

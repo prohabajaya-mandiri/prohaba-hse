@@ -83,30 +83,29 @@ export default function PermitsClient({ sites, data, page, canEdit, canDelete, p
       <FilterBar filters={[
         { type: 'search', label: 'Cari', placeholder: 'Nama / nomor' },
         { name: 'siteId', label: 'Site', type: 'select', options: sites.map((s) => [s.id, s.code]) },
-        { name: 'kind', label: 'Jenis', type: 'select', options: ['PERMIT', 'SKS'] },
-        { name: 'status', label: 'Status', type: 'select', options: ['AKTIF', 'AKAN_HABIS', 'KEDALUWARSA', 'DICABUT'] },
+        { name: 'status', label: 'Status', type: 'select', options: [['BELUM_INPUT', 'Belum input data'], 'AKTIF', 'AKAN_HABIS', 'KEDALUWARSA', 'DICABUT'] },
       ]}>
-        {canEdit && <button className="btn btn-primary" onClick={() => openForm(null)}><Plus size={16} /> Input permit / SKS</button>}
+        {canEdit && <button className="btn btn-primary" onClick={() => openForm(null)}><Plus size={16} /> Input Permit to Work</button>}
       </FilterBar>
       <div className="notice info">
         Acuan: FIT → permit {cfg.defaults.fitMonths} bulan; FOLLOW UP → permit sementara {cfg.defaults.followUpMonths} bulan bila disetujui; UNFIT tidak memenuhi syarat.
         Sistem tidak menerbitkan permit otomatis — data mengikuti keputusan owner/otoritas site. Pengingat {cfg.threshold} hari sebelum habis; permit FU yang habis memicu FU ulang.
       </div>
       <div className="card">
-        <DataTable rows={data.rows} onRowClick={setDetail} empty="Belum ada permit."
+        <DataTable rows={[...data.rows, ...(data.missing ?? [])]} onRowClick={(r) => !r.missing && setDetail(r)} empty="Belum ada permit."
           columns={[
             { key: 'p', label: 'Personel', render: (r) => (<div><strong>{r.personnel.name}</strong><div className="muted">{r.personnel.code} · {r.site.code}</div></div>) },
-            { key: 'kind', label: 'Jenis', render: (r) => (<div>{labelOf(r.kind)}<div className="muted">{r.permitType}</div></div>) },
-            { key: 'number', label: 'Nomor' },
-            { key: 'basis', label: 'Acuan MCU', render: (r) => (<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}><Badge value={r.basisResult} />{r.isTemporary && <span className="chip">Sementara</span>}</div>) },
-            { key: 'period', label: 'Masa berlaku', render: (r) => `${formatDate(r.startDate)} – ${formatDate(r.endDate)}` },
-            { key: 'status', label: 'Status', render: (r) => (<div><Badge value={r.status} />{r.renewed && <div className="muted">sudah diperpanjang</div>}</div>) },
-            ...(canDelete ? [{ key: 'del', label: '', render: (r) => <DeleteButton url={`/api/permits/${r.id}`} title="Hapus permit" message={`Hapus permanen ${labelOf(r.kind)} ${r.number} milik ${r.personnel.name}? File lampirannya ikut terhapus. Gunakan hanya untuk salah input; permit yang tidak berlaku lagi cukup dicabut.`} success="Permit dihapus." /> }] : []),
+            { key: 'kind', label: 'Jenis', render: (r) => r.permitType ?? '-' },
+            { key: 'number', label: 'Nomor', render: (r) => r.number ?? '-' },
+            { key: 'basis', label: 'Acuan MCU', render: (r) => (r.missing ? '-' : <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}><Badge value={r.basisResult} />{r.isTemporary && <span className="chip">Sementara</span>}</div>) },
+            { key: 'period', label: 'Masa berlaku', render: (r) => (r.missing ? '-' : `${formatDate(r.startDate)} – ${formatDate(r.endDate)}`) },
+            { key: 'status', label: 'Status', render: (r) => (r.missing ? <Badge value="BELUM_INPUT" label="Belum input data permit" /> : <div><Badge value={r.status} />{r.renewed && <div className="muted">sudah diperpanjang</div>}</div>) },
+            ...(canEdit || canDelete ? [{ key: 'del', label: '', render: (r) => r.missing ? (canEdit && <button className="btn btn-outline btn-sm" onClick={() => { setFiles([]); setHint(null); setForm({ ...EMPTY, personnelId: r.personnelId }); loadHint(r.personnelId, EMPTY.startDate); }}>Input</button>) : canDelete && <DeleteButton url={`/api/permits/${r.id}`} title="Hapus permit" message={`Hapus permanen permit ${r.number} milik ${r.personnel.name}? File lampirannya ikut terhapus. Gunakan hanya untuk salah input; permit yang tidak berlaku lagi cukup dicabut.`} success="Permit dihapus." /> }] : []),
           ]} />
       </div>
       <Pager page={page} total={data.total} />
 
-      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title={detail ? `${labelOf(detail.kind)} ${detail.number}` : ''}>
+      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title={detail ? `Permit to Work ${detail.number}` : ''}>
         {detail && (
           <div className="stack">
             <dl className="detail-grid">
@@ -131,7 +130,7 @@ export default function PermitsClient({ sites, data, page, canEdit, canDelete, p
         )}
       </Modal>
 
-      <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.id ? 'Edit permit' : form?.previousId ? `Perpanjangan — ${form.personName}` : 'Input permit / SKS'} size="modal-lg">
+      <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.id ? 'Edit permit' : form?.previousId ? `Perpanjangan — ${form.personName}` : 'Input Permit to Work'} size="modal-lg">
         {form && (
           <form onSubmit={save} className="stack">
             {hint?.mcu && (
@@ -144,8 +143,7 @@ export default function PermitsClient({ sites, data, page, canEdit, canDelete, p
             {hint && !hint.mcu && <div className="notice">Personel belum memiliki catatan MCU.</div>}
             <FormFields values={form} setValues={setValues} fields={[
               ...(form.id || form.previousId ? [] : [{ name: 'personnelId', label: 'Personel', type: 'personnel', required: true, span: true }]),
-              { name: 'kind', label: 'Jenis', type: 'select', options: ['PERMIT', 'SKS'], required: true, noEmpty: true },
-              { name: 'permitType', label: 'Jenis permit', type: 'select', options: [...new Set([...cfg.types, form.permitType].filter(Boolean))].map((t) => [t, t]), required: true },
+              { name: 'permitType', label: 'Jenis permit', type: 'select', options: [...new Set([...cfg.types.filter((t) => t !== 'SKS'), form.permitType].filter(Boolean))].map((t) => [t, t]), required: true },
               { name: 'number', label: 'Nomor', required: true },
               { name: 'issuer', label: 'Penerbit (owner/otoritas)' },
               { name: 'startDate', label: 'Berlaku mulai', type: 'date', required: true },

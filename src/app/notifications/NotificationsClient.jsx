@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { CheckCheck } from 'lucide-react';
 import { Card, FilterBar, Pager, useSubmit } from '@/components/ui';
 
-const TYPES = [['MCU_ANNUAL', 'MCU annual'], ['FOLLOW_UP', 'Follow Up'], ['PERMIT', 'Permit/SKS'], ['ROSTER', 'Roster'], ['CERTIFICATE', 'Sertifikat'], ['REPORT_DUE', 'Laporan bulanan'], ['MUTATION', 'Mutasi'], ['APPROVAL', 'Approval'], ['INCIDENT', 'Insiden'], ['DOCUMENT', 'Dokumen']];
+const TYPES = [['MCU_ANNUAL', 'MCU annual'], ['FOLLOW_UP', 'Follow Up'], ['PERMIT', 'Permit to Work'], ['SUPPORT', 'Aduan & bantuan'], ['ROSTER', 'Roster'], ['CERTIFICATE', 'Sertifikat'], ['REPORT_DUE', 'Laporan bulanan'], ['MUTATION', 'Mutasi'], ['APPROVAL', 'Approval'], ['INCIDENT', 'Insiden'], ['DOCUMENT', 'Dokumen']];
 const COLOR = { DANGER: 'var(--red-500)', WARNING: 'var(--orange-500)', INFO: 'var(--blue-500)' };
 
 export default function NotificationsClient({ data, page }) {

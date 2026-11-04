@@ -9,7 +9,7 @@ export const metadata = { title: 'Medical Check Up' };
 export default async function McuPage({ searchParams }) {
   const user = await requirePage('/mcu');
   const q = await query(searchParams);
-  const [sites, data] = await Promise.all([scopedSites(user), listMcu(user, q, q)]);
+  const [sites, data] = await Promise.all([scopedSites(user), listMcu(user, q, { ...q, withMissing: true })]);
   return (
     <AppLayout title="Medical Check Up" subtitle="Alur screening → MCU → hasil → feedback → Follow Up → mobilisasi" user={user}>
       <McuClient sites={sites} data={data} page={q.page} canEdit={canWrite(user.role, 'mcu')} canDelete={canDeleteRecord(user)} preselect={q.personnelId ?? null} />

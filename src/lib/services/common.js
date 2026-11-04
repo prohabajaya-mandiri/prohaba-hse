@@ -1,5 +1,6 @@
 import { prisma } from '../prisma.js';
-import { canDeleteRecord, canSeeSite, canWrite, siteScope } from '../access.js';
+import { canDeleteRecord, canSeeSite, canWrite, siteFilter, siteScope } from '../access.js';
+import { INACTIVE_STATUSES } from '../domain/personnel.js';
 import { ensure, InputError } from '../validation.js';
 import { storeFile, readUpload } from '../files.js';
 import { deleteObject } from '../storage.js';
@@ -21,6 +22,18 @@ export async function scopedPersonnel(user, id, db = prisma, select) {
   const scope = siteScope(user);
   if (scope !== null && !scope.includes(p.currentSiteId)) throw new InputError('Personel di luar cakupan site Anda.', 403);
   return p;
+}
+
+/** Personel dalam cakupan pengguna yang belum punya data suatu modul; bukan personel nonaktif/mantan. */
+export async function pendingPersonnel(user, f, none, { skip, take }) {
+  const where = { ...siteFilter(user, f.siteId, 'currentSiteId'), isFormer: false, workStatus: { notIn: INACTIVE_STATUSES }, ...none };
+  if (f.personnelId) where.id = f.personnelId;
+  if (f.q) where.name = { contains: String(f.q).slice(0, 80), mode: 'insensitive' };
+  const [people, total] = await Promise.all([
+    take > 0 ? prisma.personnel.findMany({ where, skip, take, orderBy: { name: 'asc' }, select: { id: true, code: true, name: true, position: true, currentSite: { select: { code: true } } } }) : [],
+    prisma.personnel.count({ where }),
+  ]);
+  return { total, rows: people.map(({ currentSite, ...personnel }) => ({ id: 'belum-' + personnel.id, missing: true, personnelId: personnel.id, personnel, site: currentSite })) };
 }
 
 export async function siteExists(db, siteId) {

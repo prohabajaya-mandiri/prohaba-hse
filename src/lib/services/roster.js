@@ -6,7 +6,7 @@ import { LEAVE_TYPES, nextLeaveDue, placementSchedule, rosterState } from '../do
 import { CATEGORIES } from '../domain/personnel.js';
 import { getSetting } from '../settings.js';
 import { bool, choice, date, ensure, id, InputError, int, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
-import { requireSite, scopedPersonnel } from './common.js';
+import { requireDelete, requireSite, scopedPersonnel } from './common.js';
 
 // Status kerja mengikuti jenis cuti yang sedang berjalan (SAKIT ≠ CUTI).
 const STATUS_FOR = { CUTI: 'CUTI', OFF_ROSTER: 'CUTI', SAKIT: 'SAKIT', IZIN: 'CUTI' };
@@ -135,8 +135,8 @@ export async function createLeave(user, body) {
 
 // Mulai / kembali / batal / ubah jadwal — setiap perubahan tercatat (riwayat tidak ditimpa).
 export async function updateLeave(user, leaveId, body) {
-  object(body, ['action', 'returnDate', 'startDate', 'endDate', 'reason']);
-  const action = choice(body.action, ['START', 'RETURN', 'CANCEL', 'RESCHEDULE'], 'Aksi');
+  object(body, ['action', 'type', 'returnDate', 'startDate', 'endDate', 'reason']);
+  const action = choice(body.action, ['START', 'RETURN', 'CANCEL', 'RESCHEDULE', 'EDIT'], 'Aksi');
   return prisma.$transaction(async (tx) => {
     const l = await tx.leaveRecord.findUnique({ where: { id: leaveId }, include: { personnel: { select: { workStatus: true } } } });
     ensure(l, 'Data tidak ditemukan.', 404);
@@ -155,6 +155,21 @@ export async function updateLeave(user, leaveId, body) {
     } else if (action === 'CANCEL') {
       ensure(l.status === 'RENCANA', 'Hanya rencana yang dapat dibatalkan.', 409);
       data = { status: 'BATAL' };
+    } else if (action === 'EDIT') {
+      // Perbaikan salah input; status tidak berubah dan tetap tercatat di audit log.
+      data = {
+        type: choice(body.type, LEAVE_TYPES, 'Jenis'),
+        startDate: date(body.startDate, 'Mulai'),
+        endDate: date(body.endDate, 'Selesai'),
+        returnDate: optionalDate(body.returnDate, 'Tanggal kembali'),
+        reason: text(body.reason, 'Keterangan', 500, true),
+      };
+      ensure(data.endDate >= data.startDate, 'Tanggal selesai sebelum tanggal mulai.');
+      ensure(!data.returnDate || data.returnDate >= data.startDate, 'Tanggal kembali sebelum mulai cuti.');
+      if (['RENCANA', 'BERJALAN'].includes(l.status)) {
+        const overlap = await tx.leaveRecord.findFirst({ where: { id: { not: leaveId }, personnelId: l.personnelId, status: { in: ['RENCANA', 'BERJALAN'] }, startDate: { lte: data.endDate }, endDate: { gte: data.startDate } } });
+        ensure(!overlap, 'Periode bertumpuk dengan cuti/izin lain.', 409);
+      }
     } else {
       ensure(['RENCANA', 'BERJALAN'].includes(l.status), 'Status tidak valid.', 409);
       data = { startDate: optionalDate(body.startDate) ?? l.startDate, endDate: date(body.endDate, 'Selesai'), reason: text(body.reason, 'Alasan perubahan', 500) };
@@ -163,6 +178,22 @@ export async function updateLeave(user, leaveId, body) {
     const row = await tx.leaveRecord.update({ where: { id: leaveId }, data });
     await audit(tx, user, { action: 'UPDATE', module: 'roster', recordId: leaveId, siteId: l.siteId, ...diff(l, data), note: action });
     return row;
+  });
+}
+
+/** Hapus permanen catatan salah input. Cuti yang sedang berjalan mengembalikan status kerja personel. */
+export async function deleteLeave(user, leaveId) {
+  requireDelete(user);
+  return prisma.$transaction(async (tx) => {
+    const l = await tx.leaveRecord.findUnique({ where: { id: leaveId }, include: { personnel: { select: { workStatus: true } } } });
+    ensure(l, 'Data tidak ditemukan.', 404);
+    requireSite(user, l.siteId);
+    if (l.status === 'BERJALAN' && ['CUTI', 'SAKIT'].includes(l.personnel.workStatus)) await tx.personnel.update({ where: { id: l.personnelId }, data: { workStatus: 'ACTIVE' } });
+    await tx.leaveRecord.delete({ where: { id: leaveId } });
+    const { personnel, ...before } = l;
+    void personnel;
+    await audit(tx, user, { action: 'DELETE', module: 'roster', recordId: leaveId, siteId: l.siteId, before });
+    return { ok: true };
   });
 }
 

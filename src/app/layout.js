@@ -24,7 +24,7 @@ export const metadata = {
 export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#ffffff' };
 
 // Pasang tema tersimpan sebelum halaman tampil agar tidak berkedip putih.
-const THEME_SCRIPT = "try{var d=document.documentElement.dataset;if(localStorage.getItem('theme')==='dark')d.theme='dark';var a=localStorage.getItem('accent');if(a&&a!=='hijau')d.accent=a}catch(e){}";
+const THEME_SCRIPT = "try{var d=document.documentElement.dataset;if(localStorage.getItem('theme')==='dark')d.theme='dark';var a=localStorage.getItem('accent');if(a&&a!=='hijau')d.accent=a;var z=Number(localStorage.getItem('ui-zoom'));if(z){d.zoom=z;document.documentElement.style.setProperty('--ui-zoom',z/100)}if(localStorage.getItem('ui-fit')==='1')d.fit='1'}catch(e){}";
 
 export default function RootLayout({ children }) {
   return (

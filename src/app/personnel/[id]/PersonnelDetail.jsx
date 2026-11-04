@@ -12,7 +12,7 @@ import { CONTRACT_WARNING_DAYS, WORK_STATUSES } from '@/lib/domain/personnel';
 import { permitStatus } from '@/lib/domain/permit';
 import PersonnelForm from '../PersonnelForm';
 
-const TABS = [['profil', 'Profil'], ['placement', 'Penempatan'], ['mcu', 'MCU'], ['permit', 'Permit & SKS'], ['roster', 'Cuti & Kehadiran'], ['kompetensi', 'Kompetensi'], ['mobilisasi', 'Mobilisasi']];
+const TABS = [['profil', 'Profil'], ['placement', 'Penempatan'], ['mcu', 'MCU'], ['permit', 'Permit to Work'], ['roster', 'Cuti & Kehadiran'], ['kompetensi', 'Kompetensi'], ['mobilisasi', 'Mobilisasi']];
 
 export default function PersonnelDetail({ person: p, sites, canEdit, canEmployment, canRequestMutation, canCorrectPlacement }) {
   const [tab, setTab] = useState('profil');
@@ -173,7 +173,7 @@ export default function PersonnelDetail({ person: p, sites, canEdit, canEmployme
       )}
 
       {tab === 'permit' && (
-        <Card title="Riwayat permit & SKS" padding={0} actions={<Link className="btn btn-outline btn-sm" href={`/permits?personnelId=${p.id}`}>Kelola permit</Link>}>
+        <Card title="Riwayat Permit to Work" padding={0} actions={<Link className="btn btn-outline btn-sm" href={`/permits?personnelId=${p.id}`}>Kelola permit</Link>}>
           <DataTable rows={p.permits} empty="Belum ada permit." columns={[
             { key: 'kind', label: 'Jenis', render: (r) => `${labelOf(r.kind)} · ${r.permitType}` },
             { key: 'number', label: 'Nomor' },

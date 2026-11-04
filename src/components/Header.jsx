@@ -7,6 +7,7 @@ import { signOut } from 'next-auth/react';
 import { Bell, ChevronDown, LogOut, Menu, Moon, Sun, UserRound } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/access';
 import UserAvatar from './UserAvatar';
+import ViewTools from './ViewTools';
 
 // Tema awal dipasang skrip di layout.js; atribut data-theme pada <html> jadi sumber kebenaran.
 const subscribeTheme = (cb) => {
@@ -64,6 +65,8 @@ export default function Header({ title, subtitle, user, onMenuClick }) {
           {today.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
         </div>
 
+        <ViewTools className="view-tools-header" />
+
         <button type="button" className="header-btn" onClick={toggleTheme} title={dark ? 'Mode terang' : 'Mode gelap'} aria-label={dark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'} aria-pressed={dark}>
           {dark ? <Sun size={20} /> : <Moon size={20} />}
         </button>
@@ -100,6 +103,7 @@ export default function Header({ title, subtitle, user, onMenuClick }) {
                 <Link href="/account" role="menuitem" className="menu-item" onClick={() => setShowUserMenu(false)}>
                   <UserRound size={17} /> Profil
                 </Link>
+                <ViewTools className="view-tools-menu" />
                 <button type="button" role="menuitem" className="menu-item danger" onClick={() => signOut({ callbackUrl: '/login' })}>
                   <LogOut size={17} /> Keluar
                 </button>

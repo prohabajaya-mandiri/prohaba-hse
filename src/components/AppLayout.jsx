@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import SupportWidget from './SupportWidget';
 import { applyAccent } from '@/lib/accent';
 
 export default function AppLayout({ children, title, subtitle, user }) {
@@ -44,6 +45,7 @@ export default function AppLayout({ children, title, subtitle, user }) {
           <span>E-HSE Prohaba · Health, Safety & Environment</span>
         </footer>
       </div>
+      <SupportWidget />
     </div>
   );
 }

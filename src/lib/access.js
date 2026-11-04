@@ -16,6 +16,9 @@ export const MODULES = {
   dashboard: { read: ALL },
   account: { read: ALL, write: ALL },
   notifications: { read: ALL, write: ALL },
+  // Pusat Bantuan: halaman HO HSE; aduan & balasan lewat /api/support oleh semua peran (akses per aduan dicek di service).
+  help: { read: ['HO_HSE'] },
+  support: { read: ALL, write: ALL },
   approvals: { read: ALL, write: ALL },
   files: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD'] },
   sites: { read: ALL, write: ['HO_HSE'] },
@@ -38,7 +41,7 @@ export const MODULES = {
   // CSMS: HRD hanya membaca butir yang PIC-nya HRD; PJO/PM menulis untuk pemeriksaan saja
   // (aksi per peran dicek di csmsTransition dan service).
   csms: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI', 'HRD'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },
-  // Izin kerja khusus dari owner (aktivitas), terpisah dari Permit & SKS personel.
+  // Izin kerja khusus dari owner (aktivitas), terpisah dari Permit to Work personel.
   'work-permits': { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE'] },
   // Lapangan: PJO/PM ikut melapor bahaya, inspeksi & mengerjakan tindakan korektif. Penutupan CAPA dicek di capaTransition.
   hazards: { read: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM', 'DIREKSI'], write: ['HO_HSE', 'HSE_SITE', 'PJO', 'PM'] },

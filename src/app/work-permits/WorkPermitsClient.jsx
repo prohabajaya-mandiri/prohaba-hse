@@ -55,7 +55,7 @@ export default function WorkPermitsClient({ sites, data, types, projects, page, 
 
   return (
     <div className="stack">
-      <div className="notice info">Register izin kerja khusus yang <strong>diterbitkan owner</strong> untuk aktivitas berisiko (ketinggian, panas, ruang terbatas, dll.). Berbeda dari Permit & SKS personel (ID Card/Mine Permit). Status Aktif hanya merekam izin sah; aplikasi tidak menerbitkan izin owner.</div>
+      <div className="notice info">Register izin kerja khusus yang <strong>diterbitkan owner</strong> untuk aktivitas berisiko (ketinggian, panas, ruang terbatas, dll.). Berbeda dari Permit to Work personel (ID Card/Mine Permit). Status Aktif hanya merekam izin sah; aplikasi tidak menerbitkan izin owner.</div>
       <FilterBar filters={[
         { type: 'search', label: 'Cari', placeholder: 'Nomor / pekerjaan / lokasi' },
         { name: 'siteId', label: 'Site', type: 'select', options: sites.filter((s) => !s.isHo).map((s) => [s.id, s.code]) },

@@ -60,7 +60,7 @@ export const LABELS = {
   // indikator
   ACTIVITY: 'Aktivitas', OBSERVATION: 'Observasi', INCIDENT: 'Kejadian',
   // hazard report, inspeksi & tindakan korektif
-  EKSTREM: 'Ekstrem', UNSAFE_ACT: 'Unsafe act', UNSAFE_CONDITION: 'Unsafe condition', BARU: 'Baru',
+  EKSTREM: 'Ekstrem', UNSAFE_ACT: 'Unsafe act', UNSAFE_CONDITION: 'Unsafe condition', BARU: 'Baru', DIPROSES: 'Diproses', KENDALA_APLIKASI: 'Kendala aplikasi', LAPORAN_PEKERJAAN: 'Laporan pekerjaan', INFORMASI_PENTING: 'Informasi penting', BELUM_INPUT: 'Belum input',
   HAZARD: 'Hazard report', INSPECTION: 'Inspeksi / P2H', MANUAL: 'Manual',
   P2H: 'P2H unit', AREA: 'Area kerja', APAR: 'APAR', LAYAK: 'Layak', TIDAK_LAYAK: 'Tidak layak', OK: 'OK', TIDAK_OK: 'Tidak OK',
   PAGI: 'Pagi', MALAM: 'Malam',
@@ -91,7 +91,7 @@ export const STATUS_STYLES = {
   TERCATAT: gray, BERAKHIR: orange, DIBATALKAN: gray, FINAL: green,
   TERBUKA: red, DALAM_PROSES: yellow, DIAJUKAN_TUTUP: blue, DITUTUP: green, RENDAH: green, SEDANG: yellow, TINGGI: red,
   SCREENING: gray, MENUNGGU_HASIL: blue, SUBMIT: blue, FEEDBACK: navy, SUBMIT_FU: yellow, MOBILISASI: navy,
-  EKSTREM: red, UNSAFE_ACT: orange, UNSAFE_CONDITION: yellow, BARU: red, LAYAK: green, TIDAK_LAYAK: red, OK: green, TIDAK_OK: red,
+  EKSTREM: red, UNSAFE_ACT: orange, UNSAFE_CONDITION: yellow, BARU: red, DIPROSES: yellow, BELUM_INPUT: yellow, LAYAK: green, TIDAK_LAYAK: red, OK: green, TIDAK_OK: red,
   AMAN: green, PENGAWASAN: yellow, TIDAK_BOLEH: red, NEGATIF: green, POSITIF: red,
 };
 

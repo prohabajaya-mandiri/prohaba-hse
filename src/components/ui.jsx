@@ -183,14 +183,14 @@ export function useSubmit() {
 
 // ─── Filter via query string (filter dijalankan di server) ──────────────────
 /** Tombol hapus baris tabel: selalu minta konfirmasi dan tidak ikut membuka detail baris. */
-export function DeleteButton({ url, message, title = 'Hapus', success = 'Data dihapus.' }) {
+export function DeleteButton({ url, message, title = 'Hapus', success = 'Data dihapus.', label, onDone }) {
   const { submit, busy } = useSubmit();
   const { showConfirm } = useDialog();
   const run = async (e) => {
     e.stopPropagation();
-    if (await showConfirm(message, title)) await submit(url, { method: 'DELETE', success });
+    if (await showConfirm(message, title) && await submit(url, { method: 'DELETE', success })) onDone?.();
   };
-  return <button type="button" className="btn btn-ghost btn-sm text-red" title={title} aria-label={title} disabled={busy} onClick={run}><Trash2 size={14} /></button>;
+  return <button type="button" className="btn btn-ghost btn-sm text-red" title={title} aria-label={title} disabled={busy} onClick={run}><Trash2 size={14} />{label && ` ${label}`}</button>;
 }
 
 export function FilterBar({ filters, children }) {

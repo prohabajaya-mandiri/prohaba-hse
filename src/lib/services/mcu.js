@@ -6,7 +6,7 @@ import { addDays, today } from '../dates.js';
 import { annualValidUntil, dueState, firstStage, FU_DOCTOR_SLOTS, FU_DOCTORS, MCU_RESULTS, MCU_STAGE_LABELS, MCU_STAGES, MCU_TYPES, nextStage, planMcu, reachedFields, stepFields } from '../domain/mcu.js';
 import { getSettings } from '../settings.js';
 import { choice, ensure, id, object, optionalDate, optionalId, optionalNumber, text } from '../validation.js';
-import { attachFiles, detachFiles, filesOf, groupBy, purgeObjects, requireDelete, requireSite, scopedPersonnel } from './common.js';
+import { attachFiles, detachFiles, filesOf, groupBy, pendingPersonnel, purgeObjects, requireDelete, requireSite, scopedPersonnel } from './common.js';
 
 export async function mcuSettings() {
   const s = await getSettings(['mcu.durations', 'mcu.annualMonths', 'reminder.thresholds']);
@@ -61,7 +61,7 @@ function parseDoctors(raw) {
 
 const notFuture = (d, label) => ensure(!d || d <= today(), `${label} tidak boleh setelah hari ini.`);
 
-export async function listMcu(user, f, { skip = 0, take = 50 } = {}) {
+export async function listMcu(user, f, { skip = 0, take = 50, withMissing = false } = {}) {
   const now = today();
   const cfg = await mcuSettings();
   const where = { ...siteFilter(user, f.siteId) };
@@ -73,17 +73,22 @@ export async function listMcu(user, f, { skip = 0, take = 50 } = {}) {
   if (f.due === 'annual') Object.assign(where, { isLatest: true, result: 'FIT', validUntil: { lte: addDays(now, cfg.thresholds.mcuAnnual) } });
   if (f.due === 'fu') Object.assign(where, { isLatest: true, result: 'FOLLOW_UP', fuDueDate: { lte: addDays(now, cfg.thresholds.followUp) } });
   if (f.latest === '1') where.isLatest = true;
-  const [rows, total] = await Promise.all([
+  // Personel tanpa MCU tampil setelah catatan yang ada, selama filter tidak mengarah ke isi catatan.
+  const onlyMissing = f.stage === 'BELUM_INPUT';
+  const showMissing = withMissing && !f.result && !f.type && !f.due && !f.latest && (!f.stage || onlyMissing);
+  const [rows, recorded] = onlyMissing ? [[], 0] : await Promise.all([
     prisma.mcuRecord.findMany({
       where, skip, take, orderBy: [{ createdAt: 'desc' }],
       include: { personnel: { select: { id: true, code: true, name: true, position: true, category: true } }, site: { select: { code: true } } },
     }),
     prisma.mcuRecord.count({ where }),
   ]);
+  const missing = showMissing ? await pendingPersonnel(user, f, { mcus: { none: {} } }, { skip: Math.max(skip - recorded, 0), take: take - rows.length }) : { rows: [], total: 0 };
   const files = groupBy(await filesOf('MCU', rows.map((r) => r.id)), 'entityId');
   return {
-    total,
+    total: recorded + missing.total,
     cfg,
+    missing: missing.rows,
     rows: rows.map(({ notesEnc, ...r }) => {
       const medical = canSeeSensitive(user, 'MEDICAL', r.siteId);
       return {

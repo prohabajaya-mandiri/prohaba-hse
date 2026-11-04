@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { signOut } from 'next-auth/react';
 import {
+  LifeBuoy,
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
   Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus, ClipboardCheck, FileCheck2,
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/notifications', label: 'Notifikasi', icon: Bell },
       { href: '/approvals', label: 'Persetujuan', icon: CheckSquare },
+      { href: '/help', label: 'Pusat Bantuan & Komunikasi', icon: LifeBuoy },
     ],
   },
   {
@@ -39,7 +41,7 @@ const NAV_ITEMS = [
     section: 'Kesehatan & Izin',
     items: [
       { href: '/mcu', label: 'Medical Check Up', icon: HeartPulse },
-      { href: '/permits', label: 'Permit & SKS', icon: BadgeCheck },
+      { href: '/permits', label: 'Permit to Work', icon: BadgeCheck },
       { href: '/training', label: 'Training & Kompetensi', icon: GraduationCap },
     ],
   },

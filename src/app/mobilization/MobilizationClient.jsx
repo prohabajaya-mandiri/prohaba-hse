@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, X, Plane, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Badge, Card, DataTable, FilterBar, FormFields, Modal, Pager, PersonnelPicker, useSubmit } from '@/components/ui';
+import { Edit, Plus, X, Plane, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Badge, Card, DataTable, DeleteButton, FilterBar, FormFields, Modal, Pager, PersonnelPicker, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
-import { idr, labelOf } from '@/lib/labels';
+import { labelOf } from '@/lib/labels';
 
+const PURPOSES = ['Onsite', 'Cuti', 'Izin', 'Sakit', 'MCU Annual', 'Follow Up'];
 const STATUSES = ['DIRENCANAKAN', 'MENUNGGU_PERSYARATAN', 'SIAP', 'PERJALANAN', 'TIBA', 'SELESAI', 'BATAL'];
 const NEXT = {
   DIRENCANAKAN: ['SIAP', 'MENUNGGU_PERSYARATAN', 'BATAL'],
@@ -17,15 +18,16 @@ const NEXT = {
   TIBA: ['SELESAI'],
 };
 
-export default function MobilizationClient({ user, sites, data, page, canEdit }) {
+export default function MobilizationClient({ user, sites, data, page, canEdit, canDelete }) {
   const { submit, busy } = useSubmit();
   const { showConfirm, showPrompt } = useDialog();
   const [form, setForm] = useState(null);
+  const [edit, setEdit] = useState(null);
   const [people, setPeople] = useState([]);
 
   const openForm = (type) => {
     setPeople([]);
-    setForm({ type, siteId: sites.length === 1 ? sites[0].id : '', origin: type === 'MOBILISASI' ? 'Head Office' : '', destination: '', departDate: todayIso(), arriveDate: '', transport: '', cost: '', notes: '', demobReason: '', nextStatus: 'CUTI' });
+    setForm({ type, siteId: sites.length === 1 ? sites[0].id : '', origin: type === 'MOBILISASI' ? 'Head Office' : '', destination: '', departDate: todayIso(), arriveDate: '', transport: '', notes: '', demobReason: '', nextStatus: 'CUTI' });
   };
 
   const create = async (e) => {
@@ -46,7 +48,12 @@ export default function MobilizationClient({ user, sites, data, page, canEdit })
     }
   };
 
-  const base = (m) => ({ origin: m.origin, destination: m.destination, departDate: iso(m.departDate), arriveDate: iso(m.arriveDate) ?? '', transport: m.transport ?? '', cost: m.cost ?? '', notes: m.notes ?? '' });
+  const base = (m) => ({ origin: m.origin, destination: m.destination, departDate: iso(m.departDate), arriveDate: iso(m.arriveDate) ?? '', transport: m.transport ?? '', notes: m.notes ?? '' });
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    const { row, ...body } = edit;
+    if (await submit(`/api/mobilization/${row.id}`, { method: 'PUT', body })) setEdit(null);
+  };
   const removeMember = async (m, member) => {
     if (await showConfirm(`Keluarkan ${member.personnel.name} dari ${m.code}?`)) {
       await submit(`/api/mobilization/${m.id}`, { method: 'PUT', body: { ...base(m), removeMemberIds: [member.id] } });
@@ -71,16 +78,20 @@ export default function MobilizationClient({ user, sites, data, page, canEdit })
         return (
           <Card key={m.id}
             title={<span style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>{m.code} <Badge value={m.type} label={labelOf(m.type === 'MOBILISASI' ? 'MOBILISASI' : 'DEMOBILISASI')} /> <Badge value={m.status} /></span>}
-            actions={canEdit && (NEXT[m.status] ?? []).map((s) => (
-              <button key={s} className={`btn btn-sm ${s === 'BATAL' ? 'btn-ghost' : 'btn-outline'}`} disabled={busy} onClick={() => move(m, s)}>{labelOf(s)}</button>
-            ))}>
+            actions={canEdit && (
+              <>
+                {(NEXT[m.status] ?? []).map((s) => (
+                  <button key={s} className={`btn btn-sm ${s === 'BATAL' ? 'btn-ghost' : 'btn-outline'}`} disabled={busy} onClick={() => move(m, s)}>{labelOf(s)}</button>
+                ))}
+                <button className="btn btn-sm btn-ghost" title="Edit kloter" aria-label={`Edit ${m.code}`} onClick={() => setEdit({ row: m, ...base(m) })}><Edit size={15} /></button>
+              </>
+            )}>
             <dl className="detail-grid" style={{ marginBottom: 14 }}>
               <div><dt>Site</dt><dd>{m.site.code}</dd></div>
               <div><dt>Rute</dt><dd>{m.origin} → {m.destination}</dd></div>
               <div><dt>Berangkat</dt><dd>{formatDate(m.departDate)}</dd></div>
               <div><dt>Tiba</dt><dd>{formatDate(m.arriveDate)}</dd></div>
               <div><dt>Transportasi</dt><dd>{m.transport ?? '-'}</dd></div>
-              <div><dt>Biaya</dt><dd>{m.cost ? idr(m.cost) : '-'}</dd></div>
             </dl>
             {notReady > 0 && <div className="notice" style={{ marginBottom: 12 }}><AlertTriangle size={14} /> {notReady} personel belum memenuhi persyaratan MCU/permit.</div>}
             <DataTable rows={m.members} columns={[
@@ -107,6 +118,25 @@ export default function MobilizationClient({ user, sites, data, page, canEdit })
       })}
       <Pager page={page} total={data.total} limit={30} />
 
+      <Modal open={Boolean(edit)} onClose={() => setEdit(null)} title={edit ? `Edit ${edit.row.code}` : ''} size="modal-lg">
+        {edit && (
+          <form onSubmit={saveEdit}>
+            <FormFields values={edit} setValues={setEdit} fields={[
+              { name: 'departDate', label: 'Tanggal berangkat', type: 'date', required: true },
+              { name: 'arriveDate', label: 'Tanggal tiba', type: 'date' },
+              { name: 'origin', label: 'Asal', required: true },
+              { name: 'destination', label: 'Tujuan', type: 'select', options: [...new Set([...PURPOSES, edit.destination])].map((p) => [p, p]), required: true },
+              { name: 'transport', label: 'Transportasi', placeholder: 'Pesawat / travel / kapal' },
+              { name: 'notes', label: 'Catatan', type: 'textarea', span: true },
+            ]} />
+            <div className="row-actions" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+              {canDelete ? <DeleteButton url={`/api/mobilization/${edit.row.id}`} title="Hapus kloter" label="Hapus" message={`Hapus permanen kloter ${edit.row.code}? Perubahan status personel yang sudah terjadi tidak ikut dibatalkan. Gunakan hanya untuk salah input.`} success="Kloter dihapus." onDone={() => setEdit(null)} /> : <span />}
+              <button className="btn btn-primary" disabled={busy}>Simpan</button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.type === 'MOBILISASI' ? 'Kloter mobilisasi baru' : 'Demobilisasi'} subtitle="Status kloter: direncanakan → menunggu persyaratan → siap → perjalanan → tiba → selesai." size="modal-lg">
         {form && (
           <form onSubmit={create} className="stack">
@@ -114,10 +144,9 @@ export default function MobilizationClient({ user, sites, data, page, canEdit })
               { name: 'siteId', label: form.type === 'MOBILISASI' ? 'Site tujuan' : 'Site asal', type: 'select', options: sites.filter((s) => s.isActive).map((s) => [s.id, `${s.code} — ${s.name}`]), required: true },
               { name: 'departDate', label: 'Tanggal berangkat', type: 'date', required: true },
               { name: 'origin', label: 'Asal', required: true },
-              { name: 'destination', label: 'Tujuan', required: true },
+              { name: 'destination', label: 'Tujuan', type: 'select', options: PURPOSES.map((p) => [p, p]), required: true },
               { name: 'arriveDate', label: 'Estimasi tiba', type: 'date' },
               { name: 'transport', label: 'Transportasi', placeholder: 'Pesawat / travel / kapal' },
-              { name: 'cost', label: 'Biaya total (Rp)', type: 'number', min: 0 },
               ...(form.type === 'DEMOBILISASI' ? [
                 { name: 'demobReason', label: 'Alasan demobilisasi', required: true },
                 { name: 'nextStatus', label: 'Status penempatan berikutnya', type: 'select', options: ['CUTI', 'DIRUMAHKAN', 'RESIGN', 'MUTASI'], noEmpty: true },
