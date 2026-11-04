@@ -2,7 +2,7 @@ import { prisma } from '../prisma.js';
 import { siteFilter } from '../access.js';
 import { audit, diff } from '../audit.js';
 import { addDays, today } from '../dates.js';
-import { cycleStart, LEAVE_TYPES, nextLeaveDue, pickPolicy, rosterState } from '../domain/roster.js';
+import { LEAVE_TYPES, nextLeaveDue, placementSchedule, rosterState } from '../domain/roster.js';
 import { CATEGORIES } from '../domain/personnel.js';
 import { getSetting } from '../settings.js';
 import { bool, choice, date, ensure, id, InputError, int, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
@@ -65,20 +65,42 @@ export async function rosterBoard(user, f) {
   ]);
   const rows = placements.map((pl) => {
     const p = pl.personnel;
-    const policy = pickPolicy(policies, { siteId: pl.siteId, category: p.category, maritalStatus: p.maritalStatus });
+    const { policy, start } = placementSchedule(pl, p, policies, p.leaves.filter((l) => l.status === 'SELESAI'));
     const ongoing = p.leaves.find((l) => l.status === 'BERJALAN');
     const planned = p.leaves.filter((l) => l.status === 'RENCANA').sort((a, b) => a.startDate - b.startDate)[0] ?? null;
-    const start = cycleStart(pl.startDate, p.leaves.filter((l) => l.status === 'SELESAI'));
     const due = nextLeaveDue(policy, start);
     const state = ongoing ? { state: 'SEDANG_CUTI', left: null } : rosterState(due, now, threshold);
     return {
-      placementId: pl.id, siteId: pl.siteId, siteCode: pl.site.code, personnel: { id: p.id, code: p.code, name: p.name, category: p.category, position: p.position, workStatus: p.workStatus },
+      placementId: pl.id, siteId: pl.siteId, siteCode: pl.site.code, rosterStart: pl.rosterStart, rosterPolicyId: pl.rosterPolicyId, personnel: { id: p.id, code: p.code, name: p.name, category: p.category, position: p.position, workStatus: p.workStatus },
       policy: policy ? { name: policy.name, onsiteDays: policy.onsiteDays, offDays: policy.offDays, countWorkdays: policy.countWorkdays } : null,
       cycleStart: start, due, backDue: due && policy ? addDays(due, policy.offDays) : null, ongoing, planned, ...state,
     };
   });
   const filtered = f.state ? rows.filter((r) => r.state === f.state) : rows;
-  return { rows: filtered, threshold, counts: rows.reduce((m, r) => ({ ...m, [r.state]: (m[r.state] ?? 0) + 1 }), {}) };
+  const options = policies.map(({ id, name, onsiteDays, offDays, countWorkdays }) => ({ id, name, onsiteDays, offDays, countWorkdays }));
+  return { rows: filtered, threshold, policies: options, counts: rows.reduce((m, r) => ({ ...m, [r.state]: (m[r.state] ?? 0) + 1 }), {}) };
+}
+
+// Perbaikan data roster satu personel; alasan wajib dan tercatat di audit log.
+export async function correctRoster(user, placementId, body) {
+  object(body, ['rosterStart', 'rosterPolicyId', 'reason']);
+  const rosterStart = optionalDate(body.rosterStart, 'Onsite sejak');
+  const rosterPolicyId = optionalId(body.rosterPolicyId, 'Pola roster');
+  const reason = text(body.reason, 'Alasan perbaikan', 500);
+  ensure(!rosterStart || rosterStart <= today(), 'Tanggal onsite tidak boleh di masa depan.');
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.placement.findUnique({ where: { id: placementId } });
+    ensure(before?.status === 'ACTIVE', 'Penempatan aktif tidak ditemukan.', 404);
+    requireSite(user, before.siteId);
+    if (rosterPolicyId) ensure(await tx.rosterPolicy.findFirst({ where: { id: rosterPolicyId, isActive: true }, select: { id: true } }), 'Pola roster tidak aktif.');
+    const sameStart = before.rosterStart?.getTime() === rosterStart?.getTime();
+    const data = { rosterStart, rosterStartAt: sameStart ? before.rosterStartAt : rosterStart && new Date(), rosterPolicyId };
+    const row = await tx.placement.update({ where: { id: placementId }, data });
+    const { rosterStartAt, ...changed } = data;
+    void rosterStartAt;
+    await audit(tx, user, { action: 'UPDATE', module: 'roster', recordId: placementId, siteId: before.siteId, ...diff(before, changed), note: 'Perbaikan roster: ' + reason });
+    return row;
+  });
 }
 
 export async function listLeaves(user, f, { skip = 0, take = 50 } = {}) {

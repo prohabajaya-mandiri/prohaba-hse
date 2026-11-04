@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { addDays, iso, isoWeekKey, isoWeekRange, toDate } from '../src/lib/dates.js';
 import { annualValidUntil, firstStage, fitness, nextStage, planMcu, reachedFields, stepFields } from '../src/lib/domain/mcu.js';
 import { permitStatus, permitWarnings, suggestedEnd } from '../src/lib/domain/permit.js';
-import { addWorkdays, cycleStart, nextLeaveDue, pickPolicy, rosterState } from '../src/lib/domain/roster.js';
+import { addWorkdays, cycleStart, nextLeaveDue, pickPolicy, placementSchedule, rosterState } from '../src/lib/domain/roster.js';
 import { calcManhours, safeManhours, summarize } from '../src/lib/domain/performance.js';
 import { previousMonthKey, reportPeriod, sitesNotReported } from '../src/lib/domain/reports.js';
 import { DISCUSSED_SCENARIO, simulate, validateSteps } from '../src/lib/domain/hrd.js';
@@ -309,4 +309,18 @@ test('MCU diisi bertahap: hanya maju satu tahap sesuai jenis & hasil', () => {
   assert.ok(!reachedFields('SCREENING').includes('mcuDate'));
   assert.ok(!reachedFields('FEEDBACK').includes('result'));
   assert.ok(reachedFields('SELESAI').includes('feedbackDate'));
+});
+
+test('perbaikan roster: mengalahkan cuti lama, cuti baru tetap mereset, pola khusus diutamakan', () => {
+  const leave = (returnDate, updatedAt) => ({ type: 'CUTI', status: 'SELESAI', endDate: D(returnDate), returnDate: D(returnDate), updatedAt: D(updatedAt) });
+  const correction = { date: D('2026-02-01'), at: D('2026-06-01') };
+  assert.equal(iso(cycleStart(D('2026-01-01'), [leave('2026-05-01', '2026-05-01')], correction)), '2026-02-01');
+  assert.equal(iso(cycleStart(D('2026-01-01'), [leave('2026-07-01', '2026-07-01')], correction)), '2026-07-01');
+  const policies = [{ id: 'umum', isActive: true, category: 'STAFF', onsiteDays: 90 }, { id: 'khusus', isActive: true, category: 'MANPOWER', onsiteDays: 150 }];
+  const person = { category: 'STAFF', maritalStatus: null };
+  const pl = { siteId: 's', startDate: D('2026-01-01'), rosterPolicyId: null, rosterStart: null };
+  assert.equal(placementSchedule(pl, person, policies, []).policy.id, 'umum');
+  assert.equal(placementSchedule({ ...pl, rosterPolicyId: 'khusus' }, person, policies, []).policy.id, 'khusus');
+  assert.equal(placementSchedule({ ...pl, rosterPolicyId: 'nonaktif' }, person, policies, []).policy.id, 'umum');
+  assert.equal(iso(placementSchedule({ ...pl, rosterStart: D('2026-03-01'), rosterStartAt: D('2026-06-01') }, person, policies, []).start), '2026-03-01');
 });

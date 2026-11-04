@@ -291,6 +291,9 @@ model Placement {
   endReason   String? // MUTASI | DEMOBILISASI | RESIGN | DIRUMAHKAN | SELESAI_PROYEK | LAINNYA
   notes       String?
   mutationId  String?
+  rosterStart    DateTime? // perbaikan manual "onsite sejak"; menggantikan awal penempatan
+  rosterStartAt  DateTime? // kapan perbaikan dibuat: hanya cuti setelah ini yang mereset siklus
+  rosterPolicyId String? // pola khusus personel; kosong = pola otomatis
   createdBy   String
   createdAt   DateTime  @default(now())
   personnel   Personnel @relation(fields: [personnelId], references: [id])

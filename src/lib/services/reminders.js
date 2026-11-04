@@ -1,6 +1,6 @@
 import { prisma } from '../prisma.js';
 import { addDays, daysBetween, iso, today } from '../dates.js';
-import { cycleStart, nextLeaveDue, pickPolicy } from '../domain/roster.js';
+import { nextLeaveDue, placementSchedule } from '../domain/roster.js';
 import { previousMonthKey, reportPeriod, sitesNotReported } from '../domain/reports.js';
 import { getSettings } from '../settings.js';
 import { SETTING_DEFAULTS } from '../settings-defaults.js';
@@ -78,8 +78,8 @@ export async function runReminders(now = today()) {
   for (const pl of placements) {
     const p = pl.personnel;
     if (p.leaves.some((l) => ['BERJALAN', 'RENCANA'].includes(l.status))) continue;
-    const policy = pickPolicy(policies, { siteId: pl.siteId, category: p.category, maritalStatus: p.maritalStatus });
-    const due = nextLeaveDue(policy, cycleStart(pl.startDate, p.leaves.filter((l) => l.status === 'SELESAI')));
+    const { policy, start } = placementSchedule(pl, p, policies, p.leaves.filter((l) => l.status === 'SELESAI'));
+    const due = nextLeaveDue(policy, start);
     if (!due || daysBetween(now, due) > t.roster) continue;
     const left = daysBetween(now, due);
     await push(['HSE_SITE', 'PJO'], pl.siteId, {

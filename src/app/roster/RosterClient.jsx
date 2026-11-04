@@ -7,7 +7,7 @@ import { Badge, DataTable, FilterBar, FormFields, Kpi, Modal, Pager, useSubmit }
 import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { labelOf } from '@/lib/labels';
-import { LEAVE_TYPES } from '@/lib/domain/roster';
+import { LEAVE_TYPES, nextLeaveDue } from '@/lib/domain/roster';
 import { CATEGORIES } from '@/lib/domain/personnel';
 
 const EMPTY_LEAVE = { personnelId: '', type: 'CUTI', startDate: todayIso(), endDate: '', reason: '' };
@@ -18,7 +18,20 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
   const { showPrompt, showConfirm } = useDialog();
   const [leave, setLeave] = useState(preselect && canEdit ? { ...EMPTY_LEAVE, personnelId: preselect } : null);
   const [policy, setPolicy] = useState(null);
+  const [fix, setFix] = useState(null);
 
+  const openFix = (r) => setFix({ row: r, rosterStart: iso(r.cycleStart) ?? '', rosterPolicyId: r.rosterPolicyId ?? '', reason: '' });
+
+  const saveFix = async (e) => {
+    e.preventDefault();
+    const { row, rosterStart, ...body } = fix;
+    // Tanggal yang tidak diubah tetap mengikuti hitungan otomatis.
+    const unchanged = !row.rosterStart && rosterStart === iso(row.cycleStart);
+    if (await submit(`/api/roster/placements/${row.placementId}`, { method: 'PUT', body: { ...body, rosterStart: unchanged ? '' : rosterStart } })) setFix(null);
+  };
+
+  const fixPolicy = fix && (board?.policies.find((p) => p.id === fix.rosterPolicyId) ?? fix.row.policy);
+  const fixDue = fix && fix.rosterStart ? nextLeaveDue(fixPolicy, new Date(fix.rosterStart + 'T00:00:00Z')) : null;
 
   const act = async (l, action) => {
     if (action === 'RETURN') {
@@ -57,10 +70,11 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
               columns={[
                 { key: 'p', label: 'Personel', render: (r) => (<div><Link href={'/personnel/' + r.personnel.id}><strong>{r.personnel.name}</strong></Link><div className="muted">{r.personnel.code} · {r.siteCode} · {labelOf(r.personnel.category)}</div></div>) },
                 { key: 'pol', label: 'Pola', render: (r) => (r.policy ? `${r.policy.onsiteDays}${r.policy.countWorkdays ? ' hari kerja' : ' hari'} + ${r.policy.offDays} off` : <span className="muted">Belum diatur</span>) },
-                { key: 'cs', label: 'Onsite sejak', render: (r) => formatDate(r.cycleStart) },
+                { key: 'cs', label: 'Onsite sejak', render: (r) => (<div>{formatDate(r.cycleStart)}{(r.rosterStart || r.rosterPolicyId) && <div className="muted">diperbaiki</div>}</div>) },
                 { key: 'due', label: 'Jadwal cuti', render: (r) => (r.planned ? `Rencana ${formatDate(r.planned.startDate)}` : formatDate(r.due)) },
                 { key: 'state', label: 'Kondisi', render: (r) => (<div><Badge value={r.state} />{r.left !== null && r.left !== undefined && <div className="muted">{r.left < 0 ? `lewat ${-r.left} hari` : `${r.left} hari lagi`}</div>}</div>) },
                 { key: 'ws', label: 'Status kerja', render: (r) => <Badge value={r.personnel.workStatus} /> },
+                ...(canEdit ? [{ key: 'e', label: 'Aksi', render: (r) => <button className="btn btn-ghost btn-sm" title="Edit roster" aria-label={`Edit roster ${r.personnel.name}`} onClick={() => openFix(r)}><Edit size={15} /></button> }] : []),
               ]} />
           </div>
           <div className="muted">Acuan: staff menikah 3 bulan onsite + 2 minggu cuti; belum menikah 4 bulan + 2 minggu; harian mandor mengikuti kebutuhan proyek (umumnya 5–6 bulan); aturan owner dapat berbeda (mis. 70 hari kerja + 2 minggu off). SAKIT tidak mereset siklus onsite.</div>
@@ -133,6 +147,20 @@ export default function RosterClient({ tab, sites, board, leaves, policies, page
               { name: 'endDate', label: 'Selesai', type: 'date', required: true },
               { name: 'reason', label: 'Keterangan', type: 'textarea', span: true },
             ]} />
+            <button className="btn btn-primary" disabled={busy}>Simpan</button>
+          </form>
+        )}
+      </Modal>
+
+      <Modal open={Boolean(fix)} onClose={() => setFix(null)} title="Edit roster" subtitle={fix ? `${fix.row.personnel.name} · ${fix.row.siteCode}` : ''}>
+        {fix && (
+          <form onSubmit={saveFix}>
+            <FormFields values={fix} setValues={setFix} fields={[
+              { name: 'rosterStart', label: 'Onsite sejak', type: 'date', hint: 'Tanggal mulai siklus onsite saat ini. Kosongkan untuk kembali ke hitungan otomatis.' },
+              { name: 'rosterPolicyId', label: 'Pola roster', type: 'select', options: board.policies.map((p) => [p.id, p.name]), hint: `Kosong = otomatis${fix.row.policy ? ` (${fix.row.policy.name})` : ''}.` },
+              { name: 'reason', label: 'Alasan perbaikan', type: 'textarea', required: true, span: true },
+            ]} />
+            {fixDue && <div className="notice info" style={{ margin: '12px 0 16px' }}>Jadwal cuti menjadi <strong>{formatDate(fixDue)}</strong>.</div>}
             <button className="btn btn-primary" disabled={busy}>Simpan</button>
           </form>
         )}

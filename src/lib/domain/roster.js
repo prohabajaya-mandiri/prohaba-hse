@@ -30,14 +30,27 @@ export function nextLeaveDue(policy, cycleStart) {
   return policy.countWorkdays ? addWorkdays(cycleStart, policy.onsiteDays) : addDays(cycleStart, policy.onsiteDays);
 }
 
-/** Awal siklus onsite = tanggal kembali dari cuti/off terakhir, atau awal penempatan aktif. */
-export function cycleStart(placementStart, leaves) {
+/**
+ * Awal siklus onsite = tanggal kembali dari cuti/off terakhir, atau awal penempatan aktif.
+ * Perbaikan manual menggantikan keduanya; hanya cuti yang dicatat setelah perbaikan yang mereset lagi.
+ */
+export function cycleStart(placementStart, leaves, correction = null) {
+  const base = correction?.date ?? placementStart;
   const resets = leaves
     .filter((l) => RESETS_CYCLE.includes(l.type) && l.status !== 'BATAL')
+    .filter((l) => !correction || new Date(l.updatedAt) > new Date(correction.at))
     .map((l) => new Date(l.returnDate ?? addDays(l.endDate, 1)))
-    .filter((d) => !placementStart || d >= new Date(placementStart));
+    .filter((d) => !base || d >= new Date(base));
   const last = resets.sort((a, b) => b - a)[0];
-  return last ?? (placementStart ? new Date(placementStart) : null);
+  return last ?? (base ? new Date(base) : null);
+}
+
+/** Pola & awal siklus satu penempatan, termasuk perbaikan manual pada papan roster. */
+export function placementSchedule(placement, person, policies, leaves) {
+  const policy = policies.find((p) => p.id === placement.rosterPolicyId)
+    ?? pickPolicy(policies, { siteId: placement.siteId, category: person.category, maritalStatus: person.maritalStatus });
+  const correction = placement.rosterStart ? { date: placement.rosterStart, at: placement.rosterStartAt } : null;
+  return { policy, start: cycleStart(placement.startDate, leaves, correction) };
 }
 
 export function rosterState(due, today, threshold = 14) {
