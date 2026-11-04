@@ -11,6 +11,7 @@ export default function AppLayout({ children, title, subtitle, user }) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [openedAt, setOpenedAt] = useState(pathname);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   // Laci navigasi di layar kecil ditutup setiap kali halaman berganti,
   // termasuk lewat tombol maju/mundur peramban.
@@ -30,7 +31,7 @@ export default function AppLayout({ children, title, subtitle, user }) {
 
   return (
     <div className="app-layout">
-      <Sidebar user={user} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <Sidebar user={user} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} onSupport={() => setSupportOpen(true)} />
       {isSidebarOpen && <div className="sidebar-mobile-overlay" onClick={() => setIsSidebarOpen(false)} aria-hidden />}
 
       <div className="main-content">
@@ -45,7 +46,7 @@ export default function AppLayout({ children, title, subtitle, user }) {
           <span>E-HSE Prohaba · Health, Safety & Environment</span>
         </footer>
       </div>
-      <SupportWidget />
+      <SupportWidget open={supportOpen} setOpen={setSupportOpen} />
     </div>
   );
 }

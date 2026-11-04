@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Camera, ImagePlus, MessageSquareWarning, Send, X } from 'lucide-react';
+import { Camera, ImagePlus, Send, X } from 'lucide-react';
 import { Badge, FileLinks, Modal, useSubmit } from './ui';
 import { useDialog } from './DialogProvider';
 import { apiFetch } from '@/lib/client-api';
@@ -45,11 +45,10 @@ async function captureScreen() {
   }
 }
 
-export default function SupportWidget() {
+export default function SupportWidget({ open, setOpen }) {
   const pathname = usePathname();
   const { submit, busy } = useSubmit();
   const { showAlert } = useDialog();
-  const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('new');
   const [form, setForm] = useState(EMPTY);
   const [images, setImages] = useState([]);
@@ -117,9 +116,6 @@ export default function SupportWidget() {
 
   return (
     <>
-      <button type="button" className="support-fab no-print" onClick={() => setOpen(true)} title="Kirim aduan ke HO HSE" aria-label="Kirim aduan ke HO HSE">
-        <MessageSquareWarning size={20} /> <span>Aduan</span>
-      </button>
       <Modal open={open} onClose={() => setOpen(false)} title="Aduan & Bantuan" subtitle="Sampaikan kendala, laporan, atau informasi penting kepada HO HSE.">
         <div className="tabs" style={{ marginBottom: 16 }}>
           <button type="button" className={`tab ${tab === 'new' ? 'active' : ''}`} onClick={() => setTab('new')}>Kirim aduan</button>

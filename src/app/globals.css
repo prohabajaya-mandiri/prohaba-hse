@@ -1954,8 +1954,10 @@ tbody tr:hover { background: var(--glass-bg-soft); }
 }
 
 /* ─── Aduan & bantuan ───────────────────────────────────────────────────── */
-.support-fab { position: fixed; right: 20px; bottom: 20px; z-index: 150; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border: 0; border-radius: 999px; background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: var(--on-color); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 10px 24px -8px color-mix(in srgb, var(--brand-600) 70%, transparent); transition: transform var(--transition-normal); }
-.support-fab:hover { transform: translateY(-2px); }
+/* Aksen oranye keselamatan agar menonjol dari menu lain, di warna tema apa pun. */
+.nav-item.nav-support { width: calc(100% - 20px); border: 1px solid color-mix(in srgb, var(--orange-500) 35%, transparent); background: var(--orange-50); color: var(--orange-600); font: inherit; font-size: 14.5px; font-weight: 600; text-align: left; cursor: pointer; }
+.nav-item.nav-support .nav-icon { color: var(--orange-600); }
+.nav-item.nav-support:hover { background: var(--orange-100); color: var(--orange-600); }
 .support-attach { display: flex; flex-wrap: wrap; gap: 8px; }
 .support-attach .btn.disabled { opacity: 0.5; pointer-events: none; }
 .support-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
@@ -1969,9 +1971,5 @@ tbody tr:hover { background: var(--glass-bg-soft); }
 .support-reply.ho { background: var(--brand-50); }
 .support-reply strong { display: block; font-size: 12.5px; }
 .support-reply-form { display: flex; gap: 8px; align-items: center; }
-@media (max-width: 640px) {
-  .support-fab { right: 14px; bottom: 14px; padding: 13px; }
-  .support-fab span { display: none; }
-}
 
 .support-attach label.btn { display: inline-flex; flex-direction: row; align-items: center; margin: 0; }

@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { signOut } from 'next-auth/react';
 import {
   LifeBuoy,
+  MessageSquareWarning,
   LayoutDashboard, Bell, CheckSquare, Users, ArrowLeftRight, CalendarDays, Plane,
   HeartPulse, BadgeCheck, GraduationCap, Activity, FileText, Siren, FolderLock,
   Wallet, MapPin, UserCog, SlidersHorizontal, History, LogOut, X, ChevronDown, UserPlus, ClipboardCheck, FileCheck2,
@@ -66,6 +67,7 @@ const NAV_ITEMS = [
   },
   {
     section: 'Sistem',
+    support: true,
     items: [
       { href: '/sites', label: 'Site & Proyek', icon: MapPin },
       { href: '/users', label: 'Pengguna', icon: UserCog },
@@ -83,7 +85,7 @@ const isActiveHref = (pathname, href) => pathname === href || pathname.startsWit
 // disimpan di sini agar tidak kembali ke awal. Hanya diubah di browser.
 const navMemory = { scrollTop: 0, expanded: {}, activeHref: null, anchor: null };
 
-export default function Sidebar({ user, isOpen, setIsOpen }) {
+export default function Sidebar({ user, isOpen, setIsOpen, onSupport }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { showConfirm } = useDialog();
@@ -163,10 +165,16 @@ export default function Sidebar({ user, isOpen, setIsOpen }) {
       >
         {NAV_ITEMS.map((section) => {
           const visible = section.items.filter((item) => canAccess(role, item.href));
-          if (!visible.length) return null;
+          if (!visible.length && !section.support) return null;
           return (
             <div key={section.section} className="nav-section">
               <div className="nav-section-label">{section.section}</div>
+              {section.support && (
+                <button type="button" className="nav-item nav-support" title="Kirim aduan ke HO HSE" onClick={() => { setIsOpen?.(false); onSupport?.(); }}>
+                  <MessageSquareWarning className="nav-icon" aria-hidden />
+                  <span className="nav-label">Aduan</span>
+                </button>
+              )}
               {visible.map((item) => {
                 const active = item.href === activeHref;
                 const Icon = item.icon;
