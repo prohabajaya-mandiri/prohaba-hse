@@ -10,7 +10,7 @@ export default async function UsersPage() {
   const [users, sites] = await Promise.all([listUsers(), scopedSites(user)]);
   return (
     <AppLayout title="Pengguna & Hak Akses" subtitle="Akun, peran, cakupan site dan operator akun bersama" user={user}>
-      <UsersClient users={users} sites={sites} />
+      <UsersClient users={users} sites={sites} currentUserId={user.id} />
     </AppLayout>
   );
 }

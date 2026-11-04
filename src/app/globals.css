@@ -1604,17 +1604,17 @@ th { letter-spacing: 0.04em; }
   --glass-bg-strong: rgb(255 255 255 / 0.82);
   --glass-bg-soft: rgb(255 255 255 / 0.42);
   --glass-border: rgb(255 255 255 / 0.72);
-  --glass-edge: rgb(8 104 64 / 0.1);
-  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.85), inset 0 -1px 0 rgb(8 104 64 / 0.05);
-  --glass-shadow: 0 10px 30px -12px rgb(6 74 46 / 0.22), 0 2px 6px -2px rgb(6 74 46 / 0.08);
+  --glass-edge: color-mix(in srgb, var(--brand-600) 10%, transparent);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.85), inset 0 -1px 0 color-mix(in srgb, var(--brand-600) 5%, transparent);
+  --glass-shadow: 0 10px 30px -12px color-mix(in srgb, var(--brand-600) 22%, transparent), 0 2px 6px -2px color-mix(in srgb, var(--brand-600) 8%, transparent);
   --glass-blur: saturate(170%) blur(22px);
   --glass-input: rgb(255 255 255 / 0.7);
   --app-bg:
-    radial-gradient(1100px 700px at 8% -10%, rgb(116 189 146 / 0.55), transparent 60%),
-    radial-gradient(900px 600px at 105% 8%, rgb(169 216 187 / 0.6), transparent 55%),
+    radial-gradient(1100px 700px at 8% -10%, color-mix(in srgb, var(--brand-300) 55%, transparent), transparent 60%),
+    radial-gradient(900px 600px at 105% 8%, color-mix(in srgb, var(--brand-200) 60%, transparent), transparent 55%),
     radial-gradient(700px 520px at 85% 100%, rgb(248 160 24 / 0.16), transparent 60%),
-    radial-gradient(800px 600px at 0% 100%, rgb(23 132 79 / 0.22), transparent 60%),
-    linear-gradient(160deg, #e7f2ea 0%, #eef4ef 45%, #f4f1e8 100%);
+    radial-gradient(800px 600px at 0% 100%, color-mix(in srgb, var(--brand-500) 22%, transparent), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, var(--brand-600) 8%, #f2f4f2) 0%, color-mix(in srgb, var(--brand-600) 4%, #f2f4f2) 45%, #f4f1e8 100%);
   --radius-lg: 16px;
   --radius-xl: 22px;
 }
@@ -1624,15 +1624,15 @@ th { letter-spacing: 0.04em; }
   --glass-bg-strong: rgb(20 29 25 / 0.84);
   --glass-bg-soft: rgb(30 44 37 / 0.4);
   --glass-border: rgb(255 255 255 / 0.1);
-  --glass-edge: rgb(116 189 146 / 0.12);
+  --glass-edge: color-mix(in srgb, var(--brand-300) 12%, transparent);
   --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 -1px 0 rgb(0 0 0 / 0.25);
   --glass-shadow: 0 14px 34px -14px rgb(0 0 0 / 0.7), 0 2px 8px -2px rgb(0 0 0 / 0.4);
   --glass-input: rgb(255 255 255 / 0.05);
   --app-bg:
-    radial-gradient(1000px 700px at 5% -10%, rgb(23 132 79 / 0.35), transparent 60%),
-    radial-gradient(900px 600px at 105% 10%, rgb(8 104 64 / 0.3), transparent 55%),
+    radial-gradient(1000px 700px at 5% -10%, color-mix(in srgb, var(--brand-500) 35%, transparent), transparent 60%),
+    radial-gradient(900px 600px at 105% 10%, color-mix(in srgb, var(--brand-600) 30%, transparent), transparent 55%),
     radial-gradient(700px 520px at 85% 100%, rgb(240 120 32 / 0.12), transparent 60%),
-    linear-gradient(160deg, #07120d 0%, #0b1712 50%, #10140f 100%);
+    linear-gradient(160deg, color-mix(in srgb, var(--brand-600) 10%, #060e0b) 0%, color-mix(in srgb, var(--brand-600) 8%, #0a1410) 50%, #10140f 100%);
 }
 
 body, .app-layout, .login-page { background: var(--app-bg); background-attachment: fixed; }
@@ -1668,7 +1668,7 @@ body, .app-layout, .login-page { background: var(--app-bg); background-attachmen
 .nav-item.active {
   background: var(--glass-bg-strong);
   color: var(--brand-700);
-  box-shadow: var(--glass-highlight), 0 4px 14px -6px rgb(8 104 64 / 0.35);
+  box-shadow: var(--glass-highlight), 0 4px 14px -6px color-mix(in srgb, var(--brand-600) 35%, transparent);
 }
 .nav-item.active::before {
   content: "";
@@ -1688,7 +1688,7 @@ body, .app-layout, .login-page { background: var(--app-bg); background-attachmen
 /* Kartu & KPI. */
 .card-header, .card-footer, .modal-header, .modal-footer { border-color: var(--glass-edge); }
 a .kpi-card, a.kpi-card { transition: transform var(--transition-normal), box-shadow var(--transition-normal); }
-a:hover .kpi-card, a.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--glass-highlight), 0 16px 34px -14px rgb(6 74 46 / 0.35); }
+a:hover .kpi-card, a.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--glass-highlight), 0 16px 34px -14px color-mix(in srgb, var(--brand-600) 35%, transparent); }
 .kpi-icon { background: var(--glass-bg-strong); box-shadow: var(--glass-highlight); border-radius: 12px; }
 
 /* Tabel di atas kaca: kepala tembus, garis halus. */
@@ -1699,7 +1699,7 @@ tbody tr:hover { background: var(--glass-bg-soft); }
 /* Form: isian kaca bening. */
 .form-input, .form-select {
   background-color: var(--glass-input);
-  border-color: rgb(8 104 64 / 0.22);
+  border-color: color-mix(in srgb, var(--brand-600) 22%, transparent);
   border-radius: 12px;
 }
 .form-input:hover, .form-select:hover { border-color: var(--brand-300); }
@@ -1707,8 +1707,8 @@ tbody tr:hover { background: var(--glass-bg-soft); }
 /* Tombol kapsul; primer bergradien hijau K3 dengan kilau kaca. */
 .btn { border-radius: 12px; }
 .btn-primary {
-  background: linear-gradient(180deg, var(--brand-500), var(--brand-600) 55%, #075a37);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 6px 16px -6px rgb(8 104 64 / 0.55);
+  background: linear-gradient(180deg, var(--brand-500), var(--brand-600) 55%, color-mix(in srgb, var(--brand-600) 85%, black));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 6px 16px -6px color-mix(in srgb, var(--brand-600) 55%, transparent);
 }
 .btn-orange { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 6px 16px -6px rgb(240 120 32 / 0.5); }
 .btn-outline, .btn-danger-outline {
@@ -1733,15 +1733,15 @@ tbody tr:hover { background: var(--glass-bg-soft); }
   box-shadow: var(--glass-highlight);
 }
 .tab { min-height: 38px; margin: 0; border: 0; border-radius: 10px; }
-.tab.active { background: var(--glass-bg-strong); box-shadow: var(--glass-highlight), 0 3px 10px -4px rgb(8 104 64 / 0.3); }
+.tab.active { background: var(--glass-bg-strong); box-shadow: var(--glass-highlight), 0 3px 10px -4px color-mix(in srgb, var(--brand-600) 30%, transparent); }
 
 .stepper .step { background: var(--glass-bg-soft); border: 1px solid var(--glass-border); }
-.stepper .step.current { border-color: transparent; box-shadow: 0 4px 12px -4px rgb(8 104 64 / 0.5); }
+.stepper .step.current { border-color: transparent; box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--brand-600) 50%, transparent); }
 
 .notice { border-radius: 14px; box-shadow: var(--glass-highlight); }
-.notice.info { background: rgb(212 236 221 / 0.6); }
-[data-theme="dark"] .notice.info { background: rgb(18 38 28 / 0.6); }
-[data-theme="dark"] .form-input, [data-theme="dark"] .form-select { border-color: rgb(116 189 146 / 0.22); }
+.notice.info { background: color-mix(in srgb, var(--brand-100) 60%, transparent); }
+[data-theme="dark"] .notice.info { background: color-mix(in srgb, var(--brand-50) 60%, transparent); }
+[data-theme="dark"] .form-input, [data-theme="dark"] .form-select { border-color: color-mix(in srgb, var(--brand-300) 22%, transparent); }
 
 /* Modal & menu: kaca lebih pekat; latar belakang dibuat buram. */
 .modal-overlay {
@@ -1761,4 +1761,90 @@ tbody tr:hover { background: var(--glass-bg-soft); }
 
 @media (max-width: 1024px) {
   .header { margin: 8px 8px 0; top: 8px; }
+}
+
+/* ─── Grafik dashboard ──────────────────────────────────────────────────── */
+.donut-wrap { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px 24px; align-items: center; }
+.donut-chart { position: relative; flex: none; width: 176px; height: 176px; }
+.donut-chart svg, .donut-chart path { outline: none; }
+.donut-center { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 2px; padding: 0 30px; text-align: center; pointer-events: none; }
+.donut-center strong { font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--gray-900); font-variant-numeric: tabular-nums; }
+.donut-center span { font-size: 11.5px; line-height: 1.25; color: var(--gray-500); }
+.donut-legend { flex: 1 1 210px; min-width: 0; display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.donut-row { display: grid; gap: 5px; padding: 6px 8px; border-radius: 10px; color: inherit; text-decoration: none; transition: background var(--transition-normal); }
+.donut-row:hover { background: var(--glass-bg-soft); }
+.donut-row-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.donut-row-head strong { font-variant-numeric: tabular-nums; color: var(--gray-900); }
+.donut-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.donut-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-700); }
+.donut-pct { width: 36px; text-align: right; font-size: 12px; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+.donut-track { display: block; height: 4px; border-radius: 999px; background: var(--glass-edge); overflow: hidden; }
+.donut-track span { display: block; height: 100%; min-width: 3px; border-radius: inherit; }
+
+.series-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--gray-600); }
+.series-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.series-legend i { width: 9px; height: 9px; border-radius: 50%; }
+
+.site-bars { display: grid; gap: 4px; }
+.site-bar-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 40px; align-items: center; gap: 12px; padding: 7px 8px; border-radius: 12px; color: inherit; text-decoration: none; transition: background var(--transition-normal); }
+.site-bar-row:hover { background: var(--glass-bg-soft); }
+.site-bar-code { font-size: 13px; font-weight: 600; color: var(--gray-700); }
+.site-bar-row strong { text-align: right; font-size: 14px; color: var(--gray-900); font-variant-numeric: tabular-nums; }
+.site-bar-track { display: block; height: 14px; border-radius: 999px; background: var(--glass-edge); overflow: hidden; }
+.site-bar-fill { display: flex; gap: 2px; height: 100%; border-radius: 999px; overflow: hidden; animation: site-bar-grow .6s cubic-bezier(.2, .7, .2, 1); transform-origin: left; }
+.site-bar-fill span { flex: 1 1 0; min-width: 3px; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3); }
+.site-bars-empty { margin-top: 6px; padding: 0 8px; font-size: 12.5px; color: var(--gray-500); }
+@keyframes site-bar-grow { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .site-bar-fill { animation: none; } }
+
+/* ─── Profil ────────────────────────────────────────────────────────────── */
+.user-avatar { overflow: hidden; }
+.user-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.user-avatar.lg { width: 88px; height: 88px; font-size: 28px; }
+.profile-photo { display: flex; align-items: center; gap: 18px; margin-bottom: 20px; flex-wrap: wrap; }
+.profile-photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.theme-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.theme-swatch { display: grid; justify-items: center; gap: 6px; padding: 10px 4px; border: 1px solid transparent; border-radius: 14px; background: transparent; color: var(--gray-700); font: inherit; font-size: 12.5px; cursor: pointer; }
+.theme-swatch:hover { background: var(--glass-bg-soft); }
+.theme-swatch[aria-pressed="true"] { background: var(--glass-bg-strong); border-color: var(--glass-border); box-shadow: var(--glass-highlight); font-weight: 600; }
+.theme-swatch i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3); }
+
+/* ─── Warna tema per akun ───────────────────────────────────────────────────
+   Satu warna dasar menurunkan seluruh skala brand; bawaan hijau K3 tidak memakai ini. */
+[data-accent="tosca"] { --accent-base: #0f766e; }
+[data-accent="biru"] { --accent-base: #1d5fa8; }
+[data-accent="indigo"] { --accent-base: #4338ca; }
+[data-accent="ungu"] { --accent-base: #7e3aa8; }
+[data-accent="marun"] { --accent-base: #9f2141; }
+[data-accent="oranye"] { --accent-base: #b9520f; }
+[data-accent="abu"] { --accent-base: #475569; }
+[data-accent] {
+  --brand-50: color-mix(in srgb, var(--accent-base) 7%, white);
+  --brand-100: color-mix(in srgb, var(--accent-base) 16%, white);
+  --brand-200: color-mix(in srgb, var(--accent-base) 34%, white);
+  --brand-300: color-mix(in srgb, var(--accent-base) 56%, white);
+  --brand-400: color-mix(in srgb, var(--accent-base) 76%, white);
+  --brand-500: color-mix(in srgb, var(--accent-base) 88%, white);
+  --brand-600: var(--accent-base);
+  --brand-700: color-mix(in srgb, var(--accent-base) 88%, black);
+  --brand-800: color-mix(in srgb, var(--accent-base) 72%, black);
+  --brand-900: color-mix(in srgb, var(--accent-base) 56%, black);
+  --accent-50: var(--brand-50);
+  --accent-100: var(--brand-100);
+  --accent-300: var(--brand-300);
+  --accent-400: var(--brand-400);
+  --accent-500: var(--brand-500);
+  --accent-600: var(--brand-600);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-base) 20%, transparent);
+}
+[data-theme="dark"][data-accent] {
+  --brand-50: color-mix(in srgb, var(--accent-base) 22%, #0c1210);
+  --brand-100: color-mix(in srgb, var(--accent-base) 30%, #0c1210);
+  --brand-200: color-mix(in srgb, var(--accent-base) 46%, #0c1210);
+  --brand-700: color-mix(in srgb, var(--accent-base) 45%, white);
+  --brand-800: color-mix(in srgb, var(--accent-base) 30%, white);
+  --brand-900: color-mix(in srgb, var(--accent-base) 16%, white);
+  --accent-50: var(--brand-50);
+  --accent-100: var(--brand-100);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-base) 45%, transparent);
 }

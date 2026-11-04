@@ -65,7 +65,7 @@ export default function PerformanceClient({ tab, sites, data, activities, daily,
                   <YAxis yAxisId="n" orientation="right" tick={{ fontSize: 11 }} width={36} allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  <Bar yAxisId="n" dataKey="activities" name="Aktivitas" fill="#086840" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="n" dataKey="activities" name="Aktivitas" fill="var(--brand-600)" radius={[4, 4, 0, 0]} />
                   <Bar yAxisId="n" dataKey="incidents" name="Kejadian" fill="#c2453d" radius={[4, 4, 0, 0]} />
                   <Line yAxisId="mh" type="monotone" dataKey="manhours" name="Manhours" stroke="#d08a4a" strokeWidth={2} dot={false} />
                 </ComposedChart>

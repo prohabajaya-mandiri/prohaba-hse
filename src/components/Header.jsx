@@ -4,8 +4,9 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { Bell, ChevronDown, KeyRound, LogOut, Menu, Moon, Sun } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, Moon, Sun, UserRound } from 'lucide-react';
 import { ROLE_LABELS } from '@/lib/access';
+import UserAvatar from './UserAvatar';
 
 // Tema awal dipasang skrip di layout.js; atribut data-theme pada <html> jadi sumber kebenaran.
 const subscribeTheme = (cb) => {
@@ -13,8 +14,6 @@ const subscribeTheme = (cb) => {
   mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   return () => mo.disconnect();
 };
-
-const initials =(name) => (name || 'U').trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 
 export default function Header({ title, subtitle, user, onMenuClick }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -82,7 +81,7 @@ export default function Header({ title, subtitle, user, onMenuClick }) {
             aria-haspopup="menu"
             aria-expanded={showUserMenu}
           >
-            <span className="user-avatar" aria-hidden>{initials(display)}</span>
+            <UserAvatar name={display} fileId={user?.avatarFileId} />
             <span className="user-menu-text">
               <span className="user-menu-name">{display || 'Pengguna'}</span>
               <span className="user-menu-role">{ROLE_LABELS[user?.role] || user?.role}</span>
@@ -99,7 +98,7 @@ export default function Header({ title, subtitle, user, onMenuClick }) {
                   <span>{user?.operatorName ? 'Akun bersama: ' + user.name : user?.email}</span>
                 </div>
                 <Link href="/account" role="menuitem" className="menu-item" onClick={() => setShowUserMenu(false)}>
-                  <KeyRound size={17} /> Akun & kata sandi
+                  <UserRound size={17} /> Profil
                 </Link>
                 <button type="button" role="menuitem" className="menu-item danger" onClick={() => signOut({ callbackUrl: '/login' })}>
                   <LogOut size={17} /> Keluar

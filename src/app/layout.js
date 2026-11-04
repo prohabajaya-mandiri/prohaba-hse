@@ -24,7 +24,7 @@ export const metadata = {
 export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#ffffff' };
 
 // Pasang tema tersimpan sebelum halaman tampil agar tidak berkedip putih.
-const THEME_SCRIPT = "try{if(localStorage.getItem('theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}";
+const THEME_SCRIPT = "try{var d=document.documentElement.dataset;if(localStorage.getItem('theme')==='dark')d.theme='dark';var a=localStorage.getItem('accent');if(a&&a!=='hijau')d.accent=a}catch(e){}";
 
 export default function RootLayout({ children }) {
   return (

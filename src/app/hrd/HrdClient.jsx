@@ -88,7 +88,7 @@ export default function HrdClient({ sites, board, scenarios }) {
                 <Tooltip formatter={(v) => idr(v)} />
                 <Legend />
                 <Bar dataKey="scenario" name="Biaya skenario" fill="#d08a4a" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="saving" name="Penghematan" fill="#086840" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="saving" name="Penghematan" fill="var(--brand-600)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

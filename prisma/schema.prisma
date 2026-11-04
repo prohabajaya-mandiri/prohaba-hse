@@ -24,6 +24,8 @@ model User {
   isActive       Boolean   @default(true)
   sessionVersion Int       @default(0)
   lastLoginAt    DateTime?
+  avatarFileId   String? // FileObject foto profil (entityType AVATAR)
+  themeColor     String? // warna tema pilihan pengguna (domain/profile.js)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

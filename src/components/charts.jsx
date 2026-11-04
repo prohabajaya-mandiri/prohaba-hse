@@ -1,81 +1,97 @@
 'use client';
 
-import { Rectangle } from 'recharts';
+import { useState } from 'react';
+import Link from 'next/link';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-// Gaya grafik "liquid glass": isi bergradien tembus pandang dengan tepi berkilau,
-// tooltip/legenda kaca, dan sumbu tipis. Warna teks memakai token tema agar terbaca
-// di mode terang maupun gelap.
+// Grafik "liquid glass": cincin tipis dan batang kapsul dengan rincian angka yang bisa
+// langsung dibaca. Warna utama memakai token tema agar mengikuti pilihan warna akun.
 
 /** Id gradien SVG yang aman dari nama seri (mis. "Harian Mandor"). */
-export const gradId = (prefix, key) => `${prefix}-${String(key).replace(/[^a-z0-9]/gi, '')}`;
+const gradId = (prefix, key) => `${prefix}-${String(key).replace(/[^a-z0-9]/gi, '')}`;
 
-/** <defs> gradien: kilau terang di atas → warna penuh di bawah, sedikit tembus. */
-export function GlassGradients({ prefix, colors }) {
+const percent = (value, total) => (total ? Math.round((value / total) * 100) : 0);
+
+/** Cincin dengan rincian di sampingnya; menyorot baris menyorot potongan yang sama, dan sebaliknya. */
+export function DonutBreakdown({ prefix, data, colors, centerLabel, hrefOf, format = String }) {
+  const [active, setActive] = useState(null);
+  const total = data.reduce((a, d) => a + d.value, 0);
+  const focused = data.find((d) => d.key === active);
+  const rows = [...data].sort((a, b) => b.value - a.value);
+  const colorOf = (key) => colors[key] ?? 'var(--gray-400)';
+
   return (
-    <defs>
-      {Object.entries(colors).map(([key, color]) => (
-        <linearGradient key={key} id={gradId(prefix, key)} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" style={{ stopColor: `color-mix(in srgb, ${color} 55%, white)`, stopOpacity: 0.9 }} />
-          <stop offset="55%" style={{ stopColor: color, stopOpacity: 0.88 }} />
-          <stop offset="100%" style={{ stopColor: color, stopOpacity: 0.96 }} />
-        </linearGradient>
-      ))}
-    </defs>
+    <div className="donut-wrap">
+      <div className="donut-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <defs>
+              {data.map((d) => (
+                <linearGradient key={d.key} id={gradId(prefix, d.key)} x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" style={{ stopColor: `color-mix(in srgb, ${colorOf(d.key)} 72%, white)` }} />
+                  <stop offset="100%" style={{ stopColor: colorOf(d.key) }} />
+                </linearGradient>
+              ))}
+            </defs>
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius="78%" outerRadius="100%" startAngle={90} endAngle={-270}
+              paddingAngle={data.length > 1 ? 3 : 0} minAngle={6} cornerRadius={7} stroke="none"
+              onMouseEnter={(_, i) => setActive(data[i]?.key ?? null)} onMouseLeave={() => setActive(null)}>
+              {data.map((d) => <Cell key={d.key} fill={`url(#${gradId(prefix, d.key)})`} fillOpacity={active && active !== d.key ? 0.25 : 1} style={{ transition: 'fill-opacity .18s ease', outline: 'none' }} />)}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="donut-center">
+          <strong>{format(focused?.value ?? total)}</strong>
+          <span>{focused ? `${focused.name} · ${percent(focused.value, total)}%` : centerLabel}</span>
+        </div>
+      </div>
+      <ul className="donut-legend">
+        {rows.map((d) => {
+          const body = (
+            <>
+              <span className="donut-row-head">
+                <span className="donut-dot" style={{ background: colorOf(d.key) }} />
+                <span className="donut-name">{d.name}</span>
+                <strong>{format(d.value)}</strong>
+                <span className="donut-pct">{percent(d.value, total)}%</span>
+              </span>
+              <span className="donut-track"><span style={{ width: `${percent(d.value, total)}%`, background: colorOf(d.key) }} /></span>
+            </>
+          );
+          const href = hrefOf?.(d);
+          const hover = { onMouseEnter: () => setActive(d.key), onMouseLeave: () => setActive(null) };
+          return <li key={d.key}>{href ? <Link href={href} className="donut-row" {...hover}>{body}</Link> : <div className="donut-row" {...hover}>{body}</div>}</li>;
+        })}
+      </ul>
+    </div>
   );
 }
 
-export const glassTooltip = {
-  contentStyle: {
-    background: 'var(--glass-bg-strong)',
-    WebkitBackdropFilter: 'var(--glass-blur)',
-    backdropFilter: 'var(--glass-blur)',
-    border: '1px solid var(--glass-border)',
-    borderRadius: 14,
-    boxShadow: 'var(--glass-highlight), var(--glass-shadow)',
-    padding: '10px 14px',
-    fontSize: 13,
-  },
-  labelStyle: { color: 'var(--gray-900)', fontWeight: 600, marginBottom: 4 },
-  itemStyle: { color: 'var(--gray-700)', padding: '1px 0' },
-  cursor: { fill: 'var(--glass-bg-soft)', radius: 10 },
-  wrapperStyle: { outline: 'none' },
-};
+export function SeriesLegend({ series, colors }) {
+  return <div className="series-legend">{series.map((k) => <span key={k}><i style={{ background: colors[k] }} />{k}</span>)}</div>;
+}
 
-export const glassLegend = {
-  iconType: 'circle',
-  iconSize: 9,
-  wrapperStyle: { fontSize: 13, paddingTop: 10 },
-  formatter: (value) => <span style={{ color: 'var(--gray-700)', marginRight: 6 }}>{value}</span>,
-};
-
-export const glassAxis = {
-  axisLine: false,
-  tickLine: false,
-  tick: { fontSize: 11.5, fill: 'var(--gray-500)' },
-};
-
-export const glassGrid = { stroke: 'var(--glass-edge)', strokeDasharray: '4 6', vertical: false };
-
-/** Tepi kaca untuk potongan donut/batang. */
-export const glassStroke = { stroke: 'var(--glass-border)', strokeWidth: 1 };
-
-/**
- * Bentuk batang bertumpuk: hanya segmen teratas yang tidak nol yang dibulatkan,
- * sehingga tiap batang terlihat seperti satu kapsul kaca.
- */
-export const stackedBarShape = (key, order) => function StackedBar(props) {
-  const top = [...order].reverse().find((k) => (props.payload?.[k] ?? 0) > 0);
-  return <Rectangle {...props} radius={top === key ? [10, 10, 0, 0] : 0} />;
-};
-
-/** Angka di lubang donut. */
-export function DonutCenter({ value, label }) {
+/** Peringkat per site: batang kapsul bertumpuk, terbesar di atas; site kosong diringkas satu baris. */
+export function SiteBars({ rows, series, colors, hrefOf, format = String }) {
+  const totals = rows.map((r) => ({ ...r, total: series.reduce((a, k) => a + (r.values[k] ?? 0), 0) }));
+  const filled = totals.filter((r) => r.total > 0).sort((a, b) => b.total - a.total);
+  const empty = totals.filter((r) => r.total === 0);
+  const max = filled[0]?.total ?? 1;
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-      <div style={{ textAlign: 'center', marginTop: -28 }}>
-        <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gray-900)', lineHeight: 1.1 }}>{value}</div>
-        <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>{label}</div>
-      </div>
+    <div className="site-bars">
+      {filled.map((r) => (
+        <Link key={r.key} href={hrefOf(r)} className="site-bar-row" title={`${r.label}: ${series.map((k) => `${k} ${r.values[k] ?? 0}`).join(' · ')}`}>
+          <span className="site-bar-code">{r.label}</span>
+          <span className="site-bar-track">
+            <span className="site-bar-fill" style={{ width: `${Math.max((r.total / max) * 100, 4)}%` }}>
+              {series.map((k) => (r.values[k] > 0 ? <span key={k} style={{ flexGrow: r.values[k], background: colors[k] }} /> : null))}
+            </span>
+          </span>
+          <strong>{format(r.total)}</strong>
+        </Link>
+      ))}
+      {filled.length === 0 && <div className="muted">Belum ada personel.</div>}
+      {empty.length > 0 && filled.length > 0 && <div className="site-bars-empty">Belum ada personel: {empty.map((r) => r.label).join(', ')}</div>}
     </div>
   );
 }

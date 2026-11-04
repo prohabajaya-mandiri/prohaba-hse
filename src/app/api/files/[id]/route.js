@@ -14,7 +14,7 @@ import { canReadFieldFile } from '@/lib/services/field-safety';
 import { canReadFitFile } from '@/lib/services/fit-to-work';
 
 // Bukti lapangan (hazard, inspeksi, tindakan korektif, P5M, tes alkohol) adalah catatan K3: tidak dapat dihapus.
-const LOCKED = ['DOCUMENT', 'CSMS_EVIDENCE', 'CSMS_FINDING', 'WORK_PERMIT', 'CAPA', 'HAZARD', 'INSPECTION', 'FIT_SESSION', 'ALCOHOL_TEST'];
+const LOCKED = ['AVATAR', 'DOCUMENT', 'CSMS_EVIDENCE', 'CSMS_FINDING', 'WORK_PERMIT', 'CAPA', 'HAZARD', 'INSPECTION', 'FIT_SESSION', 'ALCOHOL_TEST'];
 
 // Selain sensitivitas & site, file mengikuti hak akses entitas asalnya (dokumen terbatas, bukti CSMS).
 async function entityAllows(user, row) {

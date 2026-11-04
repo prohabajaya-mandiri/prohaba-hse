@@ -30,6 +30,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         isShared: current.isShared,
         operatorId: current.operatorId,
         operatorName: current.operatorName,
+        avatarFileId: current.avatarFileId,
+        themeColor: current.themeColor,
       };
     },
   },

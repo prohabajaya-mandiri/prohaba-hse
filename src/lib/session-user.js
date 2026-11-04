@@ -3,7 +3,7 @@ export async function loadSessionUser(db, id, operatorId) {
   const user = await db.user.findUnique({
     where: { id },
     select: {
-      id: true, name: true, email: true, role: true, region: true, isActive: true, isShared: true, sessionVersion: true,
+      id: true, name: true, email: true, role: true, region: true, isActive: true, isShared: true, sessionVersion: true, avatarFileId: true, themeColor: true,
       sites: { select: { siteId: true } },
     },
   });

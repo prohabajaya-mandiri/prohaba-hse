@@ -18,6 +18,8 @@ export const authConfig = {
         session.user.isShared = Boolean(token.isShared);
         session.user.operatorId = token.operatorId ?? null;
         session.user.operatorName = token.operatorName ?? null;
+        session.user.avatarFileId = token.avatarFileId ?? null;
+        session.user.themeColor = token.themeColor ?? null;
       }
       return session;
     },

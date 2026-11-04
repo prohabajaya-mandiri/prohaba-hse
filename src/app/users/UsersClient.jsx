@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { UserPlus, Edit, KeyRound, Users } from 'lucide-react';
-import { Badge, DataTable, FormFields, Modal, useSubmit } from '@/components/ui';
+import { Badge, DataTable, DeleteButton, FormFields, Modal, useSubmit } from '@/components/ui';
 import { useDialog } from '@/components/DialogProvider';
 import { ROLE_LABELS, ROLES } from '@/lib/access';
 import { formatDate } from '@/lib/dates';
 
 const EMPTY = { name: '', email: '', password: '', role: 'HSE_SITE', region: '', isShared: false, isActive: true, siteIds: [] };
 
-export default function UsersClient({ users, sites }) {
+export default function UsersClient({ users, sites, currentUserId }) {
   const { submit, busy } = useSubmit();
   const { showAlert, showConfirm } = useDialog();
   const [form, setForm] = useState(null);
@@ -81,6 +81,7 @@ export default function UsersClient({ users, sites }) {
                   <button className="btn btn-ghost btn-sm" title="Edit" onClick={() => setForm({ ...EMPTY, ...u, password: '', region: u.region ?? '', siteIds: u.sites.map((s) => s.siteId) })}><Edit size={15} /></button>
                   <button className="btn btn-ghost btn-sm" title="Reset kata sandi" onClick={() => reset(u)}><KeyRound size={15} /></button>
                   {u.isShared && <button className="btn btn-ghost btn-sm" title="Operator" onClick={() => setOps(u)}><Users size={15} /></button>}
+                  {u.id !== currentUserId && <DeleteButton url={`/api/users/${u.id}`} title="Hapus pengguna" message={`Hapus permanen akun ${u.name} (${u.email})? Akun tidak bisa login lagi dan tindakan ini tidak dapat dibatalkan. Riwayat di audit log tetap tersimpan atas namanya. Untuk personel yang hanya berhenti sementara, cukup nonaktifkan lewat Edit.`} success="Pengguna dihapus." />}
                 </div>
               ),
             },

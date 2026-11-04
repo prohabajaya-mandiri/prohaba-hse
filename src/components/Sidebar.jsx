@@ -12,6 +12,7 @@ import {
   TriangleAlert, ClipboardList, ListChecks, UserCheck,
 } from 'lucide-react';
 import { useDialog } from './DialogProvider';
+import UserAvatar from './UserAvatar';
 import { canAccess, ROLE_LABELS } from '@/lib/access';
 import { MODULE_TABS, currentTab, tabsFor } from '@/lib/module-tabs';
 
@@ -72,7 +73,6 @@ const NAV_ITEMS = [
   },
 ];
 
-const initials = (name) => (name || 'U').trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 
 const isActiveHref = (pathname, href) => pathname === href || pathname.startsWith(href + '/');
 
@@ -225,8 +225,8 @@ export default function Sidebar({ user, isOpen, setIsOpen }) {
 
       <div className="sidebar-footer">
         <div className="sidebar-user">
-          <Link href="/account" className="sidebar-user-link" title="Akun & kata sandi">
-            <div className="user-avatar" aria-hidden>{initials(user.operatorName || user.name)}</div>
+          <Link href="/account" className="sidebar-user-link" title="Profil">
+            <UserAvatar name={user.operatorName || user.name} fileId={user.avatarFileId} />
             <div className="user-info">
               <div className="user-name">{user.operatorName || user.name}</div>
               <div className="user-role">

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { applyAccent } from '@/lib/accent';
 
 export default function AppLayout({ children, title, subtitle, user }) {
   const pathname = usePathname();
@@ -16,6 +17,8 @@ export default function AppLayout({ children, title, subtitle, user }) {
     setOpenedAt(pathname);
     if (isSidebarOpen) setIsSidebarOpen(false);
   }
+
+  useEffect(() => applyAccent(user?.themeColor), [user?.themeColor]);
 
   useEffect(() => {
     if (!isSidebarOpen) return;

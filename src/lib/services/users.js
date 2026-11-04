@@ -4,7 +4,11 @@ import { prisma } from '../prisma.js';
 import { ROLES } from '../access.js';
 import { audit, diff } from '../audit.js';
 import { bool, choice, ensure, object, optionalChoice, text } from '../validation.js';
+import { readUpload, storeFile } from '../files.js';
+import { THEME_KEYS } from '../domain/profile.js';
+import { detachFiles, purgeObjects, requireDelete } from './common.js';
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FIELDS = ['name', 'email', 'password', 'role', 'region', 'isShared', 'isActive', 'siteIds'];
 const SELECT = {
   id: true, name: true, email: true, role: true, region: true, isShared: true, isActive: true, lastLoginAt: true, createdAt: true,
@@ -30,7 +34,7 @@ async function parse(body, editing) {
     isShared: bool(body.isShared),
     isActive: body.isActive === undefined ? true : bool(body.isActive),
   };
-  ensure(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email), 'Email tidak valid.');
+  ensure(EMAIL.test(data.email), 'Email tidak valid.');
   ensure(!data.isShared || data.role === 'HSE_SITE', 'Akun bersama hanya untuk HSE Site.');
   const siteIds = Array.isArray(body.siteIds) ? [...new Set(body.siteIds.filter((s) => typeof s === 'string'))] : [];
   if (['HSE_SITE', 'PJO'].includes(data.role)) ensure(siteIds.length > 0, 'Pilih minimal satu site untuk peran ini.');
@@ -70,6 +74,23 @@ export async function updateUser(id, body, actor) {
   });
 }
 
+// Riwayat tetap utuh: audit log menyimpan nama pelaku, kolom pembuat bukan foreign key.
+export async function deleteUser(id, actor) {
+  requireDelete(actor);
+  ensure(id !== actor.id, 'Anda tidak dapat menghapus akun sendiri.');
+  let keys = [];
+  await prisma.$transaction(async (tx) => {
+    const before = await tx.user.findUnique({ where: { id }, select: SELECT });
+    ensure(before, 'Pengguna tidak ditemukan.', 404);
+    keys = await detachFiles(tx, 'AVATAR', id);
+    await tx.user.delete({ where: { id } });
+    const { operators, sites, ...rest } = before;
+    await audit(tx, actor, { action: 'DELETE', module: 'users', recordId: id, before: { ...rest, siteIds: sites.map((s) => s.siteId), operators: operators.map((o) => o.name) } });
+  });
+  await purgeObjects(keys);
+  return { ok: true };
+}
+
 // Reset akses: kata sandi sementara ditampilkan sekali kepada HO HSE.
 export async function resetPassword(id, actor) {
   const temp = randomBytes(9).toString('base64url');
@@ -102,6 +123,57 @@ export async function saveOperator(userId, body, actor) {
     await audit(tx, actor, { action: body.id ? 'UPDATE' : 'CREATE', module: 'users', recordId: userId, note: 'Operator akun bersama: ' + name });
     return op;
   });
+}
+
+// Email adalah kunci login, jadi mengubahnya wajib mengonfirmasi kata sandi.
+export async function updateProfile(user, body) {
+  object(body, ['name', 'email', 'currentPassword']);
+  ensure(!user.isShared, 'Profil akun bersama diatur oleh HO HSE.');
+  const data = { name: text(body.name, 'Nama', 120), email: text(body.email, 'Email', 254).toLowerCase() };
+  ensure(EMAIL.test(data.email), 'Email tidak valid.');
+  const row = await prisma.user.findUnique({ where: { id: user.id }, select: { name: true, email: true, password: true } });
+  ensure(row, 'Pengguna tidak ditemukan.', 404);
+  if (data.email !== row.email) {
+    ensure(await bcrypt.compare(String(body.currentPassword ?? ''), row.password), 'Kata sandi salah. Email tidak diubah.');
+    ensure(!(await prisma.user.findUnique({ where: { email: data.email }, select: { id: true } })), 'Email sudah dipakai akun lain.', 409);
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data });
+    const d = diff({ name: row.name, email: row.email }, data);
+    await audit(tx, user, { action: 'UPDATE', module: 'account', recordId: user.id, before: d.before, after: d.after, note: 'Ubah profil sendiri' });
+  });
+  return { ok: true };
+}
+
+export async function setTheme(user, body) {
+  object(body, ['color']);
+  await prisma.user.update({ where: { id: user.id }, data: { themeColor: choice(body.color, THEME_KEYS, 'Warna tema') } });
+  return { ok: true };
+}
+
+export async function setAvatar(user, file) {
+  const upload = await readUpload(file);
+  ensure(upload.mimeType.startsWith('image/'), 'Foto profil harus berupa gambar.');
+  const data = await storeFile(upload, { entityType: 'AVATAR', entityId: user.id, uploadedBy: user.id });
+  let keys = [];
+  const row = await prisma.$transaction(async (tx) => {
+    keys = await detachFiles(tx, 'AVATAR', user.id);
+    const created = await tx.fileObject.create({ data, select: { id: true } });
+    await tx.user.update({ where: { id: user.id }, data: { avatarFileId: created.id } });
+    return created;
+  });
+  await purgeObjects(keys);
+  return { avatarFileId: row.id };
+}
+
+export async function removeAvatar(user) {
+  let keys = [];
+  await prisma.$transaction(async (tx) => {
+    keys = await detachFiles(tx, 'AVATAR', user.id);
+    await tx.user.update({ where: { id: user.id }, data: { avatarFileId: null } });
+  });
+  await purgeObjects(keys);
+  return { ok: true };
 }
 
 export async function changeOwnPassword(user, body) {
