@@ -13,9 +13,10 @@ export default async function DashboardPage({ searchParams }) {
   await maybeRunReminders();
   const [sites, data] = await Promise.all([scopedSites(user), dashboard(user, q)]);
   const allSites = siteScope(user) === null;
+  const subtitle = `${ROLE_LABELS[user.role]} · ${allSites ? 'seluruh site' : sites.map((s) => s.code).join(', ') || 'tanpa site'}`;
   return (
-    <AppLayout title={allSites ? 'Dashboard Head Office' : 'Dashboard Site'} subtitle={`${ROLE_LABELS[user.role]} · ${allSites ? 'seluruh site' : sites.map((s) => s.code).join(', ') || 'tanpa site'}`} user={user}>
-      <DashboardClient sites={sites} data={data} />
+    <AppLayout title={allSites ? 'Dashboard Head Office' : 'Dashboard Site'} subtitle={subtitle} user={user}>
+      <DashboardClient sites={sites} data={data} userName={user.operatorName || user.name} scope={subtitle} />
     </AppLayout>
   );
 }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Users, HardHat, Building, HeartPulse, BadgeCheck, CalendarClock, Clock, Siren, FileWarning, Activity } from 'lucide-react';
 import { Card, DataTable, FilterBar, Kpi } from '@/components/ui';
 import { DonutBreakdown, SeriesLegend, SiteBars } from '@/components/charts';
+import WelcomeHero from './WelcomeHero';
 import { formatDate } from '@/lib/dates';
 import { fmtNum, labelOf } from '@/lib/labels';
 import { CATEGORIES, WORK_STATUSES } from '@/lib/domain/personnel';
@@ -14,13 +15,14 @@ const FIT_COLORS = { FIT: 'var(--brand-600)', FOLLOW_UP: '#d4a73a', UNFIT: '#c24
 const SITE_ORDER = ['Staff', 'Harian Mandor', 'Harian Kantor'];
 const SITE_COLORS = { Staff: 'var(--brand-600)', 'Harian Mandor': 'var(--brand-400)', 'Harian Kantor': 'var(--brand-300)' };
 
-export default function DashboardClient({ sites, data }) {
+export default function DashboardClient({ sites, data, userName, scope }) {
   const statusData = WORK_STATUSES.map((s) => ({ name: labelOf(s), value: data.totals.statuses[s] ?? 0, key: s })).filter((x) => x.value);
   const fitData = Object.entries(data.fitness).map(([k, v]) => ({ name: labelOf(k), value: v, key: k }));
   const siteChart = data.perSite.map((s) => ({ key: s.site.id, label: s.site.code, values: { Staff: s.categories.STAFF ?? 0, 'Harian Mandor': s.categories.MANPOWER ?? 0, 'Harian Kantor': s.categories.HARIAN_KANTOR ?? 0 } }));
 
   return (
     <div className="stack">
+      <WelcomeHero name={userName} scope={scope} />
       <FilterBar filters={[
         { name: 'siteId', label: 'Site', type: 'select', options: sites.map((s) => [s.id, s.code]), allLabel: sites.length > 1 ? 'Semua site' : 'Site saya' },
         { name: 'category', label: 'Kategori', type: 'select', options: CATEGORIES },

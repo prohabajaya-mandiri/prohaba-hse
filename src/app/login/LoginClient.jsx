@@ -5,9 +5,12 @@ import Image from 'next/image';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { LogIn, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import LiveClock, { useNow } from '@/components/LiveClock';
+import { greetingFor } from '@/lib/domain/greeting';
 
 export default function LoginClient() {
   const router = useRouter();
+  const now = useNow();
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,8 +37,9 @@ export default function LoginClient() {
         <div className="login-logo">
           <Image src="/brand/prohaba-hse-logo.png" alt="Prohaba Jaya Mandiri — Utamakan Keselamatan dan Kesehatan Kerja" width={206} height={96} priority />
         </div>
-        <h1 className="login-title">E-HSE Prohaba</h1>
-        <p className="login-desc">Masuk untuk melanjutkan</p>
+        <LiveClock now={now} className="login-clock" />
+        <h1 className="login-title">{now ? greetingFor(now.getHours()) : 'Selamat datang'}, rekan HSE</h1>
+        <p className="login-desc">Masuk ke E-HSE Prohaba dan utamakan keselamatan hari ini</p>
 
         {error && (
           <div role="alert" className="alert alert-danger" style={{ marginBottom: 18 }}>

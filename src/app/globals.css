@@ -1848,3 +1848,87 @@ tbody tr:hover { background: var(--glass-bg-soft); }
   --accent-100: var(--brand-100);
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-base) 45%, transparent);
 }
+
+/* ─── Sapaan dashboard & login ──────────────────────────────────────────── */
+.live-clock-time { display: flex; align-items: baseline; gap: 2px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.02em; }
+.live-clock-time i { font-style: normal; font-weight: 500; opacity: 0.75; animation: clock-blink 2s steps(1) infinite; }
+.live-clock-time small { margin-left: 6px; font-size: 0.42em; font-weight: 600; opacity: 0.8; }
+.live-clock-time em { margin-left: 6px; font-size: 0.3em; font-style: normal; font-weight: 600; letter-spacing: 0.04em; opacity: 0.75; }
+.live-clock-date { margin-top: 8px; font-size: 13.5px; opacity: 0.85; }
+.live-clock-date strong { display: block; font-size: 15px; font-weight: 600; }
+@keyframes clock-blink { 50% { opacity: 0.25; } }
+
+.welcome-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px 40px;
+  padding: 30px 34px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  color: #fff;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--brand-600) 60%, black), var(--brand-600) 55%, color-mix(in srgb, var(--brand-600) 82%, white));
+  background-size: 180% 180%;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 18px 40px -20px color-mix(in srgb, var(--brand-600) 80%, transparent);
+  animation: hero-pan 16s ease-in-out infinite alternate, hero-rise .6s cubic-bezier(.2, .7, .2, 1) both;
+}
+.hero-glow { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.hero-glow span { position: absolute; border-radius: 50%; filter: blur(46px); }
+.hero-glow span:nth-child(1) { width: 300px; height: 300px; left: -70px; top: -140px; background: rgb(255 255 255 / 0.2); animation: hero-float 13s ease-in-out infinite alternate; }
+.hero-glow span:nth-child(2) { width: 240px; height: 240px; right: 16%; bottom: -150px; background: rgb(248 160 24 / 0.32); animation: hero-float 17s ease-in-out infinite alternate-reverse; }
+.hero-glow span:nth-child(3) { width: 180px; height: 180px; right: -40px; top: -60px; background: rgb(255 255 255 / 0.14); animation: hero-float 11s ease-in-out infinite alternate; }
+
+.hero-shield { position: absolute; z-index: -1; right: 300px; top: 50%; width: 110px; height: 110px; margin-top: -55px; display: grid; place-items: center; color: rgb(255 255 255 / 0.5); pointer-events: none; }
+.hero-shield i { position: absolute; inset: 0; border: 1px solid rgb(255 255 255 / 0.4); border-radius: 50%; animation: hero-ping 4s ease-out infinite; }
+.hero-shield i:nth-child(2) { animation-delay: 2s; }
+
+.hero-main { flex: 1 1 380px; min-width: 0; max-width: 680px; }
+.hero-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+.hero-title { margin-top: 8px; font-size: clamp(23px, 3vw, 31px); font-weight: 700; line-height: 1.2; color: #fff; letter-spacing: -0.01em; }
+.hero-scope { margin-top: 4px; font-size: 14px; opacity: 0.85; }
+.hero-quote { display: flex; gap: 10px; margin-top: 16px; padding: 11px 15px; max-width: 600px; border-radius: 14px; background: rgb(255 255 255 / 0.13); border: 1px solid rgb(255 255 255 / 0.16); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.hero-quote svg { flex-shrink: 0; margin-top: 2px; opacity: 0.75; }
+.hero-quote-label { font-size: 11.5px; font-weight: 600; opacity: 0.8; }
+.hero-quote p { margin-top: 2px; font-size: 14.5px; line-height: 1.45; font-weight: 500; }
+.hero-clock { flex: none; text-align: right; }
+.hero-clock .live-clock-time { justify-content: flex-end; font-size: 50px; }
+
+.hero-in { animation: hero-rise .6s cubic-bezier(.2, .7, .2, 1) both; }
+.hero-title.hero-in { animation-delay: .08s; }
+.hero-scope.hero-in { animation-delay: .16s; }
+.hero-quote.hero-in { animation-delay: .24s; }
+.hero-clock.hero-in { animation-delay: .2s; }
+@keyframes hero-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes hero-pan { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@keyframes hero-float { to { transform: translate(44px, 22px) scale(1.14); } }
+@keyframes hero-ping { from { transform: scale(0.7); opacity: 0.8; } to { transform: scale(1.5); opacity: 0; } }
+
+/* Tanggal di header sudah terwakili jam pada sapaan. */
+.app-layout:has(.welcome-hero) .header-date { display: none; }
+
+@media (max-width: 1180px) { .hero-shield { display: none; } }
+@media (max-width: 640px) {
+  .welcome-hero { padding: 22px 20px; }
+  .hero-clock { width: 100%; text-align: left; }
+  .hero-clock .live-clock-time { justify-content: flex-start; font-size: 40px; }
+}
+
+.login-page { position: relative; overflow: hidden; isolation: isolate; }
+.login-page::before, .login-page::after { content: ""; position: absolute; z-index: -1; border-radius: 50%; filter: blur(60px); pointer-events: none; }
+.login-page::before { width: 420px; height: 420px; left: -120px; top: -120px; background: color-mix(in srgb, var(--brand-400) 45%, transparent); animation: hero-float 14s ease-in-out infinite alternate; }
+.login-page::after { width: 340px; height: 340px; right: -100px; bottom: -110px; background: rgb(248 160 24 / 0.22); animation: hero-float 18s ease-in-out infinite alternate-reverse; }
+.login-card { animation: hero-rise .6s cubic-bezier(.2, .7, .2, 1) both; }
+.login-clock { margin: 2px 0 18px; padding: 14px 16px; border-radius: 16px; text-align: center; color: #fff; background: linear-gradient(120deg, color-mix(in srgb, var(--brand-600) 70%, black), var(--brand-600) 70%, color-mix(in srgb, var(--brand-600) 85%, white)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22); }
+.login-clock .live-clock-time { justify-content: center; font-size: 38px; }
+.login-clock .live-clock-date { margin-top: 6px; }
+.login-clock .live-clock-date strong { display: inline; font-size: 13.5px; }
+.login-clock .live-clock-date strong::after { content: ", "; }
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-hero, .hero-in, .login-card, .hero-glow span, .hero-shield i, .live-clock-time i, .login-page::before, .login-page::after { animation: none; }
+  .hero-shield i { opacity: 0.3; }
+}
