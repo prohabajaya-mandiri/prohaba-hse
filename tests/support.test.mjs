@@ -8,3 +8,7 @@ test('Pusat Bantuan hanya untuk HO HSE; semua peran dapat mengirim aduan', () =>
     assert.equal(canAccess(role, '/api/support', 'POST'), true, role);
   }
 });
+
+test('HSE Site dapat melengkapi data site; peran lain hanya membaca', () => {
+  for (const role of ROLES) assert.equal(canAccess(role, '/api/sites/abc/projects', 'POST'), ['HO_HSE', 'HSE_SITE'].includes(role), role);
+});

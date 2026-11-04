@@ -21,7 +21,8 @@ export const MODULES = {
   support: { read: ALL, write: ALL },
   approvals: { read: ALL, write: ALL },
   files: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD'] },
-  sites: { read: ALL, write: ['HO_HSE'] },
+  // HSE Site melengkapi data site sendiri (cakupan dicek di service); kode, status & hapus site tetap HO HSE.
+  sites: { read: ALL, write: ['HO_HSE', 'HSE_SITE'] },
   personnel: { read: ALL, write: ['HO_HSE', 'HSE_SITE', 'HRD'] },
   // Verifikasi pendaftaran mandiri pegawai baru (form publik /daftar).
   registrations: { read: ['HO_HSE', 'HRD'], write: ['HO_HSE', 'HRD'] },

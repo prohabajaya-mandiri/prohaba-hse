@@ -10,7 +10,7 @@ import { labelOf } from '@/lib/labels';
 const ROLE_NAMES = { PJO: 'PJO', PM: 'PM', HSE_SITE: 'HSE Site', SAFETY_OFFICER: 'Safety Officer' };
 const TIMEZONES = [['Asia/Jakarta', 'WIB (Asia/Jakarta)'], ['Asia/Makassar', 'WITA (Asia/Makassar)'], ['Asia/Jayapura', 'WIT (Asia/Jayapura)']];
 
-export default function SitesClient({ sites, canEdit }) {
+export default function SitesClient({ sites, canEdit, canMaster }) {
   const { submit, busy } = useSubmit();
   const { showConfirm } = useDialog();
   const [siteForm, setSiteForm] = useState(null);
@@ -24,7 +24,8 @@ export default function SitesClient({ sites, canEdit }) {
 
   const saveSite = async (e) => {
     e.preventDefault();
-    const { id, ...body } = siteForm;
+    const { id, location, timezone, ...rest } = siteForm;
+    const body = canMaster ? { location, timezone, ...rest } : { location, timezone };
     if (await submit(id ? `/api/sites/${id}` : '/api/sites', { method: id ? 'PUT' : 'POST', body })) setSiteForm(null);
   };
   // Hanya field form yang dikirim; objek site dari daftar juga memuat proyek, penanggung jawab, dll.
@@ -63,8 +64,8 @@ export default function SitesClient({ sites, canEdit }) {
   return (
     <div className="stack">
       <div className="toolbar">
-        <div className="notice info" style={{ flex: 1 }}>Referensi awal site perlu diverifikasi ulang status aktifnya saat implementasi.</div>
-        {canEdit && <button className="btn btn-primary" onClick={() => setSiteForm({ code: '', name: '', location: '', region: 'TIMUR', timezone: '', isHo: false, isActive: true })}><Plus size={17} /> Tambah site</button>}
+        <div className="notice info" style={{ flex: 1 }}>{canMaster ? 'Referensi awal site perlu diverifikasi ulang status aktifnya saat implementasi.' : 'Klik baris site untuk melengkapi lokasi, proyek, dan penanggung jawab seperti PJO dan PM.'}</div>
+        {canMaster && <button className="btn btn-primary" onClick={() => setSiteForm({ code: '', name: '', location: '', region: 'TIMUR', timezone: '', isHo: false, isActive: true })}><Plus size={17} /> Tambah site</button>}
       </div>
       <div className="card">
         <DataTable
@@ -89,10 +90,10 @@ export default function SitesClient({ sites, canEdit }) {
           <div className="stack">
             {canEdit && (
               <div className="row-actions" style={{ justifyContent: 'flex-start' }}>
-                <button className="btn btn-outline btn-sm" onClick={() => editSite(detail)}><Edit size={15} /> Edit site</button>
+                <button className="btn btn-outline btn-sm" onClick={() => editSite(detail)}><Edit size={15} /> {canMaster ? 'Edit site' : 'Edit lokasi'}</button>
                 <button className="btn btn-outline btn-sm" onClick={() => setProjectForm({ siteId: detail.id, name: '', owner: '', contractNo: '', startDate: '', endDate: '', status: 'ACTIVE', notes: '' })}><Briefcase size={15} /> Tambah proyek</button>
                 <button className="btn btn-outline btn-sm" onClick={() => setRespForm({ siteId: detail.id, role: 'PJO', name: '', phone: '', email: '', competency: '', approvalNo: '', approvalDate: '', startDate: todayIso() })}><UserCheck size={15} /> Ganti penanggung jawab</button>
-                <button className="btn btn-outline btn-sm text-red" disabled={busy || detail._count.placements > 0} title={detail._count.placements > 0 ? 'Site memiliki personel aktif — nonaktifkan saja' : 'Hanya untuk site yang belum pernah dipakai'} onClick={() => removeSite(detail)}><Trash2 size={15} /> Hapus site</button>
+                {canMaster && <button className="btn btn-outline btn-sm text-red" disabled={busy || detail._count.placements > 0} title={detail._count.placements > 0 ? 'Site memiliki personel aktif — nonaktifkan saja' : 'Hanya untuk site yang belum pernah dipakai'} onClick={() => removeSite(detail)}><Trash2 size={15} /> Hapus site</button>}
               </div>
             )}
             <Card title="Riwayat proyek" padding={0}>
@@ -122,19 +123,19 @@ export default function SitesClient({ sites, canEdit }) {
         )}
       </Modal>
 
-      <Modal open={Boolean(siteForm)} onClose={() => setSiteForm(null)} title={siteForm?.id ? 'Edit site' : 'Tambah site'}>
+      <Modal open={Boolean(siteForm)} onClose={() => setSiteForm(null)} title={!canMaster ? 'Edit lokasi site' : siteForm?.id ? 'Edit site' : 'Tambah site'}>
         {siteForm && (
           <form onSubmit={saveSite}>
             <FormFields values={siteForm} setValues={setSiteForm} fields={[
-              { name: 'code', label: 'Kode site', required: true },
-              { name: 'name', label: 'Nama site', required: true },
+              { name: 'code', label: 'Kode site', required: true, hidden: () => !canMaster },
+              { name: 'name', label: 'Nama site', required: true, hidden: () => !canMaster },
               { name: 'location', label: 'Lokasi', span: true },
-              { name: 'region', label: 'Wilayah', type: 'select', options: [['TIMUR', 'Timur'], ['BARAT', 'Barat'], ['HO', 'Head Office']], required: true, noEmpty: true },
+              { name: 'region', label: 'Wilayah', type: 'select', options: [['TIMUR', 'Timur'], ['BARAT', 'Barat'], ['HO', 'Head Office']], required: true, noEmpty: true, hidden: () => !canMaster },
               { name: 'timezone', label: 'Zona waktu (tenggat CSMS)', type: 'select', options: TIMEZONES, hint: 'Kosong = WIB (zona aplikasi).' },
-              { name: 'isHo', label: 'Head Office', type: 'checkbox' },
-              { name: 'isActive', label: 'Site aktif', type: 'checkbox' },
+              { name: 'isHo', label: 'Head Office', type: 'checkbox', hidden: () => !canMaster },
+              { name: 'isActive', label: 'Site aktif', type: 'checkbox', hidden: () => !canMaster },
             ]} />
-            {siteForm.id && <div className="notice" style={{ marginBottom: 12 }}>Perubahan nama/kode tercatat di audit log dan langsung berlaku di seluruh data site ini. Site yang tidak dipakai lagi cukup dinonaktifkan agar riwayatnya tetap utuh.</div>}
+            {siteForm.id && canMaster && <div className="notice" style={{ marginBottom: 12 }}>Perubahan nama/kode tercatat di audit log dan langsung berlaku di seluruh data site ini. Site yang tidak dipakai lagi cukup dinonaktifkan agar riwayatnya tetap utuh.</div>}
             <button className="btn btn-primary" disabled={busy}>Simpan</button>
           </form>
         )}

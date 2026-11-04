@@ -1,7 +1,7 @@
 import AppLayout from '@/components/AppLayout';
 import { requirePage } from '@/lib/page';
 import { listSites } from '@/lib/services/sites';
-import { canManageMaster } from '@/lib/access';
+import { canManageMaster, canWrite } from '@/lib/access';
 import SitesClient from './SitesClient';
 
 export const metadata = { title: 'Site & Proyek' };
@@ -11,7 +11,7 @@ export default async function SitesPage() {
   const sites = await listSites(user);
   return (
     <AppLayout title="Master Site & Proyek" subtitle="Referensi site, proyek, owner dan penanggung jawab" user={user}>
-      <SitesClient sites={sites} canEdit={canManageMaster(user)} />
+      <SitesClient sites={sites} canEdit={canWrite(user.role, 'sites')} canMaster={canManageMaster(user)} />
     </AppLayout>
   );
 }

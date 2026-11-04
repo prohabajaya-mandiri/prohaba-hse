@@ -1,5 +1,5 @@
 import { prisma } from '../prisma.js';
-import { siteScope } from '../access.js';
+import { canManageMaster, siteScope } from '../access.js';
 import { audit, diff } from '../audit.js';
 import { addDays } from '../dates.js';
 import { bool, choice, date, ensure, object, optionalChoice, optionalDate, optionalId, text } from '../validation.js';
@@ -34,7 +34,28 @@ function parseSite(body) {
   };
 }
 
+/** Data yang dilengkapi HSE Site; identitas site (kode, nama, wilayah, status) tetap diatur HO HSE. */
+function parseSiteDetails(body) {
+  object(body, ['location', 'timezone']);
+  return { location: text(body.location, 'Lokasi', 200, true), timezone: optionalChoice(body.timezone, Object.keys(SITE_TIMEZONES), 'Zona waktu') };
+}
+
+async function saveSiteDetails(user, id, body) {
+  ensure(id, 'Site baru ditambahkan oleh HO HSE.', 403);
+  requireSite(user, id);
+  const data = parseSiteDetails(body);
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.site.findUnique({ where: { id } });
+    ensure(before, 'Site tidak ditemukan.', 404);
+    const site = await tx.site.update({ where: { id }, data });
+    const d = diff(before, data);
+    if (d.changed) await audit(tx, user, { action: 'UPDATE', module: 'sites', recordId: id, siteId: id, ...d });
+    return site;
+  });
+}
+
 export async function saveSite(user, id, body) {
+  if (!canManageMaster(user)) return saveSiteDetails(user, id, body);
   const data = parseSite(body);
   return prisma.$transaction(async (tx) => {
     const dup = await tx.site.findUnique({ where: { code: data.code }, select: { id: true, name: true } });
@@ -65,6 +86,7 @@ const SITE_USAGE = {
 
 /** Hapus permanen hanya untuk site yang belum pernah dipakai (mis. salah input). */
 export async function deleteSite(user, id) {
+  ensure(canManageMaster(user), 'Site hanya dapat dihapus oleh HO HSE.', 403);
   return prisma.$transaction(async (tx) => {
     const site = await tx.site.findUnique({
       where: { id },
