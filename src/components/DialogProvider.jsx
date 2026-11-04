@@ -26,11 +26,16 @@ export default function DialogProvider({ children }) {
     addDialog({ type: 'prompt', title, message, resolve, promptValue: defaultValue });
   }), []);
 
+  /** Tiga pilihan: mengembalikan 'primary', 'secondary', atau null bila dibatalkan. */
+  const showChoice = useCallback((message, title, { primary, secondary }) => new Promise((resolve) => {
+    addDialog({ type: 'choice', title, message, resolve, primary, secondary });
+  }), []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (dialogs.length === 0 || e.key !== 'Escape') return;
       const top = dialogs[dialogs.length - 1];
-      top.resolve(top.type === 'prompt' ? null : false);
+      top.resolve(top.type === 'prompt' || top.type === 'choice' ? null : false);
       removeDialog(top.id);
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -38,7 +43,7 @@ export default function DialogProvider({ children }) {
   }, [dialogs]);
 
   return (
-    <DialogContext.Provider value={{ showAlert, showConfirm, showPrompt }}>
+    <DialogContext.Provider value={{ showAlert, showChoice, showConfirm, showPrompt }}>
       {children}
       {dialogs.map((dialog, index) => (
         <DialogItem
@@ -55,7 +60,7 @@ export default function DialogProvider({ children }) {
 // Nada ikon mengikuti judul yang dipakai halaman: "Sukses"/"Berhasil" hijau,
 // "Error"/"Gagal" merah, konfirmasi oranye, sisanya biru.
 function toneOf(dialog) {
-  if (dialog.type === 'confirm') return { Icon: HelpCircle, color: 'var(--accent-600)', bg: 'var(--accent-50)' };
+  if (dialog.type === 'confirm' || dialog.type === 'choice') return { Icon: HelpCircle, color: 'var(--accent-600)', bg: 'var(--accent-50)' };
   if (dialog.type === 'prompt') return { Icon: PencilLine, color: 'var(--brand-600)', bg: 'var(--brand-50)' };
   const t = String(dialog.title).toLowerCase();
   if (/sukses|berhasil/.test(t)) return { Icon: CheckCircle2, color: 'var(--green-600)', bg: 'var(--green-50)' };
@@ -74,12 +79,17 @@ function DialogItem({ dialog, isTop, onClose }) {
   }, [dialog.type]);
 
   const handleConfirm = () => {
-    dialog.resolve(dialog.type === 'prompt' ? inputValue : true);
+    dialog.resolve(dialog.type === 'prompt' ? inputValue : dialog.type === 'choice' ? 'primary' : true);
     onClose();
   };
 
   const handleCancel = () => {
-    dialog.resolve(dialog.type === 'prompt' ? null : false);
+    dialog.resolve(dialog.type === 'prompt' || dialog.type === 'choice' ? null : false);
+    onClose();
+  };
+
+  const handleSecondary = () => {
+    dialog.resolve('secondary');
     onClose();
   };
 
@@ -113,13 +123,14 @@ function DialogItem({ dialog, isTop, onClose }) {
           {dialog.type !== 'alert' && (
             <button type="button" className="btn btn-outline" onClick={handleCancel}>Batal</button>
           )}
+          {dialog.type === 'choice' && <button type="button" className="btn btn-ghost" onClick={handleSecondary}>{dialog.secondary}</button>}
           <button
             ref={confirmRef}
             type="button"
             className={`btn ${destructive ? 'btn-danger' : 'btn-primary'}`}
             onClick={handleConfirm}
           >
-            {dialog.type === 'alert' ? 'Mengerti' : dialog.type === 'prompt' ? 'Simpan' : 'Ya, lanjutkan'}
+            {dialog.type === 'choice' ? dialog.primary : dialog.type === 'alert' ? 'Mengerti' : dialog.type === 'prompt' ? 'Simpan' : 'Ya, lanjutkan'}
           </button>
         </div>
       </div>

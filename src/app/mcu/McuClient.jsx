@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Edit, GitBranchPlus, ArrowRight } from 'lucide-react';
 import { Badge, DataTable, DeleteButton, FileInput, FileLinks, FilterBar, FormFields, Modal, Pager, useSubmit } from '@/components/ui';
+import { useDialog } from '@/components/DialogProvider';
 import { formatDate, iso, todayIso } from '@/lib/dates';
 import { firstStage, FU_DOCTOR_SLOTS, FU_DOCTORS, MCU_RESULTS, MCU_STAGES, MCU_STAGE_LABELS, MCU_TYPES, MCU_TYPE_LABELS, nextStage, planMcu, reachedFields, stepFields } from '@/lib/domain/mcu';
 
@@ -49,6 +50,8 @@ function DueBadge({ due, label }) {
 
 export default function McuClient({ sites, data, page, canEdit, canDelete, preselect }) {
   const { submit, busy } = useSubmit();
+  const { showAlert, showChoice } = useDialog();
+  const stepForm = useRef(null);
   const [form, setForm] = useState(preselect && canEdit ? { ...EMPTY, personnelId: preselect } : null);
   const [step, setStep] = useState(null);
   const [files, setFiles] = useState([]);
@@ -70,9 +73,9 @@ export default function McuClient({ sites, data, page, canEdit, canDelete, prese
   const openStep = (row) => {
     setFiles([]);
     setDetail(null);
-    const keys = stepFields(row.stage, nextStage(row)).filter((k) => k !== 'notes' || row.canMedical);
+    const keys = stepFields(row.stage, nextStage(row)).filter((k) => k !== 'notes' || row.canMedical !== false);
     const vals = Object.fromEntries(keys.map((k) => [k, EVENT_DATES.includes(k) ? (d(row, k) && d(row, k) <= todayIso() ? d(row, k) : todayIso()) : '']));
-    setStep({ id: row.id, personName: row.personnel.name, row: { stage: row.stage, type: row.type, result: row.result }, from: row.stage, keys, screeningDate: d(row, 'screeningDate'), mcuDate: d(row, 'mcuDate'), resultDate: d(row, 'resultDate'), submitDate: d(row, 'submitDate'), ...vals, ...doctorValues() });
+    setStep({ id: row.id, personName: row.personnel.name, canMedical: row.canMedical, row: { stage: row.stage, type: row.type, result: row.result }, from: row.stage, keys, screeningDate: d(row, 'screeningDate'), mcuDate: d(row, 'mcuDate'), resultDate: d(row, 'resultDate'), submitDate: d(row, 'submitDate'), ...vals, ...doctorValues() });
   };
   // Tahap tujuan; setelah dikirim ke Paramedic bergantung pada hasil yang dipilih di langkah ini.
   const stepTo = (s) => (s.from === 'FEEDBACK' ? (s.result ? nextStage({ ...s.row, result: s.result }) : null) : nextStage(s.row));
@@ -98,13 +101,36 @@ export default function McuClient({ sites, data, page, canEdit, canDelete, prese
     }
     const dateKey = firstStage(form.type) === 'SCREENING' ? 'screeningDate' : 'mcuDate';
     const body = { personnelId: form.personnelId, type: form.type, clinic: form.clinic, cost: form.cost, [dateKey]: form[dateKey], ...(form.parentId ? { parentId: form.parentId } : {}) };
-    if (await send('/api/mcu', body)) setForm(null);
+    const row = await send('/api/mcu', body);
+    if (!row) return;
+    setForm(null);
+    openStep(row);
   };
 
-  const saveStep = async (e) => {
+  // Setiap tahap langsung tersimpan; jendela berlanjut ke tahap berikutnya sampai MCU selesai.
+  const advance = async ({ exit = false } = {}) => {
+    const { personName, canMedical } = step;
+    const row = await send(`/api/mcu/${step.id}/advance`, { stage: stepTo(step), ...bodyFor(step.keys, step) });
+    if (!row) return;
+    if (!exit && nextStage(row)) return openStep({ ...row, personnel: { name: personName }, canMedical });
+    setStep(null);
+    if (!exit) await showAlert(`Seluruh tahap MCU ${personName} sudah selesai.`, 'Berhasil');
+  };
+
+  const saveStep = (e) => {
     e.preventDefault();
-    const body = { stage: stepTo(step), ...bodyFor(step.keys, step) };
-    if (await send(`/api/mcu/${step.id}/advance`, body)) setStep(null);
+    advance();
+  };
+
+  // Tombol X satu-satunya jalan keluar sebelum selesai; tahap yang sudah disimpan tetap tercatat.
+  const askExit = async () => {
+    const choice = await showChoice(
+      `Progress ${step.personName} sudah tersimpan sampai tahap ${MCU_STAGE_LABELS[step.from]} dan bisa dilanjutkan nanti lewat detail MCU. Simpan juga isian tahap ini sebelum keluar?`,
+      'Simpan sebelum keluar?',
+      { primary: 'Simpan & keluar', secondary: 'Keluar tanpa simpan' },
+    );
+    if (choice === 'secondary') setStep(null);
+    else if (choice === 'primary' && stepForm.current?.reportValidity()) advance({ exit: true });
   };
 
   const defs = (v) => fieldDefs(cfg, v);
@@ -186,7 +212,7 @@ export default function McuClient({ sites, data, page, canEdit, canDelete, prese
       </Modal>
 
       <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.id ? `Koreksi data MCU — ${form.personName}` : form?.parentId ? `Follow Up — ${form.personName}` : 'Input MCU'}
-        subtitle={form?.id ? `Tahap saat ini: ${MCU_STAGE_LABELS[form.stage]}. Hanya data tahap yang sudah dilalui yang bisa dikoreksi; perubahan dicatat di audit log.` : 'Isi data tahap pertama. Tahap berikutnya diisi bertahap dari detail MCU (tombol Lanjut).'} size="modal-lg">
+        subtitle={form?.id ? `Tahap saat ini: ${MCU_STAGE_LABELS[form.stage]}. Hanya data tahap yang sudah dilalui yang bisa dikoreksi; perubahan dicatat di audit log.` : 'Isi data tahap pertama. Setelah disimpan, jendela berlanjut ke tahap berikutnya.'} size="modal-lg">
         {form && (
           <form onSubmit={save} className="stack">
             {form.id ? (
@@ -214,10 +240,10 @@ export default function McuClient({ sites, data, page, canEdit, canDelete, prese
         )}
       </Modal>
 
-      <Modal open={Boolean(step)} onClose={() => setStep(null)} title={step ? `${MCU_STAGE_LABELS[step.from]} → ${step.from === 'FEEDBACK' ? 'Hasil dari Paramedic' : MCU_STAGE_LABELS[stepTo(step)]} — ${step.personName}` : ''}
+      <Modal open={Boolean(step)} onClose={askExit} locked title={step ? `${MCU_STAGE_LABELS[step.from]} → ${step.from === 'FEEDBACK' ? 'Hasil dari Paramedic' : MCU_STAGE_LABELS[stepTo(step)]} — ${step.personName}` : ''}
         subtitle={step && !step.keys.length ? `Konfirmasi bahwa tahap ${MCU_STAGE_LABELS[step.from]} sudah selesai.` : 'Isi data tahap ini. Tanggal tidak boleh setelah hari ini atau sebelum tahap sebelumnya.'}>
         {step && (
-          <form onSubmit={saveStep} className="stack">
+          <form key={step.from} ref={stepForm} onSubmit={saveStep} className="stack">
             <div className="stepper">
               {MCU_STAGES.map((s) => {
                 const i = MCU_STAGES.indexOf(s);
@@ -228,7 +254,6 @@ export default function McuClient({ sites, data, page, canEdit, canDelete, prese
             {step.keys.length > 0 && <FormFields values={step} setValues={setStep} fields={fieldsFor(step.keys, cfg, step)} />}
             {step.keys.includes('notes') && <div className="form-grid"><FileInput label="Dokumen hasil MCU (privat)" onChange={setFiles} /></div>}
             <div className="modal-footer" style={{ padding: 0 }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setStep(null)}>Batal</button>
               <button className="btn btn-primary" disabled={busy}>{busy ? 'Menyimpan…' : stepTo(step) ? `Simpan & lanjut ke ${MCU_STAGE_LABELS[stepTo(step)]}` : 'Simpan'}</button>
             </div>
           </form>

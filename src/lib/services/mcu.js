@@ -129,7 +129,7 @@ export async function createMcu(user, body, files) {
     // Status MCU/permit ikut umpan sinkronisasi ERP (/personnel/changes), yang berkursor updatedAt personel.
     await tx.personnel.update({ where: { id: person.id }, data: { updatedAt: new Date() } });
     await audit(tx, user, { action: 'CREATE', module: 'mcu', recordId: row.id, siteId, after: { person: person.code, ...v } });
-    return row;
+    return { ...row, personnel: { name: person.name } };
   }, { timeout: 20000 });
 }
 

@@ -10,17 +10,17 @@ import { useDialog } from './DialogProvider';
 import { STATUS_STYLES, labelOf } from '@/lib/labels';
 
 // ─── Modal ──────────────────────────────────────────────────────────────────
-export function Modal({ open, onClose, title, subtitle, size = '', children, footer }) {
+export function Modal({ open, onClose, title, subtitle, size = '', children, footer, locked = false }) {
   useEffect(() => {
-    if (!open) return;
+    if (!open || locked) return;
     const onKey = (e) => e.key === 'Escape' && onClose?.();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, locked]);
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
+        <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(e) => !locked && e.target === e.currentTarget && onClose?.()}>
           <motion.div className={`modal ${size}`} initial={{ scale: 0.97, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.97, y: 20 }} role="dialog" aria-modal="true" aria-label={title}>
             <div className="modal-header">
               <div>
