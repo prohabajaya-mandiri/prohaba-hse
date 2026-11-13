@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Image as ImageIcon, RotateCcw, RotateCw, Check, X, IdCard } from 'lucide-react';
 import { compressImage } from './ui';
 import { coverCrop, coverFit, frameCrop } from '@/lib/domain/camera-crop';
@@ -185,7 +186,9 @@ function KtpCamera({ onClose, onCapture, onFallback, onGallery }) {
     if (file) setShot({ file, url: URL.createObjectURL(file) });
   };
 
-  return (
+  // Dirender langsung di <body>: leluhur ber-transform (mis. animasi kartu form) membuat
+  // position: fixed mengikuti leluhur itu, sehingga tombol bawah bisa terdorong keluar layar.
+  return createPortal(
     <div className="ktp-camera" role="dialog" aria-modal="true" aria-label="Foto KTP">
       {/* Video tetap terpasang saat meninjau hasil agar "Ulangi" langsung kembali ke kamera. */}
       {!error && <video ref={videoRef} className="ktp-camera-video" autoPlay playsInline muted />}
@@ -220,7 +223,8 @@ function KtpCamera({ onClose, onCapture, onFallback, onGallery }) {
           </div>
         </>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -323,7 +327,9 @@ function KtpAdjust({ src, onCancel, onDone, onRotate, onFailed }) {
     if (file) onDone(file);
   };
 
-  return (
+  // Dirender langsung di <body>: leluhur ber-transform (mis. animasi kartu form) membuat
+  // position: fixed mengikuti leluhur itu, sehingga tombol bawah bisa terdorong keluar layar.
+  return createPortal(
     <div className="ktp-camera" role="dialog" aria-modal="true" aria-label="Sesuaikan foto KTP">
       <div
         ref={stageRef}
@@ -356,6 +362,7 @@ function KtpAdjust({ src, onCancel, onDone, onRotate, onFailed }) {
         <button type="button" className="ktp-cam-btn" onClick={rotate} disabled={!view}><RotateCw size={20} /> Putar</button>
         <button type="button" className="ktp-cam-btn primary" onClick={done} disabled={!view || busy}><Check size={20} /> Gunakan</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
